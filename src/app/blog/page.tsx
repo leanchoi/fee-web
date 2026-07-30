@@ -5,7 +5,6 @@ import prisma from "@/lib/prisma";
 import { toPlainExcerpt } from "@/lib/sanitize";
 import { formatPostDate } from "@/lib/dateUtils";
 import { MAIN_CAMPUS } from "@/lib/site";
-import { Logo } from "@/components/brand/Logo";
 
 export const metadata: Metadata = {
   title: "Novedades y eventos",
@@ -88,9 +87,7 @@ export default async function BlogIndexPage() {
                         className="flex h-48 w-full items-center justify-center bg-gradient-to-br from-brand-blue/10 via-brand-green/5 to-brand-yellow/10"
                         aria-hidden="true"
                       >
-                        <span className="h-14 w-14 text-brand-blue/40">
-                          <Logo />
-                        </span>
+                        <span className="text-4xl font-bold text-brand-blue/50">FEE</span>
                       </div>
                     )}
 

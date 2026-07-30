@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Heart, HeartHandshake, HelpCircle, Users } from "lucide-react";
-import { FOUNDING_YEAR, ORG, yearsOfHistory } from "@/lib/site";
+import { ORG } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Comunidad de familias",
@@ -31,11 +31,11 @@ export default function ComunidadPage() {
         </div>
 
         <div className="container mx-auto px-6 lg:px-12 text-center relative z-10">
-          {/* Decía "Más de 30 años caminando juntos", en contradicción con la
-              fundación en 2005 que afirma la home y Quiénes Somos. Ahora el
-              número se calcula desde el año real de constitución. */}
-          <p className="font-bold uppercase tracking-widest text-sm mb-4 block text-brand-yellow">
-            {yearsOfHistory()} años caminando juntos · desde {FOUNDING_YEAR}
+          {/* La trayectoria supera los 30 años: el proyecto educativo viene de
+              la Escuela Arco Iris, anterior a la constitución de la Fundación
+              como tal en 2005. Son dos hitos distintos, no un dato en conflicto. */}
+          <p className="font-bold uppercase tracking-widest text-sm mb-4 block text-brand-yellow-light">
+            Más de 30 años caminando juntos
           </p>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 max-w-4xl mx-auto leading-tight">
             Nuestra comunidad

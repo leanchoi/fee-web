@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { getAdmissionYear } from "@/lib/dateUtils";
 import { CAMPUSES, CREDIT, ORG, SOCIAL } from "@/lib/site";
-import { LogoLockup } from "@/components/brand/Logo";
 
 const SOCIAL_ICONS: Record<string, string> = {
   Facebook:
@@ -23,7 +22,12 @@ export function Footer() {
         <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
           {/* Identidad */}
           <div className="relative z-10 flex flex-col gap-4">
-            <LogoLockup variant="dark" />
+            <div>
+              <span className="block text-xl font-bold leading-tight text-white">FUNDACIÓN</span>
+              <span className="text-sm font-semibold tracking-wider text-brand-lightblue">
+                EDUCATIVA ESQUEL
+              </span>
+            </div>
             <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/80">
               Formamos mentes libres y corazones solidarios. Comprometidos con el desarrollo
               integral desde la Patagonia para el mundo.

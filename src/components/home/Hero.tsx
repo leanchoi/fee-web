@@ -7,7 +7,6 @@ import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion
 import { ArrowRight } from "lucide-react";
 import { getAdmissionYear } from "@/lib/dateUtils";
 import { ORG } from "@/lib/site";
-import { Logo } from "@/components/brand/Logo";
 
 export function Hero() {
   const containerRef = useRef<HTMLElement>(null);
@@ -106,7 +105,12 @@ export function Hero() {
           >
             <div className="absolute inset-0 rounded-full bg-brand-blue/5 blur-3xl" />
             <div className="relative z-10 h-full w-full rounded-full border border-white/30 bg-white/20 p-10 shadow-2xl backdrop-blur-[2px]">
-              <Logo className="text-brand-blue drop-shadow-2xl" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.svg"
+                alt=""
+                className="h-full w-full object-contain drop-shadow-2xl"
+              />
             </div>
           </motion.div>
         </div>

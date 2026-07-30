@@ -8,7 +8,6 @@ import { Lock, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAdmissionYear } from "@/lib/dateUtils";
 import { CAMPUSES, ORG, SOCIAL } from "@/lib/site";
-import { LogoLockup } from "@/components/brand/Logo";
 
 /**
  * `match` define qué prefijo de ruta marca el ítem como activo.
@@ -89,9 +88,34 @@ export function Navbar() {
           className="z-50 flex items-center gap-3 rounded-xl"
           aria-label={`${ORG.legalName} — Inicio`}
         >
-          {/* Con el menú móvil abierto el fondo pasa a ser azul oscuro: el
-              logotipo cambia a la variante clara para no quedar ilegible. */}
-          <LogoLockup variant={mobileMenuOpen ? "dark" : "light"} />
+          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-brand-blue/10 bg-white p-1 lg:h-12 lg:w-12">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.svg"
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          </span>
+          <span className="flex flex-col">
+            {/* Con el menú móvil abierto el fondo pasa a azul oscuro: el
+                texto cambia a blanco para no quedar ilegible. */}
+            <span
+              className={cn(
+                "text-lg font-bold leading-tight transition-colors lg:text-xl",
+                mobileMenuOpen ? "text-white" : "text-brand-green"
+              )}
+            >
+              FUNDACIÓN
+            </span>
+            <span
+              className={cn(
+                "text-xs font-semibold leading-none tracking-wider transition-colors lg:text-sm",
+                mobileMenuOpen ? "text-brand-lightblue" : "text-brand-blue/80"
+              )}
+            >
+              EDUCATIVA ESQUEL
+            </span>
+          </span>
         </Link>
 
         {/* Navegación de escritorio */}

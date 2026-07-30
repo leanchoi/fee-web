@@ -1,14 +1,19 @@
 /**
  * Datos institucionales de la Fundación Educativa Esquel.
  *
- * Fuente única de verdad. Las direcciones, teléfonos y años estaban repetidos
- * y en conflicto entre el header, el footer y la página de contacto (por
- * ejemplo, "Chacabuco 1314 / Gob. Galina 950" en el menú móvil contra
- * "Chacabuco 1029" y "Gobernador Galina 2888" en el resto del sitio).
- * Cualquier corrección de un dato de contacto se hace acá y se propaga.
+ * Fuente única de verdad. Antes cada dato de contacto estaba escrito a mano en
+ * el header, el footer, la página de contacto y las de niveles, con valores que
+ * no siempre coincidían entre secciones. Cualquier corrección se hace acá y se
+ * propaga a todo el sitio.
  */
 
-/** Año de constitución de la Fundación. */
+/**
+ * Año de constitución de la Fundación como tal.
+ *
+ * No coincide con la antigüedad del proyecto educativo: la trayectoria viene de
+ * la Escuela Arco Iris y supera los 30 años. Son dos datos distintos, así que
+ * "desde 2005" y "más de 30 años caminando juntos" pueden convivir en el sitio.
+ */
 export const FOUNDING_YEAR = 2005;
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fundacioneducativaesquel.edu.ar";
@@ -87,12 +92,3 @@ export function fullAddress(campus: Campus): string {
   return `${campus.street}, ${ORG.city}, ${ORG.province}`;
 }
 
-/**
- * Años de trayectoria, calculados en vez de escritos a mano.
- *
- * El texto fijo "Más de 30 años caminando juntos" contradecía la fundación en
- * 2005 que se afirma en la home y en Quiénes Somos.
- */
-export function yearsOfHistory(): number {
-  return new Date().getFullYear() - FOUNDING_YEAR;
-}
