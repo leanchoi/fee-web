@@ -7,7 +7,9 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./prod.db"
+  // La ruta viene del entorno: fijarla en el schema hacía que
+  // desarrollo y produccion compartieran archivo por descuido.
+  url      = env("DATABASE_URL")
 }
 
 model User {

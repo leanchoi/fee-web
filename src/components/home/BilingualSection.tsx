@@ -54,7 +54,7 @@ export function BilingualSection() {
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-white font-bold text-lg">Cambridge English</h4>
+              <h3 className="text-white font-bold text-lg">Cambridge English</h3>
               <p className="text-white/70 text-sm">Certificaciones internacionales desde Young Learners hasta C1 Advanced.</p>
             </div>
           </div>
@@ -64,7 +64,7 @@ export function BilingualSection() {
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-white font-bold text-lg">Exámenes UTN</h4>
+              <h3 className="text-white font-bold text-lg">Exámenes UTN</h3>
               <p className="text-white/70 text-sm">Acreditaciones oficiales nacionales por la Universidad Tecnológica Nacional.</p>
             </div>
           </div>
@@ -74,8 +74,8 @@ export function BilingualSection() {
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-white font-bold text-lg">Inmersión Cultural</h4>
-              <p className="text-white/70 text-sm">Concert anual bilingüe y viajes de estudios al Reino Unido.</p>
+              <h3 className="text-white font-bold text-lg">Inmersión Cultural</h3>
+              <p className="text-white/70 text-sm">Concert anual íntegramente en inglés y viajes de estudio al Reino Unido.</p>
             </div>
           </div>
         </motion.div>

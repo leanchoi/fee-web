@@ -1,201 +1,332 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useState } from "react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { submitEnrollment } from "@/actions/enrollment";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Field, Honeypot, controlClasses } from "@/components/forms/Field";
+import { MAIN_CAMPUS } from "@/lib/site";
 
+/**
+ * El esquema del cliente refleja el del servidor (`src/actions/enrollment.ts`),
+ * que es el que decide. Acá sirve para dar retroalimentación inmediata.
+ */
 const formSchema = z.object({
-  tutorName: z.string().min(2, "El nombre del tutor es obligatorio"),
-  tutorEmail: z.string().email("Correo inválido"),
-  tutorPhone: z.string().min(6, "Teléfono inválido"),
-  studentName: z.string().min(2, "El nombre del estudiante es obligatorio"),
-  studentLevel: z.enum(["Inicial", "Primario", "Secundario"]),
-  studentGrade: z.string().min(1, "Especifique sala o grado"),
-  comments: z.string().min(5, "Por favor complete este campo contándonos sobre su historia o escuela de procedencia"),
+  tutorName: z.string().trim().min(2, "Ingresá el nombre completo del tutor").max(120),
+  tutorEmail: z.string().trim().email("Ingresá un correo electrónico válido").max(160),
+  tutorPhone: z.string().trim().min(6, "Ingresá un teléfono de contacto válido").max(40),
+  studentName: z.string().trim().min(2, "Ingresá el nombre del aspirante").max(120),
+  studentLevel: z.enum(["Inicial", "Primario", "Secundario"], {
+    message: "Elegí el nivel al que se postula",
+  }),
+  studentGrade: z.string().trim().min(1, "Elegí la sala, grado o año").max(40),
+  comments: z
+    .string()
+    .trim()
+    .min(5, "Contanos brevemente sobre la trayectoria escolar o los intereses del aspirante")
+    .max(2000, "El comentario no puede superar los 2000 caracteres"),
+  consent: z.literal(true, {
+    message: "Necesitamos tu consentimiento para procesar la solicitud",
+  }),
+  contactPreference: z.string().max(0).optional(),
 });
 
-type FormInput = z.infer<typeof formSchema>;
+type FormInput = z.input<typeof formSchema>;
+
+const GRADE_OPTIONS = {
+  Inicial: ["Sala de 3", "Sala de 4", "Sala de 5"],
+  Primario: ["1.er grado", "2.º grado", "3.er grado", "4.º grado", "5.º grado", "6.º grado"],
+  Secundario: ["1.er año", "2.º año", "3.er año", "4.º año", "5.º año", "6.º año"],
+} as const;
 
 export function EnrollmentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [errorObj, setErrorObj] = useState<string | null>(null);
+  const [reference, setReference] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
+    reset,
     formState: { errors },
   } = useForm<FormInput>({
-    resolver: zodResolver(formSchema),
+    // `as never` evita el desajuste de tipos entre el literal `true` del
+    // consentimiento y el valor `false` con el que arranca el checkbox.
+    resolver: zodResolver(formSchema) as never,
   });
 
-  const selectedLevel = watch("studentLevel");
-
-  const gradeOptions = {
-    Inicial: ["Sala de 3", "Sala de 4", "Sala de 5"],
-    Primario: ["1er Grado", "2do Grado", "3er Grado", "4to Grado", "5to Grado", "6to Grado"],
-    Secundario: ["1er Año", "2do Año", "3er Año", "4to Año", "5to Año", "6to Año"],
-  };
+  // `useWatch` en vez de `watch()`: devuelve un valor estable que el compilador
+  // de React puede memoizar.
+  const selectedLevel = useWatch({ control, name: "studentLevel" });
 
   const onSubmit = async (data: FormInput) => {
     setIsSubmitting(true);
-    setErrorObj(null);
+    setServerError(null);
     try {
       const result = await submitEnrollment(data);
       if (result.success) {
-        setSuccess(true);
+        setReference(result.id);
       } else {
-        setErrorObj(result.error || "Error desconocido");
+        setServerError(result.error ?? "No pudimos registrar la solicitud.");
       }
-    } catch (e) {
-      setErrorObj("Ocurrió un error de red. Intenta nuevamente.");
+    } catch {
+      setServerError("Hubo un problema de conexión. Revisá tu red e intentá de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (success) {
+  if (reference !== null) {
     return (
-      <div className="flex flex-col items-center justify-center text-center py-12">
-        <div className="w-20 h-20 bg-brand-green/10 text-brand-green rounded-full flex items-center justify-center mb-6">
-          <CheckCircle2 className="w-10 h-10" />
+      <div
+        className="flex flex-col items-center justify-center py-12 text-center"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-brand-green/10 text-brand-green">
+          <CheckCircle2 className="h-10 w-10" aria-hidden="true" />
         </div>
-        <h3 className="text-3xl font-bold text-brand-blue mb-4">¡Solicitud Enviada!</h3>
-        <p className="text-lg text-brand-foreground/80 max-w-md">
-          Hemos recibido los datos correctamente. Nuestro equipo de admisiones se pondrá en contacto a la brevedad.
+        <h3 className="mb-4 text-3xl font-bold text-brand-blue">Solicitud registrada</h3>
+        <p className="max-w-md text-lg text-foreground/80">
+          Recibimos los datos correctamente. El equipo de admisiones se pondrá en contacto por
+          correo o teléfono.
         </p>
+
+        {/* Un comprobante concreto: sirve para citar la solicitud al llamar. */}
+        {reference && (
+          <p className="mt-6 rounded-2xl border border-brand-gray/20 bg-brand-gray/5 px-5 py-3 text-sm text-foreground/75">
+            Código de seguimiento:{" "}
+            <span className="font-mono font-bold text-brand-blue">
+              {reference.slice(-8).toUpperCase()}
+            </span>
+          </p>
+        )}
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => {
+              reset();
+              setReference(null);
+            }}
+            className="rounded-full border-2 border-brand-blue/20 px-6 py-3 text-sm font-bold text-brand-blue transition-colors hover:border-brand-blue"
+          >
+            Cargar otra solicitud
+          </button>
+          <a
+            href={`mailto:${MAIN_CAMPUS.email}`}
+            className="rounded-full bg-brand-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-green"
+          >
+            Escribir a admisiones
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      
-      {errorObj && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-3 border border-red-100">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <p className="font-medium text-sm">{errorObj}</p>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      <Honeypot name="contact-pref" label="No completar" register={register("contactPreference")} />
+
+      {/* `role="alert"` hace que el lector de pantalla anuncie el error sin que
+          la persona tenga que buscarlo en la página. */}
+      {serverError && (
+        <div
+          role="alert"
+          className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700"
+        >
+          <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <p className="text-sm font-medium">{serverError}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tutor Details */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-brand-green border-b border-brand-gray/10 pb-2">
-            Datos del Tutor Responsable
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Nombre Completo</label>
-            <input 
-              {...register("tutorName")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.tutorName ? "border-red-400" : "border-brand-gray/20")}
-              placeholder="Ej. María López"
-            />
-            {errors.tutorName && <span className="text-red-500 text-xs mt-1 block">{errors.tutorName.message}</span>}
-          </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <fieldset className="space-y-4">
+          <legend className="mb-2 w-full border-b border-brand-gray/20 pb-2 text-lg font-bold text-brand-green">
+            Datos del tutor responsable
+          </legend>
 
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Correo Electrónico</label>
-            <input 
-              type="email"
-              {...register("tutorEmail")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.tutorEmail ? "border-red-400" : "border-brand-gray/20")}
-              placeholder="correo@ejemplo.com"
-            />
-            {errors.tutorEmail && <span className="text-red-500 text-xs mt-1 block">{errors.tutorEmail.message}</span>}
-          </div>
+          <Field label="Nombre completo" required error={errors.tutorName?.message}>
+            {(props) => (
+              <input
+                {...props}
+                {...register("tutorName")}
+                type="text"
+                autoComplete="name"
+                placeholder="Ej.: María López"
+                className={controlClasses(!!errors.tutorName)}
+              />
+            )}
+          </Field>
 
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Teléfono Móvil</label>
-            <input 
-              type="tel"
-              {...register("tutorPhone")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.tutorPhone ? "border-red-400" : "border-brand-gray/20")}
-              placeholder="(02945) 15-XXXXXX"
-            />
-            {errors.tutorPhone && <span className="text-red-500 text-xs mt-1 block">{errors.tutorPhone.message}</span>}
-          </div>
-        </div>
+          <Field label="Correo electrónico" required error={errors.tutorEmail?.message}>
+            {(props) => (
+              <input
+                {...props}
+                {...register("tutorEmail")}
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                placeholder="correo@ejemplo.com"
+                className={controlClasses(!!errors.tutorEmail)}
+              />
+            )}
+          </Field>
 
-        {/* Student Details */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-brand-green border-b border-brand-gray/10 pb-2">
-            Datos del Aspirante
-          </h3>
-          
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Nombre y Apellido</label>
-            <input 
-              {...register("studentName")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.studentName ? "border-red-400" : "border-brand-gray/20")}
-              placeholder="Nombre del alumno/a"
-            />
-            {errors.studentName && <span className="text-red-500 text-xs mt-1 block">{errors.studentName.message}</span>}
-          </div>
+          <Field label="Teléfono móvil" required error={errors.tutorPhone?.message}>
+            {(props) => (
+              <input
+                {...props}
+                {...register("tutorPhone")}
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="2945 15 123456"
+                className={controlClasses(!!errors.tutorPhone)}
+              />
+            )}
+          </Field>
+        </fieldset>
 
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Nivel al que postula</label>
-            <select 
-              {...register("studentLevel")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.studentLevel ? "border-red-400" : "border-brand-gray/20")}
-            >
-              <option value="">Seleccione un nivel...</option>
-              <option value="Inicial">Nivel Inicial</option>
-              <option value="Primario">Nivel Primario</option>
-              <option value="Secundario">Nivel Secundario</option>
-            </select>
-            {errors.studentLevel && <span className="text-red-500 text-xs mt-1 block">{errors.studentLevel.message}</span>}
-          </div>
+        <fieldset className="space-y-4">
+          <legend className="mb-2 w-full border-b border-brand-gray/20 pb-2 text-lg font-bold text-brand-green">
+            Datos del aspirante
+          </legend>
 
-          <div>
-            <label className="block text-sm font-semibold text-brand-blue mb-1">Sala o Grado</label>
-            <select 
-              {...register("studentGrade")} 
-              className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all", errors.studentGrade ? "border-red-400" : "border-brand-gray/20")}
-              disabled={!selectedLevel}
-            >
-              <option value="">Seleccione primero el nivel...</option>
-              {selectedLevel && gradeOptions[selectedLevel as keyof typeof gradeOptions]?.map(grade => (
-                <option key={grade} value={grade}>{grade}</option>
-              ))}
-            </select>
-            {errors.studentGrade && <span className="text-red-500 text-xs mt-1 block">{errors.studentGrade.message}</span>}
-          </div>
-        </div>
+          <Field label="Nombre y apellido" required error={errors.studentName?.message}>
+            {(props) => (
+              <input
+                {...props}
+                {...register("studentName")}
+                type="text"
+                placeholder="Nombre del alumno o alumna"
+                className={controlClasses(!!errors.studentName)}
+              />
+            )}
+          </Field>
+
+          <Field label="Nivel al que se postula" required error={errors.studentLevel?.message}>
+            {(props) => (
+              <select
+                {...props}
+                {...register("studentLevel")}
+                defaultValue=""
+                className={controlClasses(!!errors.studentLevel)}
+              >
+                <option value="">Elegí un nivel…</option>
+                <option value="Inicial">Nivel Inicial</option>
+                <option value="Primario">Nivel Primario</option>
+                <option value="Secundario">Nivel Secundario</option>
+              </select>
+            )}
+          </Field>
+
+          <Field
+            label="Sala, grado o año"
+            required
+            error={errors.studentGrade?.message}
+            hint={selectedLevel ? undefined : "Se habilita al elegir el nivel."}
+          >
+            {(props) => (
+              <select
+                {...props}
+                {...register("studentGrade")}
+                defaultValue=""
+                disabled={!selectedLevel}
+                className={controlClasses(
+                  !!errors.studentGrade,
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+              >
+                <option value="">
+                  {selectedLevel ? "Elegí una opción…" : "Elegí primero el nivel"}
+                </option>
+                {selectedLevel &&
+                  GRADE_OPTIONS[selectedLevel as keyof typeof GRADE_OPTIONS]?.map((grade) => (
+                    <option key={grade} value={grade}>
+                      {grade}
+                    </option>
+                  ))}
+              </select>
+            )}
+          </Field>
+        </fieldset>
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-brand-blue mb-1">Comentarios o Escuela de Procedencia</label>
-        <textarea 
-          {...register("comments")} 
-          rows={3}
-          className={cn("w-full px-4 py-3 rounded-xl border bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-yellow focus:border-transparent outline-none transition-all resize-none", errors.comments ? "border-red-400" : "border-brand-gray/20")}
-          placeholder="Contanos un poco sobre su historia escolar, intereses o motivaciones para conocer mejor a tu hijo/a y brindarle una experiencia educativa más ágil y personalizada..."
-        />
-        {errors.comments && <span className="text-red-500 text-xs mt-1 block">{errors.comments.message}</span>}
+      <Field
+        label="Trayectoria escolar o escuela de procedencia"
+        required
+        error={errors.comments?.message}
+        hint="Nos ayuda a conocer al aspirante antes de la entrevista."
+      >
+        {(props) => (
+          <textarea
+            {...props}
+            {...register("comments")}
+            rows={4}
+            maxLength={2000}
+            placeholder="Contanos sobre su historia escolar, intereses y qué buscan para su educación…"
+            className={controlClasses(!!errors.comments, "resize-y")}
+          />
+        )}
+      </Field>
+
+      {/* Consentimiento informado. El formulario recoge datos de un menor y de
+          su tutor: la Ley 25.326 exige informar la finalidad y pedir permiso
+          antes de almacenarlos. */}
+      <div className="rounded-2xl border border-brand-gray/20 bg-brand-gray/5 p-5">
+        <div className="flex items-start gap-3">
+          <input
+            id="consent"
+            type="checkbox"
+            {...register("consent")}
+            aria-invalid={errors.consent ? true : undefined}
+            aria-describedby={errors.consent ? "consent-error" : undefined}
+            className="mt-1 h-5 w-5 shrink-0 accent-brand-green"
+          />
+          <label htmlFor="consent" className="text-sm leading-relaxed text-foreground/80">
+            Autorizo a la Fundación Educativa Esquel a registrar estos datos con el único fin de
+            gestionar la preinscripción y comunicarse conmigo. Entiendo que se tratan de forma
+            confidencial y que puedo pedir su corrección o eliminación escribiendo a{" "}
+            <a
+              href={`mailto:${MAIN_CAMPUS.email}`}
+              className="font-semibold text-brand-green underline underline-offset-2"
+            >
+              {MAIN_CAMPUS.email}
+            </a>
+            .
+          </label>
+        </div>
+        {errors.consent && (
+          <p id="consent-error" className="mt-2 text-xs font-medium text-red-600">
+            {errors.consent.message}
+          </p>
+        )}
       </div>
 
-      <div className="pt-4 flex justify-end">
-        <button 
-          type="submit" 
+      <div className="flex flex-col items-center justify-end gap-4 pt-2 sm:flex-row">
+        <p className="text-xs text-foreground/70 sm:mr-auto">
+          Los campos con <span aria-hidden="true">*</span>
+          <span className="sr-only">asterisco</span> son obligatorios.
+        </p>
+        <button
+          type="submit"
           disabled={isSubmitting}
-          className="flex items-center gap-2 bg-brand-blue text-white px-10 py-4 rounded-full font-bold text-lg hover:bg-brand-green transition-all shadow-xl hover:-translate-y-1 disabled:opacity-70 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-10 py-4 text-lg font-bold text-white shadow-xl transition-all hover:-translate-y-1 hover:bg-brand-green disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 sm:w-auto"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Procesando...
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              Enviando…
             </>
-          ) : "Enviar Solicitud de Preinscripción"}
+          ) : (
+            "Enviar preinscripción"
+          )}
         </button>
       </div>
-
     </form>
   );
 }

@@ -2,8 +2,10 @@ import { Metadata } from "next";
 import { CheckCircle2, Globe, BookOpen, GraduationCap, Library, Plane } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Inglés Intensivo | Fundación Educativa Esquel",
-  description: "Preparando a nuestros estudiantes para un mundo global con certificaciones de Cambridge y UTN.",
+  title: "Inglés intensivo",
+  description:
+    "Recorrido de inglés desde Sala de 3 hasta el Secundario, con certificaciones Cambridge English (Starters a C1 Advanced) y exámenes de la UTN.",
+  alternates: { canonical: "/ingles" },
 };
 
 export default function InglesPage() {
@@ -40,10 +42,10 @@ export default function InglesPage() {
               <h2 className="text-3xl md:text-4xl font-bold text-brand-blue leading-tight">
                 Metodología y Adquisición Natural
               </h2>
-              <p className="text-lg text-brand-foreground/80 leading-relaxed font-medium">
+              <p className="text-lg text-foreground/80 leading-relaxed font-medium">
                 Un recorrido que comienza en Sala de 3 con dos estímulos semanales y continúa, a partir de Sala de 5, con 2 horas diarias de inglés.
               </p>
-              <p className="text-brand-foreground/75 leading-relaxed text-sm">
+              <p className="text-foreground/75 leading-relaxed text-sm">
                 Los niños y niñas adquieren el idioma de la misma forma en que aprenden su lengua materna: interactuando, jugando y escuchando en un entorno natural y estimulante. Este enfoque favorece el desarrollo integral de las cuatro habilidades lingüísticas básicas:
               </p>
               
@@ -56,8 +58,8 @@ export default function InglesPage() {
               </div>
 
               <div className="mt-6 border-l-4 border-brand-green bg-brand-green/5 p-6 rounded-r-2xl">
-                <h4 className="font-bold text-brand-green text-lg mb-2">Enfoque pedagógico:</h4>
-                <ul className="list-disc pl-5 text-sm text-brand-foreground/80 space-y-1">
+                <h3 className="font-bold text-brand-green text-lg mb-2">Enfoque pedagógico</h3>
+                <ul className="list-disc pl-5 text-sm text-foreground/80 space-y-1">
                   <li>Aprendizaje natural e intuitivo.</li>
                   <li>Enfoque comunicativo y participativo.</li>
                   <li>Desarrollo integral de la competencia lingüística.</li>
@@ -72,8 +74,8 @@ export default function InglesPage() {
                   <BookOpen className="w-5 h-5 text-brand-green" />
                   Certificaciones Cambridge English
                 </h3>
-                <p className="text-xs text-brand-foreground/60 mb-4">(Primeros pasos en el Nivel Primario, de 3.º a 6.º grado)</p>
-                <ul className="space-y-3 text-sm text-brand-foreground/80">
+                <p className="text-xs text-foreground/70 mb-4">(Primeros pasos en el Nivel Primario, de 3.er a 6.º grado)</p>
+                <ul className="space-y-3 text-sm text-foreground/80">
                   <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" /> <strong>Pre A1 Starters</strong></li>
                   <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" /> <strong>A1 Movers</strong></li>
                   <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" /> <strong>A2 Flyers</strong></li>
@@ -83,9 +85,11 @@ export default function InglesPage() {
 
               {/* Concert */}
               <div className="bg-brand-yellow/10 border border-brand-yellow/30 p-8 rounded-[2rem]">
-                <h3 className="text-lg font-bold text-brand-blue mb-2">Experiencia Destacada:</h3>
-                <h4 className="font-bold text-brand-yellow-dark text-base mb-2">Concert en Inglés</h4>
-                <p className="text-xs text-brand-foreground/75 leading-relaxed">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand-yellow-dark mb-1">
+                  Experiencia destacada
+                </p>
+                <h3 className="text-lg font-bold text-brand-blue mb-2">Concert en inglés</h3>
+                <p className="text-xs text-foreground/75 leading-relaxed">
                   A fin de año, estudiantes y docentes de Nivel Inicial y Primario organizan y protagonizan un musical completamente en inglés, integrando teatro, canto e idiomas.
                 </p>
               </div>
@@ -103,10 +107,10 @@ export default function InglesPage() {
                 </span>
                 <h2 className="text-3xl font-bold mb-4">Nivel Secundario</h2>
                 <p className="text-white/80 text-sm leading-relaxed mb-6 font-medium">
-                  En la Escuela Secundaria N.º 1739 – Fundación Educativa formamos estudiantes preparados para un mundo global, combinando idioma, cultura y habilidades clave.
+                  En la Escuela Secundaria N° 1739 de la Fundación Educativa Esquel formamos estudiantes preparados para un mundo global, combinando idioma, cultura y habilidades clave.
                 </p>
                 
-                <h4 className="font-bold text-brand-yellow text-sm uppercase tracking-wider mb-3">¿Qué nos distingue?</h4>
+                <h3 className="font-bold text-brand-yellow text-sm uppercase tracking-wider mb-3">¿Qué nos distingue?</h3>
                 <ul className="space-y-2 text-xs text-white/90">
                   <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-brand-yellow shrink-0" /> Alto nivel de inglés académico y social.</li>
                   <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-brand-yellow shrink-0" /> Proyección y acreditación nacional e internacional.</li>
@@ -127,7 +131,7 @@ export default function InglesPage() {
                       <GraduationCap className="w-5 h-5 text-brand-blue" />
                       Certificaciones Cambridge English (Internacionales)
                     </h4>
-                    <ul className="space-y-3 text-sm text-brand-foreground/75">
+                    <ul className="space-y-3 text-sm text-foreground/75">
                       <li>• <strong>B1 Preliminary (PET)</strong></li>
                       <li>• <strong>B2 First (FCE):</strong> Perfeccionamiento en Nivel Secundario, consolidando habilidades para la vida diaria y estudios superiores.</li>
                       <li>• <strong>C1 Advanced (CAE):</strong> Excelencia internacional para acceder a universidades y becas de todo el mundo.</li>
@@ -140,7 +144,7 @@ export default function InglesPage() {
                       <GraduationCap className="w-5 h-5 text-brand-green" />
                       Universidad Tecnológica Nacional (Nacional)
                     </h4>
-                    <p className="text-sm text-brand-foreground/75">
+                    <p className="text-sm text-foreground/75">
                       Exámenes y certificaciones nacionales extendidos por la UTN que validan el dominio técnico del idioma.
                     </p>
                   </div>
@@ -157,7 +161,7 @@ export default function InglesPage() {
                     <Library className="w-6 h-6 text-brand-blue shrink-0 mt-1" />
                     <div>
                       <h4 className="font-bold text-brand-blue text-sm">Biblioteca & iRead</h4>
-                      <p className="text-xs text-brand-foreground/70 mt-1 leading-relaxed">
+                      <p className="text-xs text-foreground/70 mt-1 leading-relaxed">
                         Acceso a libros físicos y a la plataforma digital iRead con más de 400 títulos interactivos en inglés.
                       </p>
                     </div>
@@ -168,7 +172,7 @@ export default function InglesPage() {
                     <BookOpen className="w-6 h-6 text-brand-green shrink-0 mt-1" />
                     <div>
                       <h4 className="font-bold text-brand-blue text-sm">Feria del Libro</h4>
-                      <p className="text-xs text-brand-foreground/70 mt-1 leading-relaxed">
+                      <p className="text-xs text-foreground/70 mt-1 leading-relaxed">
                         Feria anual del libro en inglés realizada en la escuela junto a Roots Bookshop.
                       </p>
                     </div>
@@ -179,7 +183,7 @@ export default function InglesPage() {
                     <Plane className="w-6 h-6 text-brand-yellow-dark shrink-0 mt-1" />
                     <div>
                       <h4 className="font-bold text-brand-blue text-base">Viajes de estudio al Reino Unido</h4>
-                      <p className="text-sm text-brand-foreground/80 mt-2 leading-relaxed">
+                      <p className="text-sm text-foreground/80 mt-2 leading-relaxed">
                         Programas de inmersión lingüística y cultural en campus británicos. Una experiencia única donde estudiantes de Nivel Secundario viajan a Inglaterra para asistir a clases en instituciones británicas, convivir con alumnos de todo el mundo y desarrollar autonomía y fluidez en contextos reales.
                       </p>
                     </div>

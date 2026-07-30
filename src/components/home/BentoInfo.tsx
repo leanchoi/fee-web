@@ -25,8 +25,8 @@ export function BentoInfo() {
               <h3 className="text-2xl md:text-3xl text-brand-blue font-bold mb-4">
                 Nuestras escuelas
               </h3>
-              <p className="text-brand-foreground/80 text-sm md:text-base leading-relaxed">
-                Desde su fundación en 2005, la Fundación Educativa Esquel (FEE) se ha consolidado como una institución comprometida con la formation integral, basada en valores, el desarrollo humano y la excelencia académica. Nuestra comunidad educativa gestiona con orgullo las Escuelas: Escuela N° 1030 (Nivel Inicial y Primario) y Escuela N° 1739 (Nivel Secundario). Llevamos adelante un proyecto pedagógico vivo, inclusivo y transformador, inspirado en el legado de la Escuela Arco Iris.
+              <p className="text-foreground/80 text-sm md:text-base leading-relaxed">
+                Desde su fundación en 2005, la Fundación Educativa Esquel (FEE) se consolidó como una institución comprometida con la formación integral, basada en valores, el desarrollo humano y la excelencia académica. Nuestra comunidad gestiona dos escuelas: la N° 1030, de Nivel Inicial y Primario, y la N° 1739, de Nivel Secundario. Llevamos adelante un proyecto pedagógico vivo, inclusivo y transformador, inspirado en el legado de la Escuela Arco Iris.
               </p>
             </div>
             <div className="flex gap-2 text-brand-green font-bold items-center mt-6 text-sm">
@@ -50,7 +50,7 @@ export function BentoInfo() {
                 Gestionada por familias para las familias.
               </h3>
               <p className="text-white/80 text-sm leading-relaxed mb-6">
-                A diferencia del modelo tradicional, nuestra fundación está administrada por un Consejo de padres y madres que trabajan ad-honorem. Esto nos da un carácter humano, transparente y de compromiso verdaderamente único en la región andina.
+                A diferencia del modelo tradicional, nuestra fundación está administrada por un Consejo de padres y madres que trabajan <em>ad honorem</em>. Esto nos da un carácter humano, transparente y de compromiso verdaderamente único en la región andina.
               </p>
             </div>
             
@@ -73,7 +73,7 @@ export function BentoInfo() {
                 <BookOpen className="w-5 h-5" />
               </div>
               <h3 className="text-xl font-bold text-brand-blue mb-3">Ideario de Excelencia</h3>
-              <p className="text-brand-foreground/75 leading-relaxed text-sm">
+              <p className="text-foreground/75 leading-relaxed text-sm">
                 Fomentamos un clima de cordialidad y respeto mutuo, potenciando la creatividad y una actitud vibrante de búsqueda intelectual.
               </p>
             </div>
@@ -92,7 +92,7 @@ export function BentoInfo() {
                 <Users className="w-5 h-5" />
               </div>
               <h3 className="text-xl font-bold mb-3">Compromiso Activo</h3>
-              <p className="text-brand-blue/80 leading-relaxed text-sm">
+              <p className="text-brand-blue leading-relaxed text-sm">
                 Nuestros estudiantes participan en proyectos solidarios y de impacto ambiental, formando ciudadanos globales comprometidos desde lo local.
               </p>
             </div>

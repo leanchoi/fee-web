@@ -1,49 +1,84 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-green: #164E37;
-  --color-brand-blue: #172A45;
-  --color-brand-lightblue: #3FA7C4;
-  --color-brand-yellow: #DDA122;
-  --color-brand-gray: #80879A;
+  /* Colores de marca, tal como se usan sobre fondos oscuros o como relleno. */
+  --color-brand-green: #164e37;
+  --color-brand-blue: #172a45;
+  --color-brand-lightblue: #3fa7c4;
+  --color-brand-yellow: #dda122;
+  --color-brand-gray: #80879a;
 
-  --color-background: #F8FAFC;
-  --color-foreground: #1F2937;
-  --color-card: #FFFFFF;
-  --color-muted: #6B7280;
+  /* Variantes para texto sobre fondo claro.
+     El amarillo, el celeste y el gris de marca no alcanzan el contraste
+     mínimo AA (2.28:1, 2.79:1 y 3.59:1 sobre blanco): se usaban como color de
+     texto en volantas y fechas, donde resultaban difíciles de leer.
+     Estas versiones mantienen el tono y superan 5:1. */
+  --color-brand-yellow-dark: #8f6212;
+  /* Amarillo aclarado para volantas sobre el verde o el azul de marca: el
+     amarillo pleno sobre verde queda en 4.22:1, por debajo del mínimo AA. */
+  --color-brand-yellow-light: #efc96e;
+  --color-brand-lightblue-dark: #1b6579;
+  --color-brand-gray-dark: #5c6373;
+
+  --color-background: #f8fafc;
+  --color-foreground: #1f2937;
+  --color-card: #ffffff;
+  --color-muted: #6b7280;
 
   --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
-  --font-expressive: 'Halimum', 'Dancing Script', cursive;
+  /* 'Halimum' es la tipografía de marca; queda primera para que tome el
+     control si algún día se agrega el archivo con licencia a /public/fonts.
+     Mientras tanto se usa la manuscrita que carga next/font, servida desde el
+     propio dominio (la CSP bloquea CDNs de fuentes). */
+  --font-expressive: "Halimum", var(--font-handwriting), ui-rounded, cursive;
 
   --radius-bento: 1.25rem;
   --radius-pill: 9999px;
 }
 
 @layer base {
-  @font-face {
-    font-family: 'Halimum';
-    src: url('/fonts/Halimum.woff2') format('woff2'),
-         url('/fonts/Halimum.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-  }
-
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    @apply antialiased selection:bg-brand-yellow selection:text-brand-blue scroll-smooth;
+    @apply antialiased selection:bg-brand-yellow selection:text-brand-blue;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     color: inherit;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.02em;
+    text-wrap: balance;
   }
 
   a {
     @apply transition-colors duration-200;
+  }
+
+  /* Foco visible y consistente para navegación por teclado. Antes cada
+     componente lo definía (o lo omitía) por su cuenta. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-green);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Respeta a quienes configuraron menos movimiento en su sistema.
+     El sitio usa parallax, animaciones de scroll y carruseles automáticos. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -56,7 +91,7 @@
 @utility card-bento {
   background-color: var(--color-card);
   border-radius: var(--radius-bento);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.04);
   @apply transition-all duration-300;
 }
 
@@ -65,7 +100,105 @@
 }
 
 @utility glass-panel {
-  background-color: rgba(255, 255, 255, 0.75);
+  background-color: rgb(255 255 255 / 0.75);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgb(255 255 255 / 0.2);
+}
+
+/* Oculta la barra de scroll en los carruseles horizontales sin perder el
+   desplazamiento. Se usaba `scrollbar-none`, que Tailwind no provee, así que
+   la barra quedaba visible bajo las tarjetas de niveles. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Estilos para el contenido editorial de las novedades.
+   Reemplaza a `prose prose-lg prose-blue`: esas clases pertenecen al plugin
+   @tailwindcss/typography, que no está instalado, así que no aplicaban nada y
+   las notas heredadas se veían como un bloque de texto sin jerarquía. */
+@utility rich-text {
+  color: color-mix(in srgb, var(--color-foreground) 85%, transparent);
+  line-height: 1.75;
+
+  & > * + * {
+    margin-top: 1.25em;
+  }
+
+  & h2 {
+    font-size: 1.75rem;
+    color: var(--color-brand-blue);
+    margin-top: 2em;
+  }
+
+  & h3 {
+    font-size: 1.375rem;
+    color: var(--color-brand-blue);
+    margin-top: 1.75em;
+  }
+
+  & h4 {
+    font-size: 1.125rem;
+    color: var(--color-brand-blue);
+    margin-top: 1.5em;
+  }
+
+  & p {
+    max-width: 68ch;
+  }
+
+  & strong {
+    color: var(--color-brand-blue);
+    font-weight: 700;
+  }
+
+  & a {
+    color: var(--color-brand-green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  & a:hover {
+    color: var(--color-brand-blue);
+  }
+
+  & ul,
+  & ol {
+    padding-left: 1.5rem;
+    max-width: 68ch;
+  }
+
+  & ul {
+    list-style-type: disc;
+  }
+
+  & ol {
+    list-style-type: decimal;
+  }
+
+  & li + li {
+    margin-top: 0.5em;
+  }
+
+  & blockquote {
+    border-left: 4px solid var(--color-brand-yellow);
+    background-color: color-mix(in srgb, var(--color-brand-yellow) 6%, transparent);
+    border-radius: 0 0.75rem 0.75rem 0;
+    padding: 0.75rem 1.25rem;
+    font-style: italic;
+    color: var(--color-brand-blue);
+  }
+
+  & img {
+    border-radius: 1rem;
+    max-width: 100%;
+    height: auto;
+  }
+
+  & hr {
+    border-color: color-mix(in srgb, var(--color-brand-gray) 25%, transparent);
+  }
 }

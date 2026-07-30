@@ -1,191 +1,249 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Lock } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Lock, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAdmissionYear } from "@/lib/dateUtils";
+import { CAMPUSES, ORG, SOCIAL } from "@/lib/site";
+import { LogoLockup } from "@/components/brand/Logo";
 
+/**
+ * `match` define qué prefijo de ruta marca el ítem como activo.
+ *
+ * Antes se comparaba con `href`, así que "Niveles" (que apunta a
+ * `/propuesta-educativa/inicial`) dejaba de estar resaltado al navegar a
+ * Primario o Secundario: la persona perdía la referencia de dónde estaba.
+ */
 const links = [
-  { name: "Institucional", href: "/quienes-somos" },
-  { name: "Niveles", href: "/propuesta-educativa/inicial" },
-  { name: "Inglés", href: "/ingles" },
-  { name: "Comunidad", href: "/comunidad" },
-  { name: "Novedades", href: "/blog" },
-  { name: "Contacto", href: "/contacto" },
+  { name: "Institucional", href: "/quienes-somos", match: "/quienes-somos" },
+  { name: "Niveles", href: "/propuesta-educativa/inicial", match: "/propuesta-educativa" },
+  { name: "Inglés", href: "/ingles", match: "/ingles" },
+  { name: "Comunidad", href: "/comunidad", match: "/comunidad" },
+  { name: "Novedades", href: "/blog", match: "/blog" },
+  { name: "Contacto", href: "/contacto", match: "/contacto" },
 ];
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const admissionYear = getAdmissionYear();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Cierra menú móvil al navegar
+  // Cierra el menú móvil al navegar.
+  // Se ajusta durante el render en lugar de dentro de un efecto: hacerlo en un
+  // efecto provoca un render en cascada (el menú se pinta abierto en la ruta
+  // nueva y recién después se cierra).
+  const [menuPathname, setMenuPathname] = useState(pathname);
+  if (pathname !== menuPathname) {
+    setMenuPathname(pathname);
+    if (mobileMenuOpen) setMobileMenuOpen(false);
+  }
+
+  // Con el menú abierto: Escape lo cierra y el fondo no se desplaza.
   useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
+    if (!mobileMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+        // Devuelve el foco al botón que abrió el menú.
+        toggleRef.current?.focus();
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
+  const isActive = (match: string) => pathname === match || pathname.startsWith(`${match}/`);
 
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 w-full z-50 transition-all duration-300",
-        (scrolled || pathname !== "/") ? "bg-white/90 backdrop-blur-md shadow-sm py-2" : "bg-transparent py-4"
+        "fixed left-0 top-0 z-50 w-full transition-all duration-300",
+        scrolled || pathname !== "/"
+          ? "bg-white/90 py-2 shadow-sm backdrop-blur-md"
+          : "bg-transparent py-4"
       )}
     >
-      <div className="container mx-auto px-6 lg:px-12 flex justify-between items-center">
-        <Link href="/" className="flex items-center gap-3 z-50 group">
-          <div className="relative w-10 h-10 lg:w-12 lg:h-12 overflow-hidden rounded-full border border-brand-blue/10 bg-white p-1">
-            <img 
-              src="/logo.svg" 
-              alt="Logo Fundación Educativa Esquel" 
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg lg:text-xl font-bold text-brand-green leading-tight group-hover:text-brand-blue transition-colors">
-              FUNDACIÓN
-            </span>
-            <span className="text-xs lg:text-sm font-semibold text-brand-blue tracking-wider leading-none opacity-80">
-              EDUCATIVA ESQUEL
-            </span>
-          </div>
+      <div className="container mx-auto flex items-center justify-between px-6 lg:px-12">
+        <Link
+          href="/"
+          className="z-50 flex items-center gap-3 rounded-xl"
+          aria-label={`${ORG.legalName} — Inicio`}
+        >
+          {/* Con el menú móvil abierto el fondo pasa a ser azul oscuro: el
+              logotipo cambia a la variante clara para no quedar ilegible. */}
+          <LogoLockup variant={mobileMenuOpen ? "dark" : "light"} />
         </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-8">
-          {links.map((link) => (
-            <Link
-              key={link.name}
-              href={link.href}
-              className={cn(
-                "text-sm font-semibold transition-colors duration-200 hover:text-brand-green relative group",
-                pathname.startsWith(link.href) ? "text-brand-green" : "text-brand-blue"
-              )}
-            >
-              {link.name}
-              <span
+        {/* Navegación de escritorio */}
+        <nav className="hidden items-center gap-8 lg:flex" aria-label="Navegación principal">
+          {links.map((link) => {
+            const active = isActive(link.match);
+            return (
+              <Link
+                key={link.name}
+                href={link.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "absolute -bottom-1 left-0 h-0.5 bg-brand-green transition-all duration-300",
-                  pathname.startsWith(link.href) ? "w-full" : "w-0 group-hover:w-full"
+                  "group relative text-sm font-semibold transition-colors duration-200 hover:text-brand-green",
+                  active ? "text-brand-green" : "text-brand-blue"
                 )}
-              />
-            </Link>
-          ))}
+              >
+                {link.name}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute -bottom-1 left-0 h-0.5 bg-brand-green transition-all duration-300",
+                    active ? "w-full" : "w-0 group-hover:w-full"
+                  )}
+                />
+              </Link>
+            );
+          })}
           <Link
             href="/inscripciones"
-            className="bg-brand-green text-white px-6 py-2.5 rounded-full text-sm font-semibold shadow-md shadow-brand-green/20 hover:bg-brand-blue hover:shadow-lg transition-all hover:-translate-y-0.5"
+            className="rounded-full bg-brand-green px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-green/20 transition-all hover:-translate-y-0.5 hover:bg-brand-blue hover:shadow-lg"
           >
-            Inscripciones
+            Inscripciones {admissionYear}
           </Link>
           <Link
             href="/admin"
-            className="text-brand-blue/30 hover:text-brand-blue transition-colors p-2.5 rounded-full flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
-            title="Acceso Restringido"
-            aria-label="Acceso administrativo"
+            prefetch={false}
+            className="flex shrink-0 items-center justify-center rounded-full p-2.5 text-brand-blue/40 transition-colors hover:text-brand-blue"
+            aria-label="Acceso a la intranet institucional"
           >
-            <Lock size={15} />
+            <Lock size={15} aria-hidden="true" />
           </Link>
         </nav>
 
-        {/* Mobile Toggle */}
+        {/* Botón del menú móvil */}
         <button
+          ref={toggleRef}
+          type="button"
           className={cn(
-            "lg:hidden z-50 p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow",
+            "z-50 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2.5 transition-colors lg:hidden",
             mobileMenuOpen ? "text-white" : "text-brand-blue"
           )}
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          onClick={() => setMobileMenuOpen((open) => !open)}
           aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú de navegación"}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="menu-movil"
         >
-          {mobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
+          {mobileMenuOpen ? (
+            <X size={28} aria-hidden="true" />
+          ) : (
+            <Menu size={28} aria-hidden="true" />
+          )}
         </button>
       </div>
 
-      {/* Mobile Nav Overlay */}
+      {/* Menú móvil */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="menu-movil"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-brand-blue/95 backdrop-blur-lg z-40 flex flex-col pt-28 px-8 pb-12 lg:hidden"
+            className="fixed inset-0 z-40 flex flex-col overflow-y-auto bg-brand-blue/95 px-8 pb-12 pt-28 backdrop-blur-lg lg:hidden"
           >
-            <nav className="flex flex-col gap-5 items-center w-full my-auto">
-              {links.map((l, i) => (
-                <motion.div
-                  key={l.name}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="w-full text-center"
-                >
-                  <Link
-                    href={l.href}
-                    className={cn(
-                      "text-2xl font-bold transition-colors hover:text-brand-yellow block py-2 px-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow",
-                      pathname === l.href ? "text-brand-yellow" : "text-white"
-                    )}
+            <nav
+              className="my-auto flex w-full flex-col items-center gap-5"
+              aria-label="Navegación principal"
+            >
+              {links.map((link, index) => {
+                const active = isActive(link.match);
+                return (
+                  <motion.div
+                    key={link.name}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="w-full text-center"
                   >
-                    {l.name}
-                  </Link>
-                </motion.div>
-              ))}
+                    <Link
+                      href={link.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "block rounded-lg px-4 py-2 text-2xl font-bold transition-colors hover:text-brand-yellow",
+                        active ? "text-brand-yellow" : "text-white"
+                      )}
+                    >
+                      {link.name}
+                    </Link>
+                  </motion.div>
+                );
+              })}
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: links.length * 0.05 }}
-                className="w-full mt-4"
+                className="mt-4 w-full"
               >
                 <Link
                   href="/inscripciones"
-                  className="block w-full text-center bg-brand-yellow text-brand-blue py-3.5 rounded-full text-lg font-bold shadow-lg shadow-brand-yellow/15 hover:bg-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="block w-full rounded-full bg-brand-yellow py-3.5 text-center text-lg font-bold text-brand-blue shadow-lg shadow-brand-yellow/15 transition-all hover:bg-white"
                 >
-                  Inscripciones {getAdmissionYear()}
+                  Inscripciones {admissionYear}
                 </Link>
               </motion.div>
             </nav>
 
-            {/* Mobile Menu Footer Info */}
-            <motion.div 
+            {/* Datos de contacto al pie del menú */}
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-auto w-full border-t border-white/10 pt-8 flex flex-col items-center gap-4 text-center text-white/60 text-xs"
+              transition={{ delay: 0.4 }}
+              className="mt-auto flex w-full flex-col items-center gap-4 border-t border-white/10 pt-8 text-center text-xs text-white/70"
             >
-              <div className="flex gap-4 items-center">
-                <a 
-                  href="https://www.facebook.com/fundacioneducativaesquel/?locale=es_LA" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-brand-yellow transition-colors py-1 px-2"
+              <div className="flex items-center gap-4">
+                {SOCIAL.map((social) => (
+                  <a
+                    key={social.name}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-1 transition-colors hover:text-brand-yellow"
+                  >
+                    {social.name}
+                  </a>
+                ))}
+                <Link
+                  href="/admin"
+                  prefetch={false}
+                  className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full p-2 text-white/70 transition-colors hover:text-brand-yellow"
+                  aria-label="Acceso a la intranet institucional"
                 >
-                  Facebook
-                </a>
-                <a 
-                  href="https://www.instagram.com/fundacioneducativaesquel/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="hover:text-brand-yellow transition-colors py-1 px-2"
-                >
-                  Instagram
-                </a>
-                <Link 
-                  href="/admin" 
-                  className="text-white/30 hover:text-brand-yellow transition-colors flex items-center justify-center p-2 rounded-full min-w-[36px] min-h-[36px]" 
-                  title="Acceso docente / administrativo"
-                  aria-label="Acceso docente / administrativo"
-                >
-                  <Lock size={14} />
+                  <Lock size={14} aria-hidden="true" />
                 </Link>
               </div>
-              <p>Chacabuco 1314 / Gob. Galina 950 — Esquel</p>
+              {/* Direcciones tomadas de la configuración institucional: el menú
+                  mostraba "Chacabuco 1314 / Gob. Galina 950", que no coincidía
+                  con ninguna de las sedes reales. */}
+              <address className="not-italic leading-relaxed">
+                {CAMPUSES.map((campus) => campus.street).join(" · ")}
+                <br />
+                {ORG.city}, {ORG.province}
+              </address>
             </motion.div>
           </motion.div>
         )}

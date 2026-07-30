@@ -2,56 +2,73 @@
 
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { getClientKey, rateLimit } from "@/lib/rateLimit";
+import { notifySheet } from "@/lib/sheets";
 
 const contactSchema = z.object({
-  name: z.string().min(2, "El nombre es obligatorio"),
-  email: z.string().email("Correo inválido"),
-  subject: z.string().min(2, "El asunto es obligatorio"),
-  message: z.string().min(5, "El mensaje es demasiado corto"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Ingresá tu nombre")
+    .max(120, "El nombre es demasiado largo"),
+  email: z
+    .string()
+    .trim()
+    .email("Ingresá un correo electrónico válido")
+    .max(160, "El correo es demasiado largo"),
+  subject: z
+    .string()
+    .trim()
+    .min(2, "Indicá el asunto de tu consulta")
+    .max(150, "El asunto es demasiado largo"),
+  message: z
+    .string()
+    .trim()
+    .min(5, "Contanos un poco más para poder ayudarte")
+    .max(3000, "El mensaje no puede superar los 3000 caracteres"),
+  /** Campo trampa: invisible para las personas, tentador para los bots. */
+  website: z.string().max(0).optional(),
 });
 
-type ContactInput = z.infer<typeof contactSchema>;
+export type ContactInput = z.input<typeof contactSchema>;
 
 export async function submitContact(data: ContactInput) {
+  // 5 mensajes por hora y por IP.
+  const limit = rateLimit(await getClientKey("contact"), 5, 60 * 60 * 1000);
+  if (!limit.allowed) {
+    return {
+      success: false as const,
+      error:
+        "Recibimos varios mensajes desde esta conexión. Esperá unos minutos o escribinos por correo.",
+    };
+  }
+
+  const parsed = contactSchema.safeParse(data);
+
+  if (!parsed.success) {
+    return {
+      success: false as const,
+      error: parsed.error.issues[0]?.message ?? "Revisá los datos ingresados.",
+    };
+  }
+
+  if (parsed.data.website) {
+    return { success: true as const, id: "" };
+  }
+
+  const { website: _honeypot, ...values } = parsed.data;
+
   try {
-    const parsed = contactSchema.parse(data);
+    const contact = await prisma.contactMessage.create({ data: values });
 
-    const contact = await prisma.contactMessage.create({
-      data: {
-        name: parsed.name,
-        email: parsed.email,
-        subject: parsed.subject,
-        message: parsed.message,
-      },
-    });
+    await notifySheet({ type: "contact", id: contact.id, ...values });
 
-    console.log("New Contact Message Saved:", contact.id);
-
-    // Synchronize with Google Sheets Webhook if configured
-    const webhookUrl = process.env.GOOGLE_SHEET_WEBHOOK_URL;
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "contact",
-            id: contact.id,
-            name: parsed.name,
-            email: parsed.email,
-            subject: parsed.subject,
-            message: parsed.message,
-          }),
-        });
-        console.log("Contact message synced to Google Sheets successfully");
-      } catch (err) {
-        console.error("Failed to sync contact message to Google Sheets:", err);
-      }
-    }
-
-    return { success: true, id: contact.id };
-  } catch (error: any) {
-    console.error("Contact error:", error);
-    return { success: false, error: error.message || "Ocurrió un error al procesar tu mensaje." };
+    return { success: true as const, id: contact.id };
+  } catch (error) {
+    console.error("[contact] Error al registrar el mensaje:", error);
+    return {
+      success: false as const,
+      error: "No pudimos enviar tu mensaje. Intentá de nuevo en unos minutos.",
+    };
   }
 }

@@ -1,14 +1,19 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Calendar, User } from "lucide-react";
+import { ArrowRight, Calendar, Mail } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { toPlainExcerpt } from "@/lib/sanitize";
+import { formatPostDate } from "@/lib/dateUtils";
+import { MAIN_CAMPUS } from "@/lib/site";
+import { Logo } from "@/components/brand/Logo";
 
 export const metadata: Metadata = {
-  title: "Novedades y Eventos | Fundación Educativa Esquel",
-  description: "Últimas noticias, comunicados y vida institucional educativa.",
+  title: "Novedades y eventos",
+  description:
+    "Comunicados, eventos y vida cotidiana de las escuelas de la Fundación Educativa Esquel.",
+  alternates: { canonical: "/blog" },
 };
 
-// Next.js ISR: Revalidamos la página del blog cada 60 segundos
 export const revalidate = 60;
 
 export default async function BlogIndexPage() {
@@ -19,14 +24,14 @@ export default async function BlogIndexPage() {
 
   return (
     <div className="bg-background pb-24">
-      <section className="pt-32 pb-20 bg-brand-yellow text-brand-blue relative">
-        <div className="container mx-auto px-6 lg:px-12 text-center relative z-10">
-          <span className="text-expressive text-2xl sm:text-4xl block mb-6">El día a día</span>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 max-w-4xl mx-auto leading-tight">
-            Novedades Institucionales
+      <section className="relative bg-brand-yellow pb-20 pt-32 text-brand-blue">
+        <div className="container relative z-10 mx-auto px-6 text-center lg:px-12">
+          <p className="text-expressive mb-6 block text-3xl sm:text-4xl">El día a día</p>
+          <h1 className="mx-auto mb-6 max-w-4xl text-4xl font-bold leading-tight sm:text-5xl md:text-6xl">
+            Novedades institucionales
           </h1>
-          <p className="text-xl max-w-2xl mx-auto font-medium opacity-90">
-            Eventos, circulares importantes y el pulso vibrante de nuestra comunidad.
+          <p className="mx-auto max-w-2xl text-xl font-medium opacity-90">
+            Eventos, circulares y el pulso de nuestra comunidad educativa.
           </p>
         </div>
       </section>
@@ -34,58 +39,92 @@ export default async function BlogIndexPage() {
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-6 lg:px-12">
           {posts.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-3xl border border-brand-gray/10">
-              <h3 className="text-2xl font-bold text-brand-blue mb-4">No hay novedades por ahora</h3>
-              <p className="text-brand-foreground/70">Vuelve más tarde para leer nuestras publicaciones.</p>
+            /* Estado vacío: además de avisar, ofrece una salida concreta.
+               Antes sólo decía "Vuelve más tarde". */
+            <div className="mx-auto max-w-xl rounded-3xl border border-brand-gray/15 bg-white px-8 py-16 text-center">
+              <h2 className="mb-3 text-2xl font-bold text-brand-blue">
+                Todavía no publicamos novedades
+              </h2>
+              <p className="mb-8 text-foreground/70">
+                Estamos preparando las primeras notas. Mientras tanto, seguinos en nuestras redes o
+                escribinos si necesitás información.
+              </p>
+              <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/contacto"
+                  className="rounded-full bg-brand-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-green"
+                >
+                  Ir a contacto
+                </Link>
+                <a
+                  href={`mailto:${MAIN_CAMPUS.email}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-brand-blue/15 px-6 py-3 text-sm font-bold text-brand-blue transition-colors hover:border-brand-blue"
+                >
+                  <Mail className="h-4 w-4" aria-hidden="true" />
+                  Escribirnos
+                </a>
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <ul className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
               {posts.map((post) => (
-                <Link 
-                  key={post.id} 
-                  href={`/blog/${post.slug}`}
-                  className="group flex flex-col bg-white rounded-[2rem] overflow-hidden hover:shadow-xl transition-all duration-300 border border-brand-gray/5 hover:-translate-y-1"
-                >
-                  {post.imageUrl ? (
-                    <div className="w-full h-48 bg-brand-gray/10 overflow-hidden relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={post.imageUrl} 
-                        alt={post.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full h-48 bg-brand-blue/5 flex items-center justify-center">
-                      <span className="text-brand-blue/20 font-bold text-4xl">FEE</span>
-                    </div>
-                  )}
-                  
-                  <div className="p-8 flex flex-col flex-1">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="px-3 py-1 bg-brand-green/10 text-brand-green text-xs font-bold rounded-full">
-                        {post.category}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-brand-gray text-xs font-semibold">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(post.createdAt).toLocaleDateString("es-AR", { month: "short", day: "numeric", year: "numeric" })}
+                <li key={post.id}>
+                  <Link
+                    href={`/blog/${post.slug}`}
+                    className="group flex h-full flex-col overflow-hidden rounded-[2rem] border border-brand-gray/10 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    {post.imageUrl ? (
+                      <div className="relative h-48 w-full overflow-hidden bg-brand-gray/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={post.imageUrl}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="flex h-48 w-full items-center justify-center bg-gradient-to-br from-brand-blue/10 via-brand-green/5 to-brand-yellow/10"
+                        aria-hidden="true"
+                      >
+                        <span className="h-14 w-14 text-brand-blue/40">
+                          <Logo />
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-1 flex-col p-8">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-brand-green/10 px-3 py-1 text-xs font-bold text-brand-green">
+                          {post.category}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-gray-dark">
+                          <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                          <time dateTime={post.createdAt.toISOString()}>
+                            {formatPostDate(post.createdAt)}
+                          </time>
+                        </span>
+                      </div>
+                      <h2 className="mb-3 line-clamp-2 text-xl font-bold text-brand-blue transition-colors group-hover:text-brand-green">
+                        {post.title}
+                      </h2>
+                      <p className="mb-6 line-clamp-3 text-sm leading-relaxed text-foreground/70">
+                        {post.excerpt || toPlainExcerpt(post.content, 120)}
+                      </p>
+                      <div className="mt-auto flex justify-end">
+                        <span
+                          className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue/5 text-brand-blue transition-colors group-hover:bg-brand-yellow group-hover:text-brand-blue"
+                          aria-hidden="true"
+                        >
+                          <ArrowRight className="h-5 w-5" />
+                        </span>
                       </div>
                     </div>
-                    <h3 className="text-xl font-bold text-brand-blue mb-3 group-hover:text-brand-green transition-colors line-clamp-2">
-                      {post.title}
-                    </h3>
-                    <p className="text-brand-foreground/70 text-sm leading-relaxed mb-6 line-clamp-3">
-                      {post.excerpt || post.content.replace(/<[^>]*>?/gm, '').substring(0, 120) + "..."}
-                    </p>
-                    <div className="mt-auto flex justify-end">
-                      <div className="w-10 h-10 rounded-full bg-brand-blue/5 flex items-center justify-center group-hover:bg-brand-yellow group-hover:text-brand-blue transition-colors text-brand-blue">
-                        <ArrowRight className="w-5 h-5" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </section>

@@ -1,199 +1,304 @@
 import { notFound } from "next/navigation";
-import { Metadata } from "next";
-import prisma from "@/lib/prisma";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User } from "lucide-react";
+import prisma from "@/lib/prisma";
 import { MediaBlocks } from "@/components/blog/MediaBlocks";
 import { cn } from "@/lib/utils";
+import { formatPostDate } from "@/lib/dateUtils";
+import {
+  getYouTubeId,
+  resolveBlockAlign,
+  resolveBlockColor,
+  resolveBlockFont,
+  resolveBlockTag,
+  sanitizeHtml,
+  toPlainExcerpt,
+} from "@/lib/sanitize";
 
 type Params = { slug: string };
 
-export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
-  const resolvedParams = await params;
-  const post = await prisma.post.findUnique({
-    where: { slug: resolvedParams.slug },
-  });
-  if (!post) return { title: "Post no encontrado" };
+/**
+ * Sin revalidación por tiempo: las acciones del panel llaman a
+ * `revalidatePath` al crear, editar, publicar o borrar una nota, así que el
+ * contenido se actualiza en el momento en que se edita.
+ *
+ * Nota sobre los slugs inexistentes: Next cachea el resultado de `notFound()`
+ * en las rutas con parámetros dinámicos y lo sirve con estado 200 (un "soft
+ * 404"). Ponerle `dynamicParams = false` devuelve el 404 correcto, pero
+ * entonces una nota publicada después del build queda inaccesible hasta el
+ * siguiente despliegue, lo que rompe el panel. Se elige mantener el panel
+ * funcionando y neutralizar el efecto en buscadores con `noindex` en los
+ * metadatos de la nota no encontrada (ver `generateMetadata`).
+ */
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<Params>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  // Se filtra por `published` también acá: `generateMetadata` corre aparte del
+  // componente, así que el título y el resumen de un borrador aparecían en la
+  // etiqueta <title> y en Open Graph aunque el cuerpo no se mostrara.
+  const post = await prisma.post.findFirst({ where: { slug, published: true } });
+
+  if (!post) return { title: "Novedad no encontrada", robots: { index: false, follow: false } };
+
+  const description = post.excerpt || toPlainExcerpt(post.content, 155);
+
   return {
-    title: `${post.title} | Novedades FEE`,
-    description: post.excerpt || "Novedad institucional de Fundación Educativa Esquel",
+    title: post.title,
+    description,
+    alternates: { canonical: `/blog/${post.slug}` },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description,
+      publishedTime: post.createdAt.toISOString(),
+      modifiedTime: post.updatedAt.toISOString(),
+      url: `/blog/${post.slug}`,
+      images: post.imageUrl ? [{ url: post.imageUrl, alt: post.title }] : undefined,
+    },
+    twitter: {
+      card: post.imageUrl ? "summary_large_image" : "summary",
+      title: post.title,
+      description,
+      images: post.imageUrl ? [post.imageUrl] : undefined,
+    },
   };
 }
 
-// Revalidar cada 60s
-export const revalidate = 60;
-
 export async function generateStaticParams() {
-  const posts = await prisma.post.findMany({ select: { slug: true } });
+  const posts = await prisma.post.findMany({
+    where: { published: true },
+    select: { slug: true },
+  });
   return posts.map((post) => ({ slug: post.slug }));
 }
 
-function getYouTubeEmbedUrl(url: string) {
-  if (!url) return "";
-  let videoId = "";
-  // Handles standard, share, embed and direct video ID inputs
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-  if (match && match[2].length === 11) {
-    videoId = match[2];
-  } else {
-    videoId = url; 
+interface Block {
+  id?: string;
+  type?: string;
+  data?: Record<string, unknown>;
+}
+
+/** Sólo se acepta como estructura de bloques un arreglo JSON válido. */
+function parseBlocks(content: string): Block[] | null {
+  if (!content.trim().startsWith("[")) return null;
+  try {
+    const parsed: unknown = JSON.parse(content);
+    return Array.isArray(parsed) ? (parsed as Block[]) : null;
+  } catch {
+    return null;
   }
-  return `https://www.youtube.com/embed/${videoId}`;
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<Params> }) {
-  const resolvedParams = await params;
-  const post = await prisma.post.findUnique({
-    where: { slug: resolvedParams.slug },
-  });
+  const { slug } = await params;
+  // Una nota despublicada deja de ser accesible por URL directa: antes seguía
+  // sirviéndose aunque el panel la marcara como borrador.
+  const post = await prisma.post.findFirst({ where: { slug, published: true } });
 
   if (!post) notFound();
 
-  // Smart Parser: Check if post content is JSON
-  let blocks: any[] | null = null;
-  if (post.content.trim().startsWith("[")) {
-    try {
-      blocks = JSON.parse(post.content);
-    } catch (e) {
-      blocks = null;
-    }
-  }
+  const blocks = parseBlocks(post.content);
 
   return (
     <div className="bg-background pb-24">
-      {/* Article Header */}
-      <section className="pt-32 pb-20 bg-brand-green text-white">
-        <div className="container mx-auto px-6 lg:px-12 max-w-4xl relative z-10">
-          <Link href="/blog" className="inline-flex items-center gap-2 text-brand-yellow font-bold uppercase tracking-widest text-sm mb-8 hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Volver a Novedades
-          </Link>
-          
-          <div className="flex gap-3 mb-6">
-            <span className="px-3 py-1 bg-brand-yellow/20 text-brand-yellow text-sm font-bold rounded-full">
-              {post.category}
-            </span>
-          </div>
+      <article>
+        {/* Encabezado */}
+        <header className="bg-brand-green pb-20 pt-32 text-white">
+          <div className="container relative z-10 mx-auto max-w-4xl px-6 lg:px-12">
+            <Link
+              href="/blog"
+              className="mb-8 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-brand-yellow-light transition-colors hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a novedades
+            </Link>
 
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-            {post.title}
-          </h1>
+            <p className="mb-6 flex gap-3">
+              <span className="rounded-full bg-brand-yellow/20 px-3 py-1 text-sm font-bold text-brand-yellow-light">
+                {post.category}
+              </span>
+            </p>
 
-          <div className="flex items-center gap-6 text-white/80 font-medium">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              {new Date(post.createdAt).toLocaleDateString("es-AR", { month: "long", day: "numeric", year: "numeric" })}
+            <h1 className="mb-6 text-3xl font-bold leading-tight sm:text-4xl md:text-5xl lg:text-6xl">
+              {post.title}
+            </h1>
+
+            <div className="flex flex-wrap items-center gap-6 font-medium text-white/85">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" aria-hidden="true" />
+                <time dateTime={post.createdAt.toISOString()}>
+                  {formatPostDate(post.createdAt, "long")}
+                </time>
+              </span>
+              <span className="flex items-center gap-2">
+                <User className="h-5 w-5" aria-hidden="true" />
+                Dirección institucional
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Dirección Institucional
-            </div>
           </div>
-        </div>
-      </section>
+        </header>
 
-      {/* Article Body */}
-      <section className="py-8 md:py-16 -mt-12 relative z-20">
-        <div className="container mx-auto px-6 lg:px-12 max-w-4xl">
-          <article className="bg-white rounded-[2rem] p-6 sm:p-8 md:p-16 shadow-2xl border border-brand-gray/5">
-            {post.imageUrl && (
-              <div className="w-full aspect-video rounded-2xl overflow-hidden mb-12 bg-brand-gray/10 shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={post.imageUrl} alt={post.title} className="w-full h-full object-cover" />
-              </div>
-            )}
+        {/* Cuerpo */}
+        <div className="relative z-20 -mt-12 py-8 md:py-16">
+          <div className="container mx-auto max-w-4xl px-6 lg:px-12">
+            <div className="rounded-[2rem] border border-brand-gray/10 bg-white p-6 shadow-2xl sm:p-8 md:p-16">
+              {post.imageUrl && (
+                <div className="mb-12 aspect-video w-full overflow-hidden rounded-2xl bg-brand-gray/10 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={post.imageUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="eager"
+                  />
+                </div>
+              )}
 
-            {post.excerpt && (
-              <p className="text-lg md:text-xl font-medium text-brand-blue/80 italic border-l-4 border-brand-yellow pl-4 py-1 bg-brand-yellow/5 rounded-r-xl mb-8 leading-relaxed">
-                {post.excerpt}
-              </p>
-            )}
-            
-            {/* Dynamic Rendering Block Engine */}
-            {blocks ? (
-              <div className="space-y-6">
-                {blocks.map((block: any) => {
-                  if (block.type === "text") {
-                    const CustomTag = block.data.tag || "p";
-                    
-                    // Mapeo de estilos y alineaciones
-                    const alignmentClass = 
-                      block.data.align === "center" ? "text-center" : 
-                      block.data.align === "right" ? "text-right" : "text-left";
-                      
-                    const fontClass = 
-                      block.data.fontFamily === "font-serif" ? "font-serif" : 
-                      block.data.fontFamily === "font-mono" ? "font-mono" : "font-sans";
+              {post.excerpt && (
+                <p className="mb-8 rounded-r-xl border-l-4 border-brand-yellow bg-brand-yellow/5 py-2 pl-4 text-lg font-medium italic leading-relaxed text-brand-blue/85 md:text-xl">
+                  {post.excerpt}
+                </p>
+              )}
 
-                    const colorClass = block.data.color || "text-gray-700";
+              {blocks ? (
+                <div className="space-y-6">
+                  {blocks.map((block, index) => {
+                    const key = block.id ?? `block-${index}`;
+                    const data = block.data ?? {};
 
-                    let sizeClass = "text-base md:text-lg leading-relaxed font-medium";
-                    if (CustomTag === "h1") sizeClass = "text-3xl md:text-4xl font-bold leading-tight mt-8 mb-4";
-                    if (CustomTag === "h2") sizeClass = "text-2xl md:text-3xl font-bold mt-6 mb-3";
-                    if (CustomTag === "h3") sizeClass = "text-xl md:text-2xl font-bold mt-4 mb-2";
-                    if (CustomTag === "span") sizeClass = "text-lg md:text-xl italic font-semibold border-l-4 border-brand-yellow pl-4 py-2 bg-brand-yellow/5 my-4 block";
+                    if (block.type === "text") {
+                      // La etiqueta se resuelve contra una lista de permitidos:
+                      // antes se usaba `block.data.tag` tal cual como componente,
+                      // así que un bloque guardado con `tag: "script"` terminaba
+                      // como <script> real en el HTML del servidor.
+                      const Tag = resolveBlockTag(data.tag);
+                      const text = typeof data.text === "string" ? data.text : "";
 
-                    return (
-                      <CustomTag 
-                        key={block.id} 
-                        className={cn(alignmentClass, fontClass, colorClass, sizeClass)}
-                      >
-                        {block.data.text}
-                      </CustomTag>
-                    );
-                  }
+                      if (!text.trim()) return null;
 
-                  if (block.type === "image") {
-                    return (
-                      <MediaBlocks 
-                        key={block.id}
-                        layout={block.data.layout} 
-                        images={block.data.images} 
-                        autoplay={block.data.autoplay} 
-                      />
-                    );
-                  }
+                      const sizeClass =
+                        Tag === "h2"
+                          ? "text-2xl md:text-3xl font-bold text-brand-blue mt-8 mb-2"
+                          : Tag === "h3"
+                            ? "text-xl md:text-2xl font-bold text-brand-blue mt-6 mb-1"
+                            : Tag === "h4"
+                              ? "text-lg md:text-xl font-bold text-brand-blue mt-4"
+                              : Tag === "blockquote"
+                                ? "text-lg md:text-xl italic font-semibold border-l-4 border-brand-yellow pl-4 py-2 bg-brand-yellow/5 rounded-r-xl my-4"
+                                : "text-base md:text-lg leading-relaxed";
 
-                  if (block.type === "video") {
-                    if (block.data.videoType === "youtube") {
                       return (
-                        <div key={block.id} className="w-full aspect-video rounded-2xl overflow-hidden my-8 shadow-md">
-                          <iframe 
-                            src={getYouTubeEmbedUrl(block.data.youtubeUrl)}
-                            className="w-full h-full border-0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        </div>
+                        <Tag
+                          key={key}
+                          className={cn(
+                            resolveBlockAlign(data.align),
+                            resolveBlockFont(data.fontFamily),
+                            resolveBlockColor(data.color),
+                            sizeClass,
+                            "whitespace-pre-line"
+                          )}
+                        >
+                          {text}
+                        </Tag>
                       );
                     }
-                    if (block.data.videoType === "upload" && block.data.videoUrl) {
+
+                    if (block.type === "image") {
+                      const images = Array.isArray(data.images)
+                        ? (data.images as unknown[]).filter(
+                            (src): src is string => typeof src === "string"
+                          )
+                        : [];
+
+                      if (images.length === 0) return null;
+
                       return (
-                        <div key={block.id} className="w-full aspect-video rounded-2xl overflow-hidden my-8 bg-black shadow-md">
-                          <video 
-                            src={block.data.videoUrl} 
-                            controls 
-                            className="w-full h-full object-contain"
+                        <MediaBlocks
+                          key={key}
+                          layout={data.layout === "carousel" || data.layout === "slider" ? data.layout : "single"}
+                          images={images}
+                          autoplay={data.autoplay === true}
+                        />
+                      );
+                    }
+
+                    if (block.type === "video") {
+                      if (data.videoType === "youtube") {
+                        // Sin un identificador válido no se renderiza nada, en
+                        // lugar de construir una URL con la entrada cruda.
+                        const videoId = getYouTubeId(
+                          typeof data.youtubeUrl === "string" ? data.youtubeUrl : ""
+                        );
+                        if (!videoId) return null;
+
+                        return (
+                          <div
+                            key={key}
+                            className="my-8 aspect-video w-full overflow-hidden rounded-2xl shadow-md"
+                          >
+                            <iframe
+                              src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+                              title={`Video: ${post.title}`}
+                              className="h-full w-full border-0"
+                              loading="lazy"
+                              referrerPolicy="strict-origin-when-cross-origin"
+                              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          </div>
+                        );
+                      }
+
+                      const videoUrl = typeof data.videoUrl === "string" ? data.videoUrl : "";
+                      // Sólo archivos servidos por la propia instalación.
+                      if (!videoUrl.startsWith("/uploads/")) return null;
+
+                      return (
+                        <div
+                          key={key}
+                          className="my-8 aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-md"
+                        >
+                          <video
+                            src={videoUrl}
+                            controls
+                            className="h-full w-full object-contain"
                             preload="metadata"
                           />
                         </div>
                       );
                     }
-                  }
 
-                  return null;
-                })}
-              </div>
-            ) : (
-              // Legacy Compatibility Render
-              <div 
-                className="prose prose-lg md:prose-xl prose-blue max-w-none text-brand-foreground/80 leading-relaxed font-medium"
-                dangerouslySetInnerHTML={{ __html: post.content }} 
-              />
-            )}
-          </article>
+                    return null;
+                  })}
+                </div>
+              ) : (
+                // Compatibilidad con notas heredadas guardadas como HTML.
+                // El contenido se depura contra una lista de permitidos antes de
+                // inyectarse: sin eso, cualquier persona con permiso de blog
+                // podía ejecutar JavaScript en el dominio del colegio.
+                <div
+                  className="rich-text"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
+                />
+              )}
+            </div>
+
+            <div className="mt-10 text-center">
+              <Link
+                href="/blog"
+                className="inline-flex items-center gap-2 rounded-full border-2 border-brand-blue/15 px-6 py-3 text-sm font-bold text-brand-blue transition-colors hover:border-brand-blue"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Ver todas las novedades
+              </Link>
+            </div>
+          </div>
         </div>
-      </section>
+      </article>
     </div>
   );
 }

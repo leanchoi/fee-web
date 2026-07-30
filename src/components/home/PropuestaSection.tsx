@@ -2,86 +2,95 @@
 
 import { motion } from "framer-motion";
 import { Heart, Languages, Users } from "lucide-react";
+import { ORG } from "@/lib/site";
+
+const pillars = [
+  {
+    title: "Educación en valores",
+    desc: "Promovemos la responsabilidad, la solidaridad y la participación activa en la sociedad.",
+    icon: Heart,
+    color: "text-brand-green bg-brand-green/10",
+  },
+  {
+    title: "Inglés intensivo",
+    desc: "Desde los primeros años, como herramienta de apertura al mundo.",
+    icon: Languages,
+    color: "text-brand-blue bg-brand-blue/10",
+  },
+  {
+    title: "Gestión participativa",
+    desc: "Un modelo liderado por un Consejo de Administración de madres y padres, que fortalece el compromiso de las familias en la vida institucional.",
+    icon: Users,
+    color: "text-brand-yellow-dark bg-brand-yellow/20",
+  },
+];
 
 export function PropuestaSection() {
-  const pillars = [
-    {
-      title: "Educación en valores",
-      desc: "Promovemos la responsabilidad, la solidaridad y la participación activa en la sociedad.",
-      icon: Heart,
-      color: "text-brand-green bg-brand-green/10",
-    },
-    {
-      title: "Inglés intensivo",
-      desc: "Desde los primeros años, como herramienta de apertura al mundo.",
-      icon: Languages,
-      color: "text-brand-blue bg-brand-blue/10",
-    },
-    {
-      title: "Gestión participativa",
-      desc: "Un modelo liderado por un Consejo de Administración compuesto por madres y padres, que fortalece el compromiso de las familias en la vida institucional.",
-      icon: Users,
-      color: "text-brand-yellow bg-brand-yellow/20",
-    },
-  ];
-
   return (
-    <section className="py-24 bg-brand-gray/5 border-y border-brand-gray/10 relative z-20">
+    <section className="relative z-20 border-y border-brand-gray/10 bg-brand-gray/5 py-24">
       <div className="container mx-auto px-6 lg:px-12">
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="text-brand-green font-bold uppercase tracking-widest text-sm mb-2 block">
-            Nuestros Pilares
-          </span>
-          <h2 className="text-4xl md:text-5xl font-bold text-brand-blue">
-            Nuestra propuesta educativa
+        <div className="mx-auto mb-16 max-w-2xl text-center">
+          <p className="mb-2 block text-sm font-bold uppercase tracking-widest text-brand-green">
+            Nuestros pilares
+          </p>
+          {/* Este título decía "Nuestra propuesta educativa", igual que la
+              volanta de la sección de niveles que viene después: dos encabezados
+              con el mismo texto en la misma página. Cada sección nombra ahora lo
+              que efectivamente contiene. */}
+          <h2 className="text-4xl font-bold text-brand-blue md:text-5xl">
+            Tres convicciones que sostienen el proyecto
           </h2>
-          <p className="text-lg text-brand-foreground/70 mt-4 font-medium">
-            Se distingue por:
+          <p className="mt-4 text-lg font-medium text-foreground/70">
+            No son enunciados sueltos: definen cómo se enseña, quién decide y qué se espera de cada
+            familia.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-16">
-          {pillars.map((p, i) => {
-            const Icon = p.icon;
+        <ul className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+          {pillars.map((pillar, index) => {
+            const Icon = pillar.icon;
             return (
-              <motion.div
-                key={p.title}
+              <motion.li
+                key={pillar.title}
                 initial={{ opacity: 0, y: 25 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.15 }}
-                className="bg-white p-6 sm:p-8 rounded-[2rem] border border-brand-gray/10 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col items-start"
+                transition={{ duration: 0.6, delay: index * 0.15 }}
+                className="flex flex-col items-start rounded-[2rem] border border-brand-gray/10 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-xl sm:p-8"
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${p.color}`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-brand-blue mb-4">
-                  {p.title}
-                </h3>
-                <p className="text-brand-foreground/80 leading-relaxed text-sm md:text-base">
-                  {p.desc}
+                <span
+                  className={`mb-6 flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm ${pillar.color}`}
+                  aria-hidden="true"
+                >
+                  <Icon className="h-6 w-6" />
+                </span>
+                <h3 className="mb-4 text-xl font-bold text-brand-blue">{pillar.title}</h3>
+                <p className="text-sm leading-relaxed text-foreground/80 md:text-base">
+                  {pillar.desc}
                 </p>
-              </motion.div>
+              </motion.li>
             );
           })}
-        </div>
+        </ul>
 
-        {/* Bottom Callout */}
+        {/* Cierre de sección */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="bg-brand-blue text-white rounded-[2.5rem] p-10 md:p-12 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden"
+          className="relative mx-auto max-w-4xl overflow-hidden rounded-[2.5rem] bg-brand-blue p-10 text-center text-white shadow-2xl md:p-12"
         >
-          {/* Subtle patagonian glow */}
-          <div className="absolute -top-12 -right-12 w-48 h-48 bg-brand-green/20 rounded-full blur-[60px]" />
-          
-          <h3 className="text-2xl md:text-3xl font-bold mb-4 relative z-10">
-            Gracias por acercarte a la Fundación Educativa Esquel.
-          </h3>
-          <p className="text-brand-lightblue text-base md:text-lg leading-relaxed max-w-2xl mx-auto relative z-10 font-medium">
-            Te invitamos a recorrer este espacio y sumarte a construir, juntos, una educación con sentido.
+          <div
+            className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-brand-green/20 blur-[60px]"
+            aria-hidden="true"
+          />
+          <p className="relative z-10 mb-4 text-2xl font-bold md:text-3xl">
+            Gracias por acercarte a la {ORG.legalName}.
+          </p>
+          <p className="relative z-10 mx-auto max-w-2xl text-base font-medium leading-relaxed text-brand-lightblue md:text-lg">
+            Te invitamos a recorrer este espacio y sumarte a construir, juntos, una educación con
+            sentido.
           </p>
         </motion.div>
       </div>

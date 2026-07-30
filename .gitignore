@@ -29,3 +29,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# base de datos local (SQLite) — nunca versionar: sobrescribe datos de producción
+# en cada despliegue y puede filtrar datos personales de familias
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/*.db-wal
+/prisma/*.db-shm
+
+# archivos subidos desde la intranet
+/public/uploads
+
+# empaquetados de distribución
+*.tar.gz

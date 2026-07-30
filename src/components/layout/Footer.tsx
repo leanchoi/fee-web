@@ -1,166 +1,177 @@
 import Link from "next/link";
-import { Mail, Phone, MapPin } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { getAdmissionYear } from "@/lib/dateUtils";
+import { CAMPUSES, CREDIT, ORG, SOCIAL } from "@/lib/site";
+import { LogoLockup } from "@/components/brand/Logo";
+
+const SOCIAL_ICONS: Record<string, string> = {
+  Facebook:
+    "M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z",
+  Instagram:
+    "M12 2.163c3.204 0 3.584.012 4.85.07 1.366.062 2.633.336 3.608 1.311.975.975 1.249 2.242 1.311 3.608.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.062 1.366-.336 2.633-1.311 3.608-.975.975-2.242 1.249-3.608 1.311-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-1.366-.062-2.633-.336-3.608-1.311-.975-.975-1.249-2.242-1.311-3.608-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.062-1.366.336-2.633 1.311-3.608.975-.975 2.242-1.249 3.608-1.311 1.266-.058 1.646-.07 4.85-.07zm0 1.802c-3.15 0-3.522.012-4.766.069-1.023.047-1.72.216-2.234.73-.514.513-.683 1.21-.73 2.233-.057 1.244-.069 1.616-.069 4.766s.012 3.522.069 4.766c.047 1.023.216 1.72.73 2.234.513.514 1.21.683 2.234.73 1.244.057 1.616.069 4.766.069s3.522-.012 4.766-.069c1.023-.047 1.72-.216 2.233-.73.514-.514.683-1.21.73-2.234.057-1.244.069-1.616.069-4.766s-.012-3.522-.069-4.766c-.047-1.023-.216-1.72-.73-2.233-.513-.514-1.21-.683-2.233-.73-1.244-.057-1.616-.069-4.766-.069zm0 3.064a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z",
+};
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  // El footer anunciaba `currentYear + 1` mientras el resto del sitio usaba
+  // `getAdmissionYear()`: en enero los dos números no coincidían.
+  const admissionYear = getAdmissionYear();
 
   return (
-    <footer className="bg-brand-blue text-white pt-16 pb-8 border-t-[8px] border-brand-yellow">
+    <footer className="border-t-[8px] border-brand-yellow bg-brand-blue pb-8 pt-16 text-white">
       <div className="container mx-auto px-6 lg:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          {/* Col 1 */}
-          <div className="flex flex-col gap-4 relative z-10">
-            <div>
-              <span className="text-xl font-bold text-white leading-tight block">
-                FUNDACIÓN
-              </span>
-              <span className="text-sm font-semibold text-brand-lightblue tracking-wider">
-                EDUCATIVA ESQUEL
-              </span>
-            </div>
-            <p className="text-white/80 text-sm mt-2 leading-relaxed max-w-xs">
-              Formamos mentes libres y corazones solidarios. Comprometidos con el desarrollo integral desde la Patagonia para el mundo.
+        <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+          {/* Identidad */}
+          <div className="relative z-10 flex flex-col gap-4">
+            <LogoLockup variant="dark" />
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/80">
+              Formamos mentes libres y corazones solidarios. Comprometidos con el desarrollo
+              integral desde la Patagonia para el mundo.
             </p>
-            <div className="flex gap-4 mt-2">
-              <a 
-                href="https://www.facebook.com/fundacioneducativaesquel/?locale=es_LA" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-white/60 hover:text-brand-yellow transition-colors"
-                title="Facebook Oficial"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-                </svg>
-              </a>
-              <a 
-                href="https://www.instagram.com/fundacioneducativaesquel/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-white/60 hover:text-brand-yellow transition-colors"
-                title="Instagram Oficial"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.008 3.752.052 2.73.124 4.093 1.528 4.21 4.21.044.968.052 1.322.052 3.752 0 2.43-.008 2.784-.052 3.752-.117 2.683-1.482 4.084-4.21 4.21-.968.044-1.322.052-3.752.052-2.43 0-2.784-.008-3.752-.052-2.73-.124-4.093-1.528-4.21-4.21C2.044 14.784 2 14.43 2 12c0-2.43.008-2.784.052-3.752.117-2.68-1.482-4.084-4.21-4.21C9.216 2.008 9.57 2 12 2h.315zm0 2c-2.404 0-2.687.009-3.636.052-2.15.098-2.923.865-3.02 3.02C5.61 8.016 5.6 8.3 5.6 10.706c0 2.404.009 2.687.052 3.636.098 2.15.865 2.923 3.02 3.02.949.043 1.233.052 3.636.052 2.404 0 2.687-.009 3.636-.052 2.15-.098 2.923-.865 3.02-3.02.043-.949.052-1.233.052-3.636 0-2.404-.009-2.687-.052-3.636-.098-2.15-.865-2.923-3.02-3.02-.949-.043-1.233-.052-3.636-.052zm0 4.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5zm0 2a1.75 1.75 0 110 3.5 1.75 1.75 0 010-3.5zm5.75-2.75a.9.9 0 100 1.8.9.9 0 000-1.8z" clipRule="evenodd" />
-                </svg>
-              </a>
+            <div className="mt-2 flex gap-4">
+              {SOCIAL.map((social) => (
+                <a
+                  key={social.name}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/60 transition-colors hover:text-brand-yellow"
+                  aria-label={`${social.name} de ${ORG.legalName}`}
+                >
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fillRule="evenodd" d={SOCIAL_ICONS[social.name]} clipRule="evenodd" />
+                  </svg>
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Col 2 */}
-          <div className="flex flex-col gap-4 relative z-10">
-            <h4 className="text-lg font-bold text-brand-yellow">Propuesta</h4>
+          {/* Propuesta */}
+          <nav className="relative z-10 flex flex-col gap-4" aria-labelledby="footer-propuesta">
+            <h2 id="footer-propuesta" className="text-lg font-bold text-brand-yellow">
+              Propuesta
+            </h2>
             <ul className="flex flex-col gap-2 text-sm text-white/80">
               <li>
-                <Link href="/propuesta-educativa/inicial" className="hover:text-white transition-colors">
+                <Link href="/propuesta-educativa/inicial" className="hover:text-white">
                   Nivel Inicial
                 </Link>
               </li>
               <li>
-                <Link href="/propuesta-educativa/primario" className="hover:text-white transition-colors">
+                <Link href="/propuesta-educativa/primario" className="hover:text-white">
                   Nivel Primario
                 </Link>
               </li>
               <li>
-                <Link href="/propuesta-educativa/secundario" className="hover:text-white transition-colors">
+                <Link href="/propuesta-educativa/secundario" className="hover:text-white">
                   Nivel Secundario
                 </Link>
               </li>
               <li>
-                <Link href="/ingles" className="hover:text-white transition-colors">
+                <Link href="/ingles" className="hover:text-white">
                   Programa de Inglés
                 </Link>
               </li>
             </ul>
-          </div>
+          </nav>
 
-          {/* Col 3 */}
-          <div className="flex flex-col gap-4 relative z-10">
-            <h4 className="text-lg font-bold text-brand-yellow">Institucional</h4>
+          {/* Institucional */}
+          <nav className="relative z-10 flex flex-col gap-4" aria-labelledby="footer-institucional">
+            <h2 id="footer-institucional" className="text-lg font-bold text-brand-yellow">
+              Institucional
+            </h2>
             <ul className="flex flex-col gap-2 text-sm text-white/80">
               <li>
-                <Link href="/quienes-somos" className="hover:text-white transition-colors">
+                <Link href="/quienes-somos" className="hover:text-white">
                   Nuestra Historia
                 </Link>
               </li>
               <li>
-                <Link href="/comunidad" className="hover:text-white transition-colors">
+                <Link href="/comunidad" className="hover:text-white">
                   Comunidad de Familias
                 </Link>
               </li>
               <li>
-                <Link href="/blog" className="hover:text-white transition-colors">
+                <Link href="/blog" className="hover:text-white">
                   Novedades y Eventos
                 </Link>
               </li>
               <li>
-                <Link href="/inscripciones" className="hover:text-white font-semibold text-brand-lightblue transition-colors">
-                  Admisiones {currentYear + 1}
+                <Link
+                  href="/inscripciones"
+                  className="font-semibold text-brand-lightblue hover:text-white"
+                >
+                  Admisiones {admissionYear}
                 </Link>
               </li>
             </ul>
-          </div>
+          </nav>
 
-          {/* Col 4 */}
-          <div className="flex flex-col gap-4 relative z-10">
-            <h4 className="text-lg font-bold text-brand-yellow">Contacto</h4>
-            <ul className="flex flex-col gap-4 text-xs text-white/80">
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-brand-lightblue shrink-0 mt-0.5" />
-                <span className="leading-tight">
-                  <strong>Admin / Inicial / Primaria:</strong><br />
-                  Chacabuco 1029, Esquel
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <span>(02945) 456053</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
-              </li>
-              <li className="border-t border-white/10 my-1"></li>
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-brand-lightblue shrink-0 mt-0.5" />
-                <span className="leading-tight">
-                  <strong>Sede Secundaria:</strong><br />
-                  Gobernador Galina 2888
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <span>2945-404000</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <a href="mailto:escuela1739.fee@gmail.com" className="hover:text-white transition-colors">escuela1739.fee@gmail.com</a>
-              </li>
+          {/* Contacto: una entrada por sede, desde la configuración institucional */}
+          <div className="relative z-10 flex flex-col gap-4">
+            <h2 className="text-lg font-bold text-brand-yellow">Contacto</h2>
+            <ul className="flex flex-col gap-5 text-xs text-white/80">
+              {CAMPUSES.map((campus) => (
+                <li key={campus.id} className="flex flex-col gap-2">
+                  <span className="flex items-start gap-2">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-lightblue" aria-hidden="true" />
+                    <span className="leading-tight">
+                      <strong className="font-semibold text-white">{campus.name}</strong>
+                      <br />
+                      {campus.levels}
+                      <br />
+                      <address className="not-italic">{campus.street}, {ORG.city}</address>
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 pl-6">
+                    <Phone className="h-4 w-4 shrink-0 text-brand-lightblue" aria-hidden="true" />
+                    <a href={`tel:${campus.phoneHref}`} className="hover:text-white">
+                      {campus.phone}
+                    </a>
+                  </span>
+                  <span className="flex items-center gap-2 pl-6">
+                    <Mail className="h-4 w-4 shrink-0 text-brand-lightblue" aria-hidden="true" />
+                    <a href={`mailto:${campus.email}`} className="break-all hover:text-white">
+                      {campus.email}
+                    </a>
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
-        {/* Bottom */}
-        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 text-xs text-white/60">
-          <div className="flex flex-col md:flex-row items-center gap-4 text-center md:text-left">
-            <p>&copy; {currentYear} Fundación Educativa Esquel. Todos los derechos reservados.</p>
-            <span className="hidden md:inline opacity-30">|</span>
+        {/* Pie */}
+        <div className="flex flex-col items-center justify-between gap-6 border-t border-white/10 pt-8 text-xs text-white/70 md:flex-row">
+          <div className="flex flex-col items-center gap-4 text-center md:flex-row md:text-left">
+            <p>
+              &copy; {currentYear} {ORG.legalName}. Todos los derechos reservados.
+            </p>
+            <span className="hidden opacity-30 md:inline" aria-hidden="true">
+              |
+            </span>
             <p className="flex items-center gap-1.5">
               <span>Co-creado en comunidad por:</span>
-              <a 
-                href="https://www.chib.com.ar" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-brand-lightblue font-bold hover:text-brand-yellow transition-colors uppercase tracking-wider"
+              <a
+                href={CREDIT.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold uppercase tracking-wider text-brand-lightblue transition-colors hover:text-brand-yellow"
               >
-                CHIB Usina Cultural
+                {CREDIT.name}
               </a>
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/contacto" className="hover:text-white transition-colors">Contacto Completo</Link>
-            <span className="opacity-30">|</span>
-            <Link href="/admin" className="hover:text-white transition-colors">Acceso Restringido</Link>
+            <Link href="/contacto" className="hover:text-white">
+              Contacto completo
+            </Link>
+            <span className="opacity-30" aria-hidden="true">
+              |
+            </span>
+            <Link href="/admin" prefetch={false} className="hover:text-white">
+              Intranet
+            </Link>
           </div>
         </div>
       </div>

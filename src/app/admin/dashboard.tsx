@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { 
   logoutAdmin, 
   createPost, 
@@ -10,7 +10,8 @@ import {
   createUserAction, 
   deleteUser, 
   uploadMediaAction,
-  deleteContactMessage
+  deleteContactMessage,
+  updateEnrollmentStatus
 } from "@/actions/admin";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -29,19 +30,48 @@ import {
   Image as ImageIcon, 
   Video as VideoIcon, 
   Edit, 
-  X, 
-  Lock, 
+  X,
   UserCheck,
   Mail,
   Phone,
   Calendar
 } from "lucide-react";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
+import {
+  resolveBlockAlign,
+  resolveBlockColor,
+  resolveBlockFont,
+  resolveBlockTag,
+} from "@/lib/sanitize";
+import type { SessionPayload } from "@/lib/auth";
+
+/**
+ * Campos que puede llevar un bloque. Todos son opcionales porque cada tipo usa
+ * un subconjunto distinto.
+ */
+interface BlockData {
+  text?: string;
+  tag?: string;
+  color?: string;
+  fontFamily?: string;
+  align?: string;
+  layout?: string;
+  images?: string[];
+  autoplay?: boolean;
+  videoType?: string;
+  youtubeUrl?: string;
+  videoUrl?: string;
+}
 
 interface Block {
   id: string;
   type: "text" | "image" | "video";
-  data: any;
+  /**
+   * Forma libre según el tipo de bloque (texto, imagen o video). El
+   * renderizador público valida cada campo contra listas de permitidos antes
+   * de usarlo, así que acá alcanza con un mapa de valores desconocidos.
+   */
+  data: BlockData;
 }
 
 export function AdminDashboard({ 
@@ -54,8 +84,8 @@ export function AdminDashboard({
   posts: Post[], 
   enrollments: Enrollment[], 
   contactMessages: ContactMessage[],
-  users: User[], 
-  session: any 
+  users: User[],
+  session: SessionPayload
 }) {
   const router = useRouter();
   
@@ -77,6 +107,8 @@ export function AdminDashboard({
   // User Management State
   const [userError, setUserError] = useState("");
   const [userSuccess, setUserSuccess] = useState("");
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -98,19 +130,28 @@ export function AdminDashboard({
     e.preventDefault();
     setUserError("");
     setUserSuccess("");
-    const fd = new FormData(e.currentTarget);
-    
+
+    // React deja `currentTarget` en null cuando el handler cede el control en
+    // un `await`. Antes se llamaba `e.currentTarget.reset()` después de esperar
+    // la acción, así que al crear un usuario correctamente saltaba un
+    // TypeError y el formulario nunca se limpiaba.
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+
+    setCreatingUser(true);
     try {
       const res = await createUserAction(fd);
       if (res.success) {
         setUserSuccess("Usuario creado correctamente.");
-        e.currentTarget.reset();
+        form.reset();
         router.refresh();
       } else {
-        setUserError(res.error || "Error al crear usuario");
+        setUserError(res.error || "No pudimos crear el usuario.");
       }
-    } catch (err: any) {
-      setUserError(err.message || "Error al conectar con el servidor");
+    } catch (err) {
+      setUserError(err instanceof Error ? err.message : "Error al conectar con el servidor.");
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -123,8 +164,23 @@ export function AdminDashboard({
       } else {
         alert(res.error || "Error al eliminar");
       }
-    } catch (err: any) {
-      alert(err.message || "Error");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Ocurrió un error.");
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: string) => {
+    setUpdatingStatus(id);
+    try {
+      const res = await updateEnrollmentStatus(id, status);
+      if (!res.success) {
+        alert(res.error || "No pudimos actualizar el estado.");
+      }
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al actualizar el estado.");
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -137,8 +193,8 @@ export function AdminDashboard({
       } else {
         alert(res.error || "Error al eliminar");
       }
-    } catch (err: any) {
-      alert(err.message || "Error");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Ocurrió un error.");
     }
   };
 
@@ -235,9 +291,9 @@ export function AdminDashboard({
                           {p.category}
                         </span>
                       </td>
-                      <td className="p-4 text-brand-foreground/70">{new Date(p.createdAt).toLocaleDateString()}</td>
+                      <td className="p-4 text-foreground/70">{new Date(p.createdAt).toLocaleDateString()}</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded-md font-semibold text-xs ${p.published ? 'bg-green-100 text-green-700' : 'bg-brand-gray/20 text-brand-gray'}`}>
+                        <span className={`px-2 py-1 rounded-md font-semibold text-xs ${p.published ? 'bg-green-100 text-green-700' : 'bg-brand-gray/20 text-brand-gray-dark'}`}>
                           {p.published ? "Público" : "Borrador"}
                         </span>
                       </td>
@@ -254,7 +310,7 @@ export function AdminDashboard({
                       </td>
                     </tr>
                   ))}
-                  {posts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-brand-gray">No hay novedades cargadas.</td></tr>}
+                  {posts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-brand-gray-dark">No hay novedades cargadas.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -311,7 +367,7 @@ export function AdminDashboard({
                                 {initial}
                               </div>
                               <div className="text-right">
-                                <span className="text-[10px] text-brand-foreground/50 font-medium block">
+                                <span className="text-[10px] text-foreground/70 font-medium block">
                                   {new Date(e.createdAt).toLocaleDateString()}
                                 </span>
                                 <span className={cn("inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1", levelColor)}>
@@ -321,25 +377,45 @@ export function AdminDashboard({
                             </div>
                             
                             <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
-                            <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
+                            <p className="text-xs text-foreground/70 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
                             
                             <div className="space-y-2 border-t pt-3 text-xs mb-4">
-                              <p className="text-brand-foreground/75"><span className="font-bold">Tutor:</span> {e.tutorName}</p>
-                              <p className="text-brand-foreground/75 flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5 text-brand-blue" /> {e.tutorEmail}</p>
-                              <p className="text-brand-foreground/75 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-green" /> {e.tutorPhone}</p>
+                              <p className="text-foreground/75"><span className="font-bold">Tutor:</span> {e.tutorName}</p>
+                              <p className="text-foreground/75 flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5 text-brand-blue" /> {e.tutorEmail}</p>
+                              <p className="text-foreground/75 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-green" /> {e.tutorPhone}</p>
                             </div>
 
                             {e.comments && (
-                              <div className="bg-brand-gray/5 border p-2.5 rounded-xl text-[11px] text-brand-foreground/80 leading-normal max-h-24 overflow-y-auto mb-4">
+                              <div className="bg-brand-gray/5 border p-2.5 rounded-xl text-[11px] text-foreground/80 leading-normal max-h-24 overflow-y-auto mb-4">
                                 <span className="font-bold block mb-0.5">Comentarios:</span>
                                 {e.comments}
                               </div>
                             )}
                           </div>
 
+                          <div className="border-t pt-3 mb-3">
+                            <label
+                              htmlFor={`status-${e.id}`}
+                              className="text-[10px] font-bold uppercase tracking-wider text-foreground/70 block mb-1"
+                            >
+                              Seguimiento
+                            </label>
+                            <select
+                              id={`status-${e.id}`}
+                              defaultValue={e.status}
+                              disabled={updatingStatus === e.id}
+                              onChange={(event) => handleStatusChange(e.id, event.target.value)}
+                              className="w-full border rounded-lg px-2 py-1.5 text-xs font-semibold bg-white disabled:opacity-60"
+                            >
+                              <option value="PENDING">Pendiente</option>
+                              <option value="REVIEWED">Revisada</option>
+                              <option value="CONTACTED">Familia contactada</option>
+                            </select>
+                          </div>
+
                           <div className="flex gap-2 border-t pt-3">
                             <a href={`mailto:${e.tutorEmail}`} className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors">
-                              Enviar Mail
+                              Enviar mail
                             </a>
                             <a href={`tel:${e.tutorPhone}`} className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors">
                               Llamar
@@ -348,7 +424,7 @@ export function AdminDashboard({
                         </div>
                       );
                     })}
-                    {enrollments.length === 0 && <p className="text-brand-gray text-sm italic col-span-full text-center py-4">No hay fichas de inscripción.</p>}
+                    {enrollments.length === 0 && <p className="text-brand-gray-dark text-sm italic col-span-full text-center py-4">No hay fichas de inscripción.</p>}
                   </div>
 
                   <h3 className="text-lg font-bold text-brand-blue mb-4">Lista Detallada</h3>
@@ -361,13 +437,14 @@ export function AdminDashboard({
                           <th className="p-4 font-bold border-b">Nivel / Grado</th>
                           <th className="p-4 font-bold border-b">Tutor</th>
                           <th className="p-4 font-bold border-b">Contacto</th>
+                          <th className="p-4 font-bold border-b">Estado</th>
                           <th className="p-4 font-bold border-b">Comentarios</th>
                         </tr>
                       </thead>
                       <tbody className="text-sm">
                         {enrollments.map(e => (
                           <tr key={e.id} className="border-b last:border-0 hover:bg-brand-green/5 transition-colors">
-                            <td className="p-4 text-brand-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
+                            <td className="p-4 text-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
                             <td className="p-4 font-semibold text-brand-blue">{e.studentName}</td>
                             <td className="p-4">
                               <span className="px-2 py-1 bg-brand-green/10 text-brand-green rounded-md font-semibold text-xs">
@@ -375,11 +452,23 @@ export function AdminDashboard({
                               </span>
                             </td>
                             <td className="p-4 font-medium">{e.tutorName}</td>
-                            <td className="p-4 text-xs text-brand-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
+                            <td className="p-4 text-xs text-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
+                            <td className="p-4">
+                              <span className={cn(
+                                "px-2 py-1 rounded-md font-semibold text-xs whitespace-nowrap",
+                                e.status === "CONTACTED"
+                                  ? "bg-green-100 text-green-800"
+                                  : e.status === "REVIEWED"
+                                    ? "bg-brand-lightblue/15 text-brand-lightblue-dark"
+                                    : "bg-brand-yellow/20 text-brand-yellow-dark"
+                              )}>
+                                {e.status === "CONTACTED" ? "Contactada" : e.status === "REVIEWED" ? "Revisada" : "Pendiente"}
+                              </span>
+                            </td>
                             <td className="p-4 max-w-[150px] truncate text-xs" title={e.comments || ""}>{e.comments || "-"}</td>
                           </tr>
                         ))}
-                        {enrollments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-brand-gray">No hay solicitudes nuevas.</td></tr>}
+                        {enrollments.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-brand-gray-dark">No hay solicitudes nuevas.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -417,7 +506,7 @@ export function AdminDashboard({
                           </div>
                           <div>
                             <h3 className="font-bold text-brand-blue text-sm leading-tight">{msg.name}</h3>
-                            <span className="text-[10px] text-brand-foreground/60">
+                            <span className="text-[10px] text-foreground/70">
                               {new Date(msg.createdAt).toLocaleDateString()} a las {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
@@ -427,8 +516,8 @@ export function AdminDashboard({
                         </span>
                       </div>
 
-                      <div className="bg-white/80 backdrop-blur-[2px] p-4 rounded-xl border text-sm text-brand-foreground/80 italic leading-relaxed mb-4 whitespace-pre-line">
-                        "{msg.message}"
+                      <div className="bg-white/80 backdrop-blur-[2px] p-4 rounded-xl border text-sm text-foreground/80 italic leading-relaxed mb-4 whitespace-pre-line">
+                        &ldquo;{msg.message}&rdquo;
                       </div>
                     </div>
 
@@ -462,7 +551,7 @@ export function AdminDashboard({
               })}
 
               {contactMessages.length === 0 && (
-                <div className="col-span-full py-16 text-center text-brand-gray border border-dashed rounded-3xl bg-brand-gray/5">
+                <div className="col-span-full py-16 text-center text-brand-gray-dark border border-dashed rounded-3xl bg-brand-gray/5">
                   <Mail className="w-12 h-12 mx-auto opacity-30 mb-3" />
                   <p className="font-semibold">No se han registrado consultas de contacto aún.</p>
                 </div>
@@ -517,21 +606,25 @@ export function AdminDashboard({
                     
                     <div className="flex items-center gap-2 text-xs">
                       <input type="checkbox" name="perm_blog" id="perm_blog" defaultChecked />
-                      <label htmlFor="perm_blog" className="font-semibold text-brand-foreground/80">Escribir Entradas de Blog</label>
+                      <label htmlFor="perm_blog" className="font-semibold text-foreground/80">Escribir Entradas de Blog</label>
                     </div>
                     
                     <div className="flex items-center gap-2 text-xs">
                       <input type="checkbox" name="perm_enrollments" id="perm_enrollments" />
-                      <label htmlFor="perm_enrollments" className="font-semibold text-brand-foreground/80">Ver Inscripciones</label>
+                      <label htmlFor="perm_enrollments" className="font-semibold text-foreground/80">Ver Inscripciones</label>
                     </div>
                     
                     <div className="flex items-center gap-2 text-xs">
                       <input type="checkbox" name="perm_contacts" id="perm_contacts" />
-                      <label htmlFor="perm_contacts" className="font-semibold text-brand-foreground/80">Ver Consultas</label>
+                      <label htmlFor="perm_contacts" className="font-semibold text-foreground/80">Ver Consultas</label>
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-brand-green text-white py-2.5 rounded-lg font-bold hover:bg-brand-blue transition-colors text-sm shadow-md">
-                    Guardar Usuario
+                  <button
+                    type="submit"
+                    disabled={creatingUser}
+                    className="w-full bg-brand-green text-white py-2.5 rounded-lg font-bold hover:bg-brand-blue transition-colors text-sm shadow-md disabled:opacity-60"
+                  >
+                    {creatingUser ? "Guardando…" : "Guardar usuario"}
                   </button>
                 </form>
               </div>
@@ -557,7 +650,7 @@ export function AdminDashboard({
                             {u.role}
                           </span>
                           {u.role !== 'SUPER_ADMIN' && (
-                            <span className="text-[10px] text-brand-foreground/60 block mt-1">
+                            <span className="text-[10px] text-foreground/70 block mt-1">
                               Permisos: {u.permissions || "ninguno"}
                             </span>
                           )}
@@ -573,7 +666,7 @@ export function AdminDashboard({
                         </td>
                       </tr>
                     ))}
-                    {users.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-brand-gray">No hay usuarios gestores en la base de datos.</td></tr>}
+                    {users.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-brand-gray-dark">No hay usuarios gestores en la base de datos.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -600,6 +693,24 @@ export function AdminDashboard({
 function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // El modal ocupa toda la pantalla pero no atendía el teclado: no se cerraba
+  // con Escape y el fondo seguía desplazándose detrás.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
   const [title, setTitle] = useState(post?.title || "");
   const [category, setCategory] = useState(post?.category || "Institucional");
   const [excerpt, setExcerpt] = useState(post?.excerpt || "");
@@ -609,8 +720,8 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
       if (post.content.trim().startsWith("[")) {
         try {
           return JSON.parse(post.content);
-        } catch (e) {
-          // Fallback if parsing fails
+        } catch {
+          // Contenido no serializado como bloques: se trata como texto heredado.
         }
       }
       // Wrap legacy HTML content in a single text block
@@ -646,8 +757,8 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
       }
       onClose();
       router.refresh();
-    } catch (err: any) {
-      alert(err.message || "Error al guardar el post");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No pudimos guardar la novedad.");
     } finally {
       setLoading(false);
     }
@@ -674,7 +785,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
     ]);
   };
 
-  const updateBlockData = (id: string, newData: any) => {
+  const updateBlockData = (id: string, newData: Record<string, unknown>) => {
     setBlocks(prev => prev.map(b => b.id === id ? { ...b, data: { ...b.data, ...newData } } : b));
   };
 
@@ -717,8 +828,8 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
       } else {
         alert(res.error || "Error al subir");
       }
-    } catch (err: any) {
-      alert(err.message || "Error al subir archivo");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No pudimos subir el archivo.");
     } finally {
       setUploadingBlockId(null);
     }
@@ -744,28 +855,35 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
         const currentImages = blocks.find(b => b.id === blockId)?.data.images || [];
         updateBlockData(blockId, { images: [...currentImages, ...urls] });
       }
-    } catch (err: any) {
-      alert(err.message || "Error al subir archivos");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "No pudimos subir los archivos.");
     } finally {
       setUploadingBlockId(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-brand-blue/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 md:p-6">
+    <div
+      className="fixed inset-0 bg-brand-blue/40 backdrop-blur-sm z-50 flex items-center justify-center p-2 md:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editor-title"
+    >
       <div className="bg-white rounded-[2.5rem] w-full h-full max-w-7xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden relative">
-        <button 
-          onClick={onClose} 
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar el editor"
           className="absolute top-4 right-4 p-2 text-brand-blue hover:bg-brand-gray/10 rounded-full transition-colors z-50 bg-white shadow-sm border"
         >
-          <X className="w-5 h-5" />
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden h-full">
           {/* Lado Izquierdo: Editor Form */}
           <div className="lg:col-span-6 flex flex-col p-6 md:p-8 overflow-y-auto h-full border-r border-brand-gray/10">
-            <h3 className="text-xl font-extrabold text-brand-blue mb-6">
-              {post ? "Modificar Entrada" : "Nueva Entrada por Bloques"}
+            <h3 id="editor-title" className="text-xl font-extrabold text-brand-blue mb-6">
+              {post ? "Modificar novedad" : "Nueva novedad"}
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-6 flex-1 flex flex-col justify-between">
@@ -809,7 +927,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                     />
                   </div>
                   {post?.imageUrl && (
-                    <div className="text-xs text-brand-foreground/75 truncate bg-brand-gray/5 border p-2 rounded-xl flex items-center gap-2">
+                    <div className="text-xs text-foreground/75 truncate bg-brand-gray/5 border p-2 rounded-xl flex items-center gap-2">
                       <span className="font-bold">Actual:</span>
                       <span className="truncate">{post.imageUrl}</span>
                     </div>
@@ -869,10 +987,10 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                                   className="w-full border rounded p-1 bg-white"
                                 >
                                   <option value="p">Párrafo (P)</option>
-                                  <option value="h1">Título Grande (H1)</option>
-                                  <option value="h2">Subtítulo (H2)</option>
-                                  <option value="h3">Subtítulo Chico (H3)</option>
-                                  <option value="span">Cita / Destacado (Span)</option>
+                                  <option value="h2">Título de sección</option>
+                                  <option value="h3">Subtítulo</option>
+                                  <option value="h4">Subtítulo menor</option>
+                                  <option value="blockquote">Cita destacada</option>
                                 </select>
                               </div>
                               <div>
@@ -896,9 +1014,9 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                                   onChange={(e) => updateBlockData(block.id, { fontFamily: e.target.value })}
                                   className="w-full border rounded p-1 bg-white"
                                 >
-                                  <option value="font-sans">Sans (Inter)</option>
-                                  <option value="font-serif">Serif (Clásica)</option>
-                                  <option value="font-mono">Mono (Código/Carta)</option>
+                                  <option value="font-sans">Montserrat (por defecto)</option>
+                                  <option value="font-serif">Serif (clásica)</option>
+                                  <option value="font-mono">Monoespaciada</option>
                                 </select>
                               </div>
                               <div>
@@ -976,13 +1094,16 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                             {/* Display current image list */}
                             {block.data.images && block.data.images.length > 0 && (
                               <div className="flex flex-wrap gap-2 pt-2 border-t mt-2">
-                                {block.data.images.map((url: string, imgIdx: number) => (
+                                {block.data.images.map((url, imgIdx) => (
                                   <div key={imgIdx} className="relative w-16 h-16 border rounded-lg overflow-hidden group">
-                                    <img src={url} alt={`img-${imgIdx}`} className="w-full h-full object-cover" />
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- miniatura de un archivo recién subido, sólo visible en el panel */}
+                                    <img src={url} alt="" className="w-full h-full object-cover" />
                                     <button 
                                       type="button" 
                                       onClick={() => {
-                                        const filtered = block.data.images.filter((_: string, idx: number) => idx !== imgIdx);
+                                        const filtered = (block.data.images ?? []).filter(
+                                          (_, idx) => idx !== imgIdx
+                                        );
                                         updateBlockData(block.id, { images: filtered });
                                       }}
                                       className="absolute inset-0 bg-red-600/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1067,7 +1188,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
 
               {/* Action buttons */}
               <div className="flex gap-4 justify-end mt-8 border-t pt-4 bg-white sticky bottom-0">
-                <button type="button" onClick={onClose} className="px-6 py-3 font-bold text-brand-gray hover:text-brand-blue">Cancelar</button>
+                <button type="button" onClick={onClose} className="px-6 py-3 font-bold text-brand-gray-dark hover:text-brand-blue">Cancelar</button>
                 <button type="submit" disabled={loading || uploadingBlockId !== null} className="px-8 py-3 bg-brand-blue text-white rounded-full font-bold shadow-md hover:bg-brand-green disabled:opacity-40">
                   {loading ? "Guardando..." : (post ? "Guardar Cambios" : "Publicar Nota")}
                 </button>
@@ -1079,7 +1200,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
           <div className="lg:col-span-6 bg-slate-50 p-6 md:p-8 overflow-y-auto h-full hidden lg:flex flex-col gap-6">
             <div className="border-b border-brand-gray/20 pb-4">
               <span className="text-[10px] font-bold text-brand-green uppercase tracking-widest block mb-1">Previsualización en Vivo</span>
-              <h4 className="text-sm font-medium text-brand-gray">Así se verá tu novedad una vez publicada en la web pública:</h4>
+              <h4 className="text-sm font-medium text-brand-gray-dark">Así se verá tu novedad una vez publicada en la web pública:</h4>
             </div>
 
             {/* Simulated Public Article Page */}
@@ -1091,7 +1212,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                 <h1 className="text-2xl md:text-3xl font-extrabold text-brand-blue leading-tight mb-4">
                   {title || <span className="text-gray-300 italic">Sin título aún...</span>}
                 </h1>
-                <div className="flex items-center gap-3 text-xs text-brand-foreground/60 font-medium">
+                <div className="flex items-center gap-3 text-xs text-foreground/70 font-medium">
                   <Calendar className="w-4 h-4 text-brand-green" />
                   <span>{new Date().toLocaleDateString("es-AR", { month: "long", day: "numeric", year: "numeric" })}</span>
                   <span>• Dirección Institucional</span>
@@ -1099,7 +1220,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
               </div>
 
               {excerpt && (
-                <p className="text-brand-foreground/80 font-medium leading-relaxed italic border-l-4 border-brand-yellow pl-4 py-1 bg-brand-yellow/5 rounded-r-xl text-sm">
+                <p className="text-foreground/80 font-medium leading-relaxed italic border-l-4 border-brand-yellow pl-4 py-1 bg-brand-yellow/5 rounded-r-xl text-sm">
                   {excerpt}
                 </p>
               )}
@@ -1108,13 +1229,29 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
               <div className="space-y-6 pt-4 border-t border-brand-gray/10 flex-1">
                 {blocks.map((block) => {
                   if (block.type === "text") {
-                    const Tag = (block.data.tag || "p") as any;
-                    const colorClass = block.data.color || "text-brand-blue";
-                    const alignClass = block.data.align === "center" ? "text-center" : block.data.align === "right" ? "text-right" : "text-left";
-                    const fontClass = block.data.fontFamily === "serif" ? "font-serif" : block.data.fontFamily === "mono" ? "font-mono" : "font-sans";
+                    // Las mismas funciones que usa la página pública, para que
+                    // la previsualización sea fiel.
+                    const Tag = resolveBlockTag(block.data.tag);
+                    const colorClass = resolveBlockColor(block.data.color);
+                    const alignClass = resolveBlockAlign(block.data.align);
+                    const sizeClass =
+                      Tag === "h2"
+                        ? "text-2xl font-bold text-brand-blue mt-4"
+                        : Tag === "h3"
+                          ? "text-xl font-bold text-brand-blue mt-3"
+                          : Tag === "h4"
+                            ? "text-lg font-bold text-brand-blue mt-2"
+                            : Tag === "blockquote"
+                              ? "text-base italic font-semibold border-l-4 border-brand-yellow pl-4 py-2 bg-brand-yellow/5 rounded-r-xl"
+                              : "text-sm md:text-base leading-relaxed";
+                    // El selector guarda "font-serif" / "font-mono", no
+                    // "serif" / "mono": la comparación nunca coincidía y la
+                    // vista previa mostraba todo en sans, aunque la nota
+                    // publicada sí cambiaba de tipografía.
+                    const fontClass = resolveBlockFont(block.data.fontFamily);
                     
                     return (
-                      <Tag key={block.id} className={cn(colorClass, alignClass, fontClass, "leading-relaxed text-sm md:text-base font-semibold")}>
+                      <Tag key={block.id} className={cn(colorClass, alignClass, fontClass, sizeClass, "whitespace-pre-line")}>
                         {block.data.text || <span className="text-gray-300 italic">Bloque de texto vacío...</span>}
                       </Tag>
                     );
@@ -1123,7 +1260,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                     const images = block.data.images || [];
                     if (images.length === 0) {
                       return (
-                        <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray gap-2">
+                        <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray-dark gap-2">
                           <ImageIcon className="w-6 h-6 text-brand-gray/60" />
                           <span>Bloque de Imagen (sin fotos aún)</span>
                         </div>
@@ -1134,7 +1271,8 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                         <span className="text-[10px] font-bold text-brand-green uppercase tracking-wider block">Vista: {block.data.layout} ({images.length} fotos)</span>
                         <div className="grid grid-cols-2 gap-2">
                           {images.map((img: string, idx: number) => (
-                            <img key={idx} src={img} alt="preview" className="rounded-xl object-cover w-full aspect-video border" />
+                            // eslint-disable-next-line @next/next/no-img-element -- previsualización interna
+                            <img key={idx} src={img} alt="" className="rounded-xl object-cover w-full aspect-video border" />
                           ))}
                         </div>
                       </div>
@@ -1145,7 +1283,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                     if (videoType === "youtube") {
                       if (!youtubeUrl) {
                         return (
-                          <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray gap-2">
+                          <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray-dark gap-2">
                             <VideoIcon className="w-6 h-6 text-brand-gray/60" />
                             <span>YouTube (falta ingresar dirección)</span>
                           </div>
@@ -1161,7 +1299,7 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
                     } else {
                       if (!videoUrl) {
                         return (
-                          <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray gap-2">
+                          <div key={block.id} className="w-full aspect-video rounded-2xl bg-brand-gray/5 border-2 border-dashed border-brand-gray/20 flex flex-col items-center justify-center text-xs text-brand-gray-dark gap-2">
                             <VideoIcon className="w-6 h-6 text-brand-gray/60" />
                             <span>Video Local (falta subir archivo)</span>
                           </div>
