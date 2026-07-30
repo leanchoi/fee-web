@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-green: #164E37;
+  --color-brand-blue: #172A45;
+  --color-brand-lightblue: #3FA7C4;
+  --color-brand-yellow: #DDA122;
+  --color-brand-gray: #80879A;
+
+  --color-background: #F8FAFC;
+  --color-foreground: #1F2937;
+  --color-card: #FFFFFF;
+  --color-muted: #6B7280;
+
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-expressive: 'Halimum', 'Dancing Script', cursive;
+
+  --radius-bento: 1.25rem;
+  --radius-pill: 9999px;
+}
+
+@layer base {
+  @font-face {
+    font-family: 'Halimum';
+    src: url('/fonts/Halimum.woff2') format('woff2'),
+         url('/fonts/Halimum.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    @apply antialiased selection:bg-brand-yellow selection:text-brand-blue scroll-smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: inherit;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    @apply transition-colors duration-200;
+  }
+}
+
+@utility text-expressive {
+  font-family: var(--font-expressive);
+  font-weight: normal;
+  display: inline-block;
+}
+
+@utility card-bento {
+  background-color: var(--color-card);
+  border-radius: var(--radius-bento);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+  @apply transition-all duration-300;
+}
+
+@utility card-bento-hover {
+  @apply card-bento hover:-translate-y-1 hover:shadow-xl;
+}
+
+@utility glass-panel {
+  background-color: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}

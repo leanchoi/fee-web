@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./prod.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  name        String?
+  role        String   @default("EDITOR")
+  permissions String   @default("blog")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String   // MDX or HTML
+  excerpt   String?
+  imageUrl  String?
+  category  String   @default("Novedades")
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Enrollment {
+  id              String   @id @default(cuid())
+  tutorName       String
+  tutorEmail      String
+  tutorPhone      String
+  studentName     String
+  studentLevel    String   // Inicial, Primario, Secundario
+  studentGrade    String   // Sala, Grado, Año
+  comments        String?
+  status          String   @default("PENDING") // PENDING, REVIEWED, CONTACTED
+  createdAt       DateTime @default(now())
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+}
