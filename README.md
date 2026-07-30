@@ -66,6 +66,30 @@ Direcciones, teléfonos, correos, año de fundación y redes sociales viven en
 `src/lib/site.ts`. El header, el footer, la página de contacto, los niveles y
 los datos estructurados leen de ahí: un cambio se propaga a todo el sitio.
 
+## Assets de marca (pendiente)
+
+Varios archivos estáticos que el código referencia **no están versionados**:
+existen sólo en el disco del servidor, así que producción los muestra bien pero
+un clon limpio los pide y recibe un 404.
+
+```bash
+node scripts/fetch-assets.mjs                       # informa qué falta
+node scripts/fetch-assets.mjs http://<host>:<puerto> # los baja del sitio en línea
+git add public && git commit -m "Agrega los assets de marca"
+```
+
+| Archivo | Uso |
+| --- | --- |
+| `public/logo.svg` | Isotipo del header y del hero. **Sin reemplazo: hoy se ve como imagen rota.** |
+| `public/hero-bg.png` | Fondo del hero de la portada. Reemplazado por `school-esquel.jpg`. |
+| `public/comunidad-hero.png` | Fondo del hero de Comunidad. Reemplazado por `school-esquel.jpg`. |
+| `public/nivel-*.png` | Portadas de las tarjetas de niveles. Reemplazadas por paneles de color. |
+| `public/fonts/Halimum.woff2` y `.ttf` | Tipografía manuscrita de marca. Reemplazada por una que carga next/font. |
+
+Cuando los archivos estén en el repositorio, conviene volver a las referencias
+originales en `Hero.tsx`, `comunidad/page.tsx` y `NivelesCards.tsx`. La
+tipografía toma el control sola: `--font-expressive` ya lista `Halimum` primero.
+
 ## Notas de despliegue
 
 - La base SQLite y `public/uploads/` **no se versionan**. Al desplegar hay que
