@@ -44,7 +44,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-3 z-50 group">
           <div className="relative w-10 h-10 lg:w-12 lg:h-12 overflow-hidden rounded-full border border-brand-blue/10 bg-white p-1">
             <img 
-              src="/logo.svg" 
+              src="/logo.png" 
               alt="Logo Fundación Educativa Esquel" 
               className="w-full h-full object-contain"
             />

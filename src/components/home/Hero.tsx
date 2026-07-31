@@ -89,8 +89,8 @@ export function Hero() {
             <div className="absolute inset-0 bg-brand-blue/5 rounded-full blur-3xl animate-pulse" />
             <div className="relative z-10 w-full h-full p-8 bg-white/10 backdrop-blur-[2px] rounded-full border border-white/20 shadow-2xl">
               <img 
-                src="/logo.svg" 
-                alt="Logo Fundación" 
+                src="/logo.png" 
+                alt="Logo Fundación Educativa Esquel" 
                 className="w-full h-full object-contain filter drop-shadow-2xl"
               />
             </div>
