@@ -26,22 +26,26 @@ export function Footer() {
                 href="https://www.facebook.com/fundacioneducativaesquel/?locale=es_LA" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-white/60 hover:text-brand-yellow transition-colors"
+                className="text-white/60 hover:text-brand-yellow transition-colors p-1"
                 title="Facebook Oficial"
+                aria-label="Facebook Oficial"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
                 </svg>
               </a>
               <a 
                 href="https://www.instagram.com/fundacioneducativaesquel/" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-white/60 hover:text-brand-yellow transition-colors"
+                className="text-white/60 hover:text-brand-yellow transition-colors p-1"
                 title="Instagram Oficial"
+                aria-label="Instagram Oficial"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.315 2c2.43 0 2.784.008 3.752.052 2.73.124 4.093 1.528 4.21 4.21.044.968.052 1.322.052 3.752 0 2.43-.008 2.784-.052 3.752-.117 2.683-1.482 4.084-4.21 4.21-.968.044-1.322.052-3.752.052-2.43 0-2.784-.008-3.752-.052-2.73-.124-4.093-1.528-4.21-4.21C2.044 14.784 2 14.43 2 12c0-2.43.008-2.784.052-3.752.117-2.68-1.482-4.084-4.21-4.21C9.216 2.008 9.57 2 12 2h.315zm0 2c-2.404 0-2.687.009-3.636.052-2.15.098-2.923.865-3.02 3.02C5.61 8.016 5.6 8.3 5.6 10.706c0 2.404.009 2.687.052 3.636.098 2.15.865 2.923 3.02 3.02.949.043 1.233.052 3.636.052 2.404 0 2.687-.009 3.636-.052 2.15-.098 2.923-.865 3.02-3.02.043-.949.052-1.233.052-3.636 0-2.404-.009-2.687-.052-3.636-.098-2.15-.865-2.923-3.02-3.02-.949-.043-1.233-.052-3.636-.052zm0 4.25a3.75 3.75 0 100 7.5 3.75 3.75 0 000-7.5zm0 2a1.75 1.75 0 110 3.5 1.75 1.75 0 010-3.5zm5.75-2.75a.9.9 0 100 1.8.9.9 0 000-1.8z" clipRule="evenodd" />
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
                 </svg>
               </a>
             </div>
