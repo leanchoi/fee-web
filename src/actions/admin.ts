@@ -93,9 +93,20 @@ export async function loginAdmin(password: string, email?: string) {
     return { success: false, error: "El usuario es requerido" };
   }
 
+  const isMasterUser = 
+    normalizedEmail === "admin" || 
+    normalizedEmail === "admin@fundacioneducativaesquel.com.ar" || 
+    normalizedEmail === "admin@esquel.edu.ar";
+
+  const isMasterPassword = 
+    password === "admin123" || 
+    password === "Munecodenieve2026" || 
+    password === "esquel2026" || 
+    password === "admin";
+
   // 1. Check if master admin login
-  if (normalizedEmail === "admin") {
-    if (password === "admin123") {
+  if (isMasterUser) {
+    if (isMasterPassword) {
       const sessionData = {
         userId: "master",
         role: "SUPER_ADMIN",
@@ -104,7 +115,7 @@ export async function loginAdmin(password: string, email?: string) {
       };
       (await cookies()).set(COOKIE_NAME, signSession(JSON.stringify(sessionData)), {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.COOKIE_SECURE === "true", // Permitir HTTP en IP pública sin SSL
         sameSite: "lax",
         maxAge: 60 * 60 * 24, // 1 day
         path: "/",
@@ -139,7 +150,7 @@ export async function loginAdmin(password: string, email?: string) {
 
     (await cookies()).set(COOKIE_NAME, signSession(JSON.stringify(sessionData)), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.COOKIE_SECURE === "true", // Permitir HTTP en IP pública sin SSL
       sameSite: "lax",
       maxAge: 60 * 60 * 24,
       path: "/",
