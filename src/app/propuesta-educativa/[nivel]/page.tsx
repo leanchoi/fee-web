@@ -87,7 +87,7 @@ export default async function NivelPage({ params }: { params: Promise<Params> })
   return (
     <div className="bg-background pb-24">
       {/* Dynamic Header */}
-      <section className={`pt-32 pb-20 ${colorBgMap[data.color as keyof typeof colorBgMap]}`}>
+      <section className={`pt-32 pb-16 ${colorBgMap[data.color as keyof typeof colorBgMap]}`}>
         <div className="container mx-auto px-6 lg:px-12 relative z-10 text-center max-w-4xl">
           <span className="font-bold uppercase tracking-widest text-xs mb-4 block opacity-80">
             Oferta Pedagógica
@@ -95,9 +95,34 @@ export default async function NivelPage({ params }: { params: Promise<Params> })
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight">
             {data.title}
           </h1>
-          <p className="text-xl max-w-2xl mx-auto leading-relaxed opacity-95 font-medium">
+          <p className="text-xl max-w-2xl mx-auto leading-relaxed opacity-95 font-medium mb-8">
             {data.subtitle}
           </p>
+
+          {/* Level Switcher Prominente Arriba */}
+          <div className="bg-black/15 backdrop-blur-md p-3 sm:p-4 rounded-full max-w-xl mx-auto border border-white/20 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-white pl-3 hidden sm:inline">Niveles:</span>
+            <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
+              <Link 
+                href="/propuesta-educativa/inicial" 
+                className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-full text-xs font-bold transition-all ${nivel === 'inicial' ? 'bg-white text-brand-blue shadow-lg scale-105' : 'text-white hover:bg-white/20'}`}
+              >
+                Inicial
+              </Link>
+              <Link 
+                href="/propuesta-educativa/primario" 
+                className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-full text-xs font-bold transition-all ${nivel === 'primario' ? 'bg-white text-brand-blue shadow-lg scale-105' : 'text-white hover:bg-white/20'}`}
+              >
+                Primario
+              </Link>
+              <Link 
+                href="/propuesta-educativa/secundario" 
+                className={`flex-1 sm:flex-initial px-4 sm:px-6 py-2.5 rounded-full text-xs font-bold transition-all ${nivel === 'secundario' ? 'bg-white text-brand-blue shadow-lg scale-105' : 'text-white hover:bg-white/20'}`}
+              >
+                Secundario
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
