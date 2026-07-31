@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Heart, Users, HelpCircle, HeartHandshake } from "lucide-react";
+import { Heart, Users, HelpCircle, HeartHandshake, ShieldCheck, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Comunidad de Familias | Fundación Educativa Esquel",
@@ -22,111 +22,149 @@ export default function ComunidadPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-brand-blue via-brand-blue/80 to-brand-blue" />
         </div>
         
-        <div className="container mx-auto px-6 lg:px-12 text-center relative z-10">
-          <span className="font-bold uppercase tracking-widest text-sm mb-4 block text-brand-yellow">
+        <div className="container mx-auto px-6 lg:px-12 text-center relative z-10 max-w-4xl">
+          <span className="font-bold uppercase tracking-widest text-xs mb-4 block text-brand-yellow">
             Más de 30 años caminando juntos
           </span>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 max-w-4xl mx-auto leading-tight">
-            Nuestra Comunidad
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-white leading-tight">
+            Nuestra Comunidad de Familias
           </h1>
-          <p className="text-xl max-w-2xl mx-auto font-medium opacity-90">
-            Familias, docentes y estudiantes unidos en un proyecto educativo que trasciende el aula.
+          <p className="text-xl max-w-2xl mx-auto font-medium opacity-90 leading-relaxed">
+            Familias, docentes y estudiantes unidos en un proyecto educativo participativo que trasciende las aulas.
           </p>
         </div>
       </section>
 
-      <section className="py-16 md:py-24">
+      {/* Section 1: Gestión Común & Voluntariado (Balanced 2-Column Grid) */}
+      <section className="py-16 md:py-20">
         <div className="container mx-auto px-6 lg:px-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 mb-16 md:mb-24">
-            <div className="flex flex-col justify-center">
-              <h2 className="text-4xl font-bold text-brand-blue mb-6 leading-tight">
-                El corazón detrás <br/> de las aulas
-              </h2>
-              <p className="text-lg text-brand-foreground/80 leading-relaxed mb-6">
-                Todas las comisiones de trabajo de la <strong>Fundación Educativa Esquel</strong> están conformadas por madres, padres y tutores de manera voluntaria. Cada familia que ingresa entiende que el bienestar del ecosistema escolar depende de lo que aportemos colectivamente.
-              </p>
-              <ul className="flex flex-col gap-4">
-                <li className="flex items-center gap-3 text-brand-blue font-bold">
-                  <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center shrink-0">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  Consejo de Administración
-                </li>
-                <li className="flex items-center gap-3 text-brand-blue font-bold">
-                  <div className="w-10 h-10 rounded-full bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
-                    <HeartHandshake className="w-5 h-5" />
-                  </div>
-                  Comisión de Apoyo y Eventos
-                </li>
-                <li className="flex items-center gap-3 text-brand-blue font-bold">
-                  <div className="w-10 h-10 rounded-full bg-brand-yellow/30 flex items-center justify-center shrink-0">
-                    <Heart className="w-5 h-5" />
-                  </div>
-                  Proyectos Solidarios Externos
-                </li>
-              </ul>
-
-              <div className="mt-8 bg-brand-yellow/10 border border-brand-yellow/30 p-6 rounded-2xl">
-                <span className="text-brand-blue font-bold text-xs uppercase tracking-wider block mb-1">Programa de Voluntariado Institucional</span>
-                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium mb-3">
-                  Constituye evidencia concreta del compromiso institucional con una **escuela inclusiva, solidaria y profundamente articulada con la comunidad**.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+            
+            {/* Left Box: El Corazón de la Escuela */}
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
+              <div>
+                <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Compromiso Ad-Honorem</span>
+                <h2 className="text-3xl font-bold text-brand-blue mb-4">Órganos de Participación</h2>
+                <p className="text-brand-foreground/80 leading-relaxed font-medium text-base mb-6">
+                  Todas las comisiones de la <strong>Fundación Educativa Esquel</strong> están conformadas por familias de manera voluntaria. Cada integrante entiende que el bienestar del ecosistema escolar depende del aporte colectivo.
                 </p>
-                <ul className="text-xs text-brand-foreground/75 space-y-1.5 font-medium">
-                  <li>• <strong>Finalidad:</strong> Promover acciones concretas de apoyo pedagógico, acompañamiento a familias y fortalecimiento del entorno educativo.</li>
-                  <li>• <strong>Acciones:</strong> Talleres de mantenimiento colaborativo, campañas solidarias de equipamiento y padrinazgo de proyectos educativos.</li>
+                
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3 text-brand-blue font-bold text-sm bg-brand-gray/5 p-3.5 rounded-xl border border-brand-gray/10">
+                    <div className="w-9 h-9 rounded-xl bg-brand-blue/10 flex items-center justify-center shrink-0 text-brand-blue">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    Consejo de Administración (Padres & Madres)
+                  </li>
+                  <li className="flex items-center gap-3 text-brand-blue font-bold text-sm bg-brand-gray/5 p-3.5 rounded-xl border border-brand-gray/10">
+                    <div className="w-9 h-9 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green shrink-0">
+                      <HeartHandshake className="w-5 h-5" />
+                    </div>
+                    Cooperadora N° 1030 (Inicial y Primaria)
+                  </li>
+                  <li className="flex items-center gap-3 text-brand-blue font-bold text-sm bg-brand-gray/5 p-3.5 rounded-xl border border-brand-gray/10">
+                    <div className="w-9 h-9 rounded-xl bg-brand-yellow/30 flex items-center justify-center text-brand-blue shrink-0">
+                      <Heart className="w-5 h-5" />
+                    </div>
+                    Comisión de Apoyo y Eventos Solidarios
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Right Box: Programa de Voluntariado */}
+            <div className="bg-brand-green/5 p-8 md:p-10 rounded-[2.5rem] border border-brand-green/20 flex flex-col justify-between">
+              <div>
+                <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Inclusión e Impacto</span>
+                <h2 className="text-3xl font-bold text-brand-green mb-4">Programa de Voluntariado</h2>
+                <p className="text-brand-foreground/80 leading-relaxed font-medium text-base mb-4">
+                  Evidencia concreta del compromiso institucional con una <strong>escuela inclusiva, solidaria y profundamente articulada con Esquel</strong>.
+                </p>
+                <ul className="space-y-3 text-sm text-brand-foreground/80 font-medium">
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-green shrink-0 mt-2" />
+                    <span><strong>Acción Directa:</strong> Talleres de mantenimiento colaborativo, campañas solidarias de equipamiento y padrinazgo de proyectos educativos.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-green shrink-0 mt-2" />
+                    <span><strong>Fortalecimiento Institucional:</strong> Compra colectiva de insumos de laboratorio, renovación de áreas de juego e integración con instituciones de la región.</span>
+                  </li>
                 </ul>
               </div>
 
-              <div className="mt-4 bg-brand-green/5 border border-brand-green/20 p-6 rounded-2xl">
-                <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-1">Cooperación Institucional</span>
-                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
-                  El Consejo de Administración cuenta con la ayuda activa de la <strong>Cooperadora de la escuela de Nivel Inicial y Primario (N° 1030)</strong> para la compra de materiales pedagógicos, mejora de infraestructura y la recaudación de fondos comunitarios.
+              <div className="mt-6 bg-white p-4 rounded-2xl border border-brand-green/20 text-xs text-brand-foreground/75 font-semibold">
+                La Cooperadora apoya la adquisición de material pedagógico para las aulas.
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Section 2: Preguntas Frecuentes (3-Column Symmetrical Grid) */}
+      <section className="py-16 bg-brand-gray/5 border-y border-brand-gray/10">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-brand-blue font-bold text-xs uppercase tracking-wider block mb-2">Transparencia</span>
+            <h2 className="text-3xl font-bold text-brand-blue">Preguntas Frecuentes de la Comunidad</h2>
+            <p className="text-sm text-brand-foreground/70 mt-2">Claridad sobre la dinámica de participación y financiamiento institucional</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* Q1 */}
+            <div className="bg-white p-8 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
+              <div>
+                <HelpCircle className="w-8 h-8 text-brand-green mb-4" />
+                <h3 className="text-lg font-bold text-brand-blue mb-3">¿Es obligatorio participar?</h3>
+                <p className="text-xs text-brand-foreground/75 leading-relaxed font-medium">
+                  No se exige asistencia semanal, pero sí se espera que las familias formen parte de comisiones puntuales o asistan a las asambleas anuales para garantizar la representatividad democrática de la escuela.
                 </p>
               </div>
             </div>
 
-            <div className="bg-white rounded-[3rem] p-12 shadow-xl border border-brand-gray/5 relative overflow-hidden">
-               {/* Decorative Circle */}
-               <div className="absolute top-0 right-0 w-64 h-64 bg-brand-lightblue/10 rounded-full blur-[80px]" />
-               
-               <h3 className="text-2xl font-bold text-brand-blue mb-6">Preguntas Habituales</h3>
-               
-               <div className="flex flex-col gap-6">
-                 <div>
-                   <h4 className="font-bold text-brand-green flex gap-2 items-center mb-2">
-                     <HelpCircle className="w-4 h-4" />
-                     ¿Es obligatorio participar?
-                   </h4>
-                   <p className="text-sm text-brand-foreground/70 leading-relaxed">
-                     No se exige asistencia semanal, pero sí se espera que las familias formen parte de comisiones puntuales o asistan a las asambleas anuales para garantizar la representatividad.
-                   </p>
-                 </div>
-                 <div>
-                   <h4 className="font-bold text-brand-green flex gap-2 items-center mb-2">
-                     <HelpCircle className="w-4 h-4" />
-                     ¿Tienen fines de lucro?
-                   </h4>
-                   <p className="text-sm text-brand-foreground/70 leading-relaxed">
-                     De ninguna manera. Todos los excedentes de las cuotas mensuales se reinvierten sistemáticamente en salarios docentes, infraestructura, calefacción o fondos de becas parciales.
-                   </p>
-                 </div>
-               </div>
-
+            {/* Q2 */}
+            <div className="bg-white p-8 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
+              <div>
+                <ShieldCheck className="w-8 h-8 text-brand-blue mb-4" />
+                <h3 className="text-lg font-bold text-brand-blue mb-3">¿Tienen fines de lucro?</h3>
+                <p className="text-xs text-brand-foreground/75 leading-relaxed font-medium">
+                  De ninguna manera. Todos los excedentes de las cuotas mensuales se reinvierten sistemáticamente en salarios docentes, infraestructura, calefacción o fondos de becas parciales.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="bg-brand-blue text-white rounded-[2rem] p-12 text-center lg:px-32 relative overflow-hidden">
-            <h2 className="text-3xl font-bold mb-4 z-10 relative">¿Querés sumar tu granito de arena?</h2>
-            <p className="text-brand-lightblue mb-8 z-10 relative">Invitamos a todas nuestras familias a acercarse al consejo.</p>
-            <Link href="/contacto" className="inline-block bg-brand-yellow text-brand-blue font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white transition-all z-10 relative">
-              Quiero colaborar
-            </Link>
-          </div>
+            {/* Q3 */}
+            <div className="bg-white p-8 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
+              <div>
+                <Users className="w-8 h-8 text-brand-yellow-dark mb-4" />
+                <h3 className="text-lg font-bold text-brand-blue mb-3">¿Cómo se eligen las autoridades?</h3>
+                <p className="text-xs text-brand-foreground/75 leading-relaxed font-medium">
+                  El Consejo de Administración se renueva periódicamente en Asambleas Generales Ordinarias donde cada familia tiene voz y voto en las decisiones estructurales.
+                </p>
+              </div>
+            </div>
 
+          </div>
         </div>
       </section>
 
+      {/* Section 3: Call to Action Banner */}
+      <section className="container mx-auto px-6 lg:px-12 mt-16">
+        <div className="bg-brand-blue text-white rounded-[2.5rem] p-10 md:p-14 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-green/20 rounded-full blur-[80px]" />
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 relative z-10">¿Querés sumar tu granito de arena?</h2>
+          <p className="text-brand-lightblue text-base mb-8 max-w-2xl mx-auto relative z-10 font-medium">
+            Invitamos a todas las familias de la Fundación a sumarse activamente a las comisiones de trabajo y asambleas.
+          </p>
+          <Link 
+            href="/contacto" 
+            className="inline-flex items-center gap-2 bg-brand-yellow text-brand-blue font-bold px-8 py-4 rounded-full shadow-lg hover:bg-white transition-all text-sm relative z-10"
+          >
+            Quiero Colaborar <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }
