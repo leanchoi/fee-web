@@ -1,9 +1,9 @@
 import { Metadata } from "next";
-import { CheckCircle2, Globe, BookOpen, GraduationCap, Library, Plane, Award, Sparkles } from "lucide-react";
+import { Globe, BookOpen, GraduationCap, Plane, Sparkles, Award, Compass, Quote } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Inglés Intensivo | Fundación Educativa Esquel",
-  description: "Preparando a nuestros estudiantes para un mundo global con certificaciones de Cambridge y UTN.",
+  description: "Formación global con proyección internacional: certificaciones Cambridge English y experiencias de inmersión.",
 };
 
 export default function InglesPage() {
@@ -16,71 +16,86 @@ export default function InglesPage() {
         </div>
         <div className="container mx-auto px-6 lg:px-12 text-center max-w-4xl relative z-10">
           <span className="text-brand-yellow font-bold uppercase tracking-widest text-xs mb-4 block">
-            Acreditaciones Nacionales e Internacionales
+            Programa de Inglés Intensivo
           </span>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 text-white leading-tight">
-            Programa de Inglés Intensivo
+            Formación Global con Proyección Internacional
           </h1>
           <p className="text-xl text-white/80 leading-relaxed font-medium">
-            Más de dos décadas preparando a nuestros estudiantes para comunicarse con soltura y rendir con éxito exámenes internacionales de la Universidad de Cambridge y certificaciones nacionales de la UTN.
+            Programa de inglés intensivo que fortalece las competencias comunicativas y potencia la proyección académica e internacional de nuestros estudiantes.
           </p>
         </div>
       </section>
 
-      {/* Section 1: Metodología & 4 Competencias (Balanced 2-Column Grid) */}
+      {/* Quote Banner */}
+      <section className="bg-brand-yellow/10 border-b border-brand-yellow/20 py-8">
+        <div className="container mx-auto px-6 lg:px-12 text-center max-w-4xl">
+          <div className="flex items-center justify-center gap-3 text-brand-blue font-bold italic text-lg sm:text-xl">
+            <Quote className="w-6 h-6 text-brand-yellow-dark shrink-0 hidden sm:inline-block" />
+            <p>
+              "Formamos ciudadanos del mundo con pensamiento crítico, identidad local y proyección internacional."
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 1: Metodologías Innovadoras (Grid 2 - Balanced) */}
       <section className="py-16 md:py-20">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
             
-            {/* Left Box: Adquisición Natural */}
+            {/* Metodologías Innovadoras */}
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
               <div>
-                <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Nivel Inicial y Primario</span>
-                <h2 className="text-3xl font-bold text-brand-blue mb-4">Adquisición Natural e Inmersión</h2>
-                <p className="text-brand-foreground/80 leading-relaxed font-medium text-base mb-4">
-                  Un recorrido continuo que inicia en <strong>Sala de 3 años</strong> con dos estímulos semanales y avanza desde <strong>Sala de 5 años</strong> con <strong>2 horas diarias de inglés</strong>.
-                </p>
-                <p className="text-brand-foreground/75 leading-relaxed text-sm">
-                  Los niños y niñas aprehenden el idioma de la misma manera que su lengua materna: interactuando, jugando y escuchando en un entorno natural y estimulante.
+                <div className="w-12 h-12 rounded-2xl bg-brand-green/10 text-brand-green flex items-center justify-center font-bold mb-6">
+                  <Compass className="w-6 h-6" />
+                </div>
+                <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Enfoque Pedagógico</span>
+                <h2 className="text-3xl font-bold text-brand-blue mb-4">Metodologías Innovadoras</h2>
+                <p className="text-brand-foreground/80 leading-relaxed font-medium text-base mb-6">
+                  Trabajamos con enfoques comunicativos, <strong>Project & Task-Based Learning</strong> y <strong>CLIL</strong> (Content and Language Integrated Learning), integrando el inglés con otras áreas del conocimiento para desarrollar pensamiento crítico, creatividad y autonomía.
                 </p>
               </div>
 
-              <div className="mt-8 border-l-4 border-brand-green bg-brand-green/5 p-5 rounded-r-2xl">
-                <h4 className="font-bold text-brand-green text-sm mb-1">Enfoque Pedagógico Comunicativo:</h4>
-                <p className="text-xs text-brand-foreground/80 font-medium">
-                  Aprendizaje intuitivo, libre de presiones, orientado a la soltura verbal y la comprensión espontánea.
-                </p>
+              <div className="bg-brand-green/5 p-5 rounded-2xl border border-brand-green/20">
+                <span className="font-bold text-brand-green text-sm block mb-1">Pilares Metodológicos:</span>
+                <ul className="text-xs text-brand-foreground/80 font-medium space-y-1">
+                  <li>• <strong>Project & Task-Based Learning:</strong> Aprendizaje basado en proyectos y tareas reales.</li>
+                  <li>• <strong>CLIL:</strong> Integración del idioma con ciencias, arte y cultura.</li>
+                  <li>• <strong>Comunicación Fluida:</strong> Estimulación natural desde Nivel Inicial.</li>
+                </ul>
               </div>
             </div>
 
-            {/* Right Box: Las 4 Habilidades Lingüísticas */}
+            {/* Desarrollo Lingüístico e Inmersión */}
             <div className="bg-brand-blue/5 p-8 md:p-10 rounded-[2.5rem] border border-brand-blue/15 flex flex-col justify-between">
               <div>
-                <span className="text-brand-blue font-bold text-xs uppercase tracking-wider block mb-2">Competencias Globales</span>
-                <h2 className="text-3xl font-bold text-brand-blue mb-6">Desarrollo Lingüístico Integral</h2>
-                
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-white p-5 rounded-2xl border border-brand-blue/10 shadow-sm text-center">
-                    <span className="text-brand-blue font-bold text-sm block">Expresión Oral</span>
-                    <span className="text-xs text-brand-foreground/60">Speaking & Fluency</span>
+                <div className="w-12 h-12 rounded-2xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold mb-6">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <span className="text-brand-blue font-bold text-xs uppercase tracking-wider block mb-2">Trayectoria Escolar</span>
+                <h2 className="text-3xl font-bold text-brand-blue mb-4">Inmersión Continua</h2>
+                <p className="text-brand-foreground/80 leading-relaxed font-medium text-base mb-4">
+                  Iniciamos en <strong>Sala de 3 años</strong> con estímulos semanales y avanzamos desde <strong>Sala de 5 años y Primaria</strong> con <strong>2 horas diarias de inglés</strong>.
+                </p>
+                <div className="grid grid-cols-2 gap-3 my-4">
+                  <div className="bg-white p-3.5 rounded-xl border border-brand-blue/10 text-center font-bold text-brand-blue text-xs">
+                    Expresión Oral
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-brand-blue/10 shadow-sm text-center">
-                    <span className="text-brand-blue font-bold text-sm block">Comprensión Auditiva</span>
-                    <span className="text-xs text-brand-foreground/60">Listening Skills</span>
+                  <div className="bg-white p-3.5 rounded-xl border border-brand-blue/10 text-center font-bold text-brand-blue text-xs">
+                    Comprensión Auditiva
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-brand-blue/10 shadow-sm text-center">
-                    <span className="text-brand-blue font-bold text-sm block">Expresión Escrita</span>
-                    <span className="text-xs text-brand-foreground/60">Writing & Grammar</span>
+                  <div className="bg-white p-3.5 rounded-xl border border-brand-blue/10 text-center font-bold text-brand-blue text-xs">
+                    Expresión Escrita
                   </div>
-                  <div className="bg-white p-5 rounded-2xl border border-brand-blue/10 shadow-sm text-center">
-                    <span className="text-brand-blue font-bold text-sm block">Comprensión Lectora</span>
-                    <span className="text-xs text-brand-foreground/60">Reading Comprehension</span>
+                  <div className="bg-white p-3.5 rounded-xl border border-brand-blue/10 text-center font-bold text-brand-blue text-xs">
+                    Comprensión Lectora
                   </div>
                 </div>
               </div>
 
               <p className="text-xs text-brand-foreground/70 font-medium text-center italic">
-                Sostenido transversalmente desde Inicial hasta el egreso del Nivel Secundario.
+                Formación articulada desde Nivel Inicial hasta el egreso del Nivel Secundario.
               </p>
             </div>
 
@@ -88,73 +103,73 @@ export default function InglesPage() {
         </div>
       </section>
 
-      {/* Section 2: Ruta de Certificaciones Cambridge y UTN (Balanced 2-Column Grid) */}
+      {/* Section 2: Certificaciones Internacionales (Balanced Grid) */}
       <section className="py-16 bg-brand-gray/5 border-y border-brand-gray/10">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Trayectoria de Exámenes</span>
-            <h2 className="text-3xl font-bold text-brand-blue">Acreditaciones y Certificaciones</h2>
-            <p className="text-sm text-brand-foreground/70 mt-2">Certificaciones validadas a nivel nacional e internacional</p>
+            <span className="text-brand-green font-bold text-xs uppercase tracking-wider block mb-2">Acreditaciones Oficiales</span>
+            <h2 className="text-3xl font-bold text-brand-blue">Certificaciones Internacionales</h2>
+            <p className="text-sm text-brand-foreground/70 mt-2">
+              Preparación para las certificaciones internacionales de <strong>Cambridge English</strong> (Universidad de Cambridge) y exámenes nacionales de la <strong>UTN</strong>.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
             
-            {/* Primaria Cambridge */}
+            {/* Cambridge English */}
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-2xl bg-brand-green/10 text-brand-green flex items-center justify-center font-bold">
-                    <BookOpen className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-2xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold">
+                    <Award className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-brand-blue">Cambridge Young Learners</h3>
-                    <span className="text-xs text-brand-foreground/60">Nivel Primario (de 3.º a 6.º Grado)</span>
+                    <h3 className="text-xl font-bold text-brand-blue">Cambridge English Qualifications</h3>
+                    <span className="text-xs text-brand-foreground/60">Universidad de Cambridge</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   {[
-                    { name: "Pre A1 Starters", desc: "Primer contacto lúdico con el formato de examen" },
-                    { name: "A1 Movers", desc: "Consolidación de vocabulario y estructura gramatical" },
-                    { name: "A2 Flyers", desc: "Nivel elemental de autonomía comunicativa" },
-                    { name: "A2 Key (KET)", desc: "Examen oficial de suficiencia básica internacional" },
+                    { name: "A2 Key (KET)", desc: "Dominio elemental e independencia comunicativa inicial" },
+                    { name: "B1 Preliminary (PET)", desc: "Nivel intermedio consolidado para la vida cotidiana" },
+                    { name: "B2 First (FCE)", desc: "Fluidez académica y profesional internacional" },
+                    { name: "C1 Advanced (CAE)", desc: "Excelencia superior para universidades y becas del mundo" },
                   ].map((cert) => (
                     <div key={cert.name} className="flex items-center justify-between p-3.5 bg-brand-gray/5 rounded-xl text-sm font-medium border border-brand-gray/10">
                       <span className="font-bold text-brand-blue">{cert.name}</span>
-                      <span className="text-xs text-brand-foreground/70">{cert.desc}</span>
+                      <span className="text-xs text-brand-foreground/70 text-right">{cert.desc}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Secundaria Cambridge & UTN */}
+            {/* Primario Young Learners & UTN */}
             <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-brand-gray/10 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-2xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold">
+                  <div className="w-10 h-10 rounded-2xl bg-brand-green/10 text-brand-green flex items-center justify-center font-bold">
                     <GraduationCap className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-brand-blue">Exámenes Avanzados & UTN</h3>
-                    <span className="text-xs text-brand-foreground/60">Nivel Secundario & Ámbito Técnico</span>
+                    <h3 className="text-xl font-bold text-brand-blue">Trayectoria Inicial & Nacional</h3>
+                    <span className="text-xs text-brand-foreground/60">Primaria & Universidad Tecnológica Nacional</span>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="p-4 bg-brand-blue/5 rounded-2xl border border-brand-blue/10">
-                    <span className="font-bold text-brand-blue text-sm block mb-1">Certificaciones Cambridge International:</span>
-                    <ul className="text-xs text-brand-foreground/80 space-y-1.5 font-medium">
-                      <li>• <strong>B1 Preliminary (PET):</strong> Intermedio independiente.</li>
-                      <li>• <strong>B2 First (FCE):</strong> Competencia fluida para ámbitos laborales y universitarios.</li>
-                      <li>• <strong>C1 Advanced (CAE):</strong> Excelencia académica internacional para universidades globales.</li>
-                    </ul>
+                  <div className="p-4 bg-brand-green/5 rounded-2xl border border-brand-green/10">
+                    <span className="font-bold text-brand-green text-sm block mb-1">Primeros Pasos en Primario:</span>
+                    <p className="text-xs text-brand-foreground/80 font-medium leading-relaxed">
+                      Evaluaciones formativas <strong>Pre A1 Starters</strong> y <strong>A1 Movers</strong> de 3.º a 6.º grado para familiarizar a los estudiantes con el formato internacional.
+                    </p>
                   </div>
 
-                  <div className="p-4 bg-brand-green/5 rounded-2xl border border-brand-green/10">
-                    <span className="font-bold text-brand-green text-sm block mb-1">Acreditación Nacional UTN:</span>
-                    <p className="text-xs text-brand-foreground/80 font-medium">
-                      Convenio con la Universidad Tecnológica Nacional para certificar el dominio técnico del idioma inglés a nivel nacional.
+                  <div className="p-4 bg-brand-blue/5 rounded-2xl border border-brand-blue/10">
+                    <span className="font-bold text-brand-blue text-sm block mb-1">Acreditación Nacional UTN:</span>
+                    <p className="text-xs text-brand-foreground/80 font-medium leading-relaxed">
+                      Convenio con la Universidad Tecnológica Nacional que certifica la suficiencia técnica y laboral del idioma dentro del país.
                     </p>
                   </div>
                 </div>
@@ -165,46 +180,46 @@ export default function InglesPage() {
         </div>
       </section>
 
-      {/* Section 3: Experiencias Destacadas (3-Column Symmetrical Grid) */}
+      {/* Section 3: Experiencias Internacionales (3-Column Symmetrical Grid) */}
       <section className="py-16 md:py-20">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-brand-yellow-dark font-bold text-xs uppercase tracking-wider block mb-2">Vivencias Integrales</span>
-            <h2 className="text-3xl font-bold text-brand-blue">Experiencias que Potencian el Idioma</h2>
-            <p className="text-sm text-brand-foreground/70 mt-2">El inglés puesto en práctica a través del arte, la lectura y la inmersión cultural</p>
+            <span className="text-brand-yellow-dark font-bold text-xs uppercase tracking-wider block mb-2">Vivencias Transformativas</span>
+            <h2 className="text-3xl font-bold text-brand-blue">Experiencias Internacionales y Culturales</h2>
+            <p className="text-sm text-brand-foreground/70 mt-2">Inmersión lingüística, arte y literatura en contexto real</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            {/* Card 1: Concert */}
-            <div className="bg-brand-yellow/10 p-8 rounded-[2.5rem] border border-brand-yellow/20 flex flex-col justify-between">
-              <div>
-                <Sparkles className="w-8 h-8 text-brand-yellow-dark mb-4" />
-                <h3 className="text-xl font-bold text-brand-blue mb-3">Concert Anual en Inglés</h3>
-                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
-                  A fin de año, los estudiantes de Nivel Inicial y Primario protagonizan un gran musical totalmente en inglés, integrando actuación, canto e idiomas sobre el escenario.
-                </p>
-              </div>
-            </div>
-
-            {/* Card 2: Biblioteca & iRead */}
-            <div className="bg-brand-green/5 p-8 rounded-[2.5rem] border border-brand-green/20 flex flex-col justify-between">
-              <div>
-                <Library className="w-8 h-8 text-brand-green mb-4" />
-                <h3 className="text-xl font-bold text-brand-green mb-3">Biblioteca & iRead</h3>
-                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
-                  Acceso a literatura física y a la plataforma digital iRead con más de 400 títulos interactivos, además de la Feria del Libro Anual junto a Roots Bookshop.
-                </p>
-              </div>
-            </div>
-
-            {/* Card 3: Viajes al Reino Unido */}
+            {/* Card 1: Viajes al Reino Unido */}
             <div className="bg-brand-blue text-white p-8 rounded-[2.5rem] shadow-xl flex flex-col justify-between">
               <div>
                 <Plane className="w-8 h-8 text-brand-yellow mb-4" />
-                <h3 className="text-xl font-bold text-brand-yellow mb-3">Viajes de Estudio al UK</h3>
+                <h3 className="text-xl font-bold text-brand-yellow mb-3">Experiencias Internacionales</h3>
                 <p className="text-xs text-white/90 leading-relaxed font-medium">
-                  Programas de inmersión lingüística y cultural en campus británicos. Estudiantes de Secundario asisten a clases en el Reino Unido, conviviendo con alumnos de todo el mundo.
+                  Programas de intercambio y viajes educativos al Reino Unido que ofrecen experiencias de inmersión lingüística y cultural, fortaleciendo la autonomía, la confianza y la visión global de nuestros estudiantes.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 2: Concert Anual */}
+            <div className="bg-brand-yellow/10 p-8 rounded-[2.5rem] border border-brand-yellow/20 flex flex-col justify-between">
+              <div>
+                <Sparkles className="w-8 h-8 text-brand-yellow-dark mb-4" />
+                <h3 className="text-xl font-bold text-brand-blue mb-3">Concert en Inglés</h3>
+                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
+                  Musical anual totalmente en inglés donde estudiantes de Inicial y Primaria integran teatro, canto e idiomas sobre el escenario.
+                </p>
+              </div>
+            </div>
+
+            {/* Card 3: Biblioteca & Feria del Libro */}
+            <div className="bg-brand-green/5 p-8 rounded-[2.5rem] border border-brand-green/20 flex flex-col justify-between">
+              <div>
+                <BookOpen className="w-8 h-8 text-brand-green mb-4" />
+                <h3 className="text-xl font-bold text-brand-green mb-3">Biblioteca & iRead</h3>
+                <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
+                  Acceso a literatura física y a la plataforma digital iRead con más de 400 títulos interactivos, además de la Feria del Libro junto a Roots Bookshop.
                 </p>
               </div>
             </div>
