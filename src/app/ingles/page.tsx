@@ -1,10 +1,20 @@
 import { Metadata } from "next";
-import { CheckCircle2, Globe, BookOpen, GraduationCap, Library, Plane } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  Globe,
+  GraduationCap,
+  Layers,
+  Library,
+  Plane,
+  Puzzle,
+  Users,
+} from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Inglés intensivo",
   description:
-    "Recorrido de inglés desde Sala de 3 hasta el Secundario, con certificaciones Cambridge English (Starters a C1 Advanced) y exámenes de la UTN.",
+    "Programa de inglés intensivo desde Sala de 3 hasta el Secundario: enfoque comunicativo, CLIL y aprendizaje por proyectos, certificaciones Cambridge English (Starters a C1 Advanced), exámenes de la UTN e intercambios al Reino Unido.",
   alternates: { canonical: "/ingles" },
 };
 
@@ -23,9 +33,75 @@ export default function InglesPage() {
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 max-w-4xl text-white leading-tight">
             Inglés Intensivo
           </h1>
-          <p className="text-xl text-white/80 max-w-2xl leading-relaxed font-medium">
-            Más de dos décadas preparando a nuestros estudiantes para rendir con éxito los exámenes de la Universidad de Cambridge.
+          <p className="text-xl text-white/85 max-w-3xl leading-relaxed font-medium">
+            Desde hace más de dos décadas, un programa intensivo que fortalece las competencias
+            comunicativas y potencia la proyección académica e internacional de nuestros
+            estudiantes.
           </p>
+        </div>
+      </section>
+
+      {/* Metodologías: transversales a los tres niveles */}
+      <section className="border-b border-brand-gray/10 bg-white py-16 md:py-20">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="max-w-3xl">
+            <p className="text-brand-green font-bold uppercase tracking-wider text-sm mb-3">
+              Cómo enseñamos
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold text-brand-blue leading-tight mb-4">
+              Metodologías que van más allá de la clase de idioma
+            </h2>
+            <p className="text-lg text-foreground/80 leading-relaxed">
+              Integramos el inglés con otras áreas del conocimiento para desarrollar pensamiento
+              crítico, creatividad y autonomía.
+            </p>
+          </div>
+
+          <ul className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
+            <li className="rounded-[2rem] border border-brand-gray/15 bg-brand-gray/5 p-8">
+              <span
+                className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-green/10 text-brand-green"
+                aria-hidden="true"
+              >
+                <Users className="h-6 w-6" />
+              </span>
+              <h3 className="text-lg font-bold text-brand-blue mb-2">Enfoque comunicativo</h3>
+              <p className="text-sm text-foreground/75 leading-relaxed">
+                El idioma se usa para decir algo real desde el primer día: la conversación es el
+                medio y no sólo el objetivo.
+              </p>
+            </li>
+
+            <li className="rounded-[2rem] border border-brand-gray/15 bg-brand-gray/5 p-8">
+              <span
+                className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue/10 text-brand-blue"
+                aria-hidden="true"
+              >
+                <Puzzle className="h-6 w-6" />
+              </span>
+              <h3 className="text-lg font-bold text-brand-blue mb-2">
+                Project &amp; Task-Based Learning
+              </h3>
+              <p className="text-sm text-foreground/75 leading-relaxed">
+                Se aprende resolviendo tareas y proyectos con un resultado concreto, donde el inglés
+                es la herramienta para llegar a él.
+              </p>
+            </li>
+
+            <li className="rounded-[2rem] border border-brand-gray/15 bg-brand-gray/5 p-8">
+              <span
+                className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-yellow/20 text-brand-yellow-dark"
+                aria-hidden="true"
+              >
+                <Layers className="h-6 w-6" />
+              </span>
+              <h3 className="text-lg font-bold text-brand-blue mb-2">CLIL</h3>
+              <p className="text-sm text-foreground/75 leading-relaxed">
+                Contenidos de otras materias se estudian en inglés, de modo que el idioma y el
+                conocimiento avanzan juntos.
+              </p>
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -58,10 +134,10 @@ export default function InglesPage() {
               </div>
 
               <div className="mt-6 border-l-4 border-brand-green bg-brand-green/5 p-6 rounded-r-2xl">
-                <h3 className="font-bold text-brand-green text-lg mb-2">Enfoque pedagógico</h3>
+                <h3 className="font-bold text-brand-green text-lg mb-2">En los primeros años</h3>
                 <ul className="list-disc pl-5 text-sm text-foreground/80 space-y-1">
                   <li>Aprendizaje natural e intuitivo.</li>
-                  <li>Enfoque comunicativo y participativo.</li>
+                  <li>Adquisición por interacción, juego y escucha.</li>
                   <li>Desarrollo integral de la competencia lingüística.</li>
                 </ul>
               </div>
@@ -129,7 +205,7 @@ export default function InglesPage() {
                   <div className="bg-white p-6 rounded-2xl border border-brand-gray/10 shadow-sm">
                     <h4 className="font-bold text-brand-blue text-base flex items-center gap-2 mb-3">
                       <GraduationCap className="w-5 h-5 text-brand-blue" />
-                      Certificaciones Cambridge English (Internacionales)
+                      Certificaciones Cambridge English (Universidad de Cambridge)
                     </h4>
                     <ul className="space-y-3 text-sm text-foreground/75">
                       <li>• <strong>B1 Preliminary (PET)</strong></li>
@@ -182,9 +258,15 @@ export default function InglesPage() {
                   <div className="col-span-1 md:col-span-2 flex gap-4 items-start bg-brand-yellow/10 p-6 rounded-2xl border border-brand-yellow/20">
                     <Plane className="w-6 h-6 text-brand-yellow-dark shrink-0 mt-1" />
                     <div>
-                      <h4 className="font-bold text-brand-blue text-base">Viajes de estudio al Reino Unido</h4>
+                      <h4 className="font-bold text-brand-blue text-base">
+                        Intercambios y viajes de estudio al Reino Unido
+                      </h4>
                       <p className="text-sm text-foreground/80 mt-2 leading-relaxed">
-                        Programas de inmersión lingüística y cultural en campus británicos. Una experiencia única donde estudiantes de Nivel Secundario viajan a Inglaterra para asistir a clases en instituciones británicas, convivir con alumnos de todo el mundo y desarrollar autonomía y fluidez en contextos reales.
+                        Programas de intercambio y viajes educativos de inmersión lingüística y
+                        cultural en campus británicos. Estudiantes de Nivel Secundario asisten a
+                        clases en instituciones del Reino Unido y conviven con alumnos de todo el
+                        mundo: una experiencia que fortalece la autonomía, la confianza y la visión
+                        global, además de la fluidez en contextos reales.
                       </p>
                     </div>
                   </div>
@@ -195,6 +277,27 @@ export default function InglesPage() {
           </div>
 
         </div>
+      </section>
+
+      {/* Cierre */}
+      <section className="container mx-auto px-6 lg:px-12">
+        <figure className="relative overflow-hidden rounded-[2.5rem] bg-brand-blue px-8 py-14 text-center text-white shadow-2xl md:px-16">
+          <div
+            className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand-green/25 blur-[70px]"
+            aria-hidden="true"
+          />
+          <Globe
+            className="relative z-10 mx-auto mb-6 h-10 w-10 text-brand-yellow-light"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
+          <blockquote className="relative z-10">
+            <p className="mx-auto max-w-3xl text-2xl font-bold leading-snug md:text-3xl">
+              Formamos ciudadanos del mundo con pensamiento crítico, identidad local y proyección
+              internacional.
+            </p>
+          </blockquote>
+        </figure>
       </section>
     </div>
   );
