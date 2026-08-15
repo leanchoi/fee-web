@@ -64,7 +64,21 @@ if (file_exists($dataFile)) {
 array_unshift($existing, $record);
 @file_put_contents($dataFile, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-// 2. Intentar guardar en MySQL si la conexión está lista
+// 2. Sincronizar en tiempo real con Google Sheets
+$googlePayload = [
+    'type'         => 'enrollment',
+    'id'           => $id,
+    'tutorName'    => $tutorName,
+    'tutorEmail'   => $tutorEmail,
+    'tutorPhone'   => $tutorPhone,
+    'studentName'  => $studentName,
+    'studentLevel' => $studentLevel,
+    'studentGrade' => $studentGrade,
+    'comments'     => $comments
+];
+syncToGoogleSheets($googlePayload);
+
+// 3. Intentar guardar en MySQL si la conexión está lista
 try {
     $pdo = getPDO();
     if ($pdo) {
@@ -83,8 +97,6 @@ try {
             ':comments'     => $comments
         ]);
     }
-} catch (Exception $e) {
-    // Si MySQL da error de credenciales, el registro queda 100% a salvo en el archivo de respaldo
-}
+} catch (Exception $e) {}
 
 echo json_encode(["success" => true, "id" => $id]);

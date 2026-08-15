@@ -13,6 +13,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Clave secreta para tokens de sesión
 define('JWT_SECRET', 'fee_esquel_secret_patagonia_2026_hostinger_key');
 
+// Webhook de Google Sheets
+define('GOOGLE_SHEET_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
+
+function syncToGoogleSheets($payload) {
+    $url = defined('GOOGLE_SHEET_WEBHOOK_URL') ? GOOGLE_SHEET_WEBHOOK_URL : '';
+    if (empty($url)) return false;
+
+    $jsonData = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Content-Length: ' . strlen($jsonData)
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    return $response;
+}
+
 function getPDO() {
     static $pdo = null;
     if ($pdo !== null) return $pdo;

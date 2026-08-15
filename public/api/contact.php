@@ -57,7 +57,18 @@ if (file_exists($dataFile)) {
 array_unshift($existing, $record);
 @file_put_contents($dataFile, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-// 2. Intentar guardar en MySQL si la conexión está lista
+// 2. Sincronizar en tiempo real con Google Sheets
+$googlePayload = [
+    'type'    => 'contact',
+    'id'      => $id,
+    'name'    => $name,
+    'email'   => $email,
+    'subject' => $subject,
+    'message' => $message
+];
+syncToGoogleSheets($googlePayload);
+
+// 3. Intentar guardar en MySQL si la conexión está lista
 try {
     $pdo = getPDO();
     if ($pdo) {
@@ -73,8 +84,6 @@ try {
             ':message' => $message
         ]);
     }
-} catch (Exception $e) {
-    // Si MySQL da error, el mensaje queda 100% a salvo en el archivo de respaldo
-}
+} catch (Exception $e) {}
 
 echo json_encode(["success" => true, "id" => $id]);
