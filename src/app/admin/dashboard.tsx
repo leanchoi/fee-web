@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef } from "react";
 import { 
   logoutAdmin, 
@@ -7,6 +9,7 @@ import {
   togglePostPublish, 
   createUserAction, 
   deleteUser, 
+  deleteEnrollment,
   uploadMediaAction,
   deleteContactMessage,
   saveGalleryItemAction,
@@ -84,6 +87,10 @@ export function AdminDashboard({
   const [galleryList, setGalleryList] = useState<any[]>(gallery || []);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [editingGalleryItem, setEditingGalleryItem] = useState<any | null>(null);
+
+  // Enrollments and Contacts State
+  const [enrollmentList, setEnrollmentList] = useState<Enrollment[]>(enrollments || []);
+  const [contactList, setContactList] = useState<ContactMessage[]>(contactMessages || []);
   
   // User Management State
   const [userError, setUserError] = useState("");
@@ -120,13 +127,25 @@ export function AdminDashboard({
 
   const handleDeletePost = async (id: string) => {
     if (!confirm("¿Eliminar este post definitivamente?")) return;
-    await deletePost(id);
-    router.refresh();
+    try {
+      const res = await deletePost(id);
+      if (res.success) {
+        router.refresh();
+      } else {
+        alert(res.error || "Error al eliminar");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error");
+    }
   };
 
   const handleToggleState = async (id: string, current: boolean) => {
-    await togglePostPublish(id, current);
-    router.refresh();
+    try {
+      await togglePostPublish(id, current);
+      router.refresh();
+    } catch (err: any) {
+      alert(err.message || "Error");
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -168,12 +187,28 @@ export function AdminDashboard({
     try {
       const res = await deleteContactMessage(id);
       if (res.success) {
+        setContactList(prev => prev.filter(m => m.id !== id));
         router.refresh();
       } else {
         alert(res.error || "Error al eliminar");
       }
     } catch (err: any) {
       alert(err.message || "Error");
+    }
+  };
+
+  const handleDeleteEnrollment = async (id: string) => {
+    if (!confirm("¿Estás seguro de que deseás eliminar esta solicitud de inscripción definitivamente?")) return;
+    try {
+      const res = await deleteEnrollment(id);
+      if (res.success) {
+        setEnrollmentList(prev => prev.filter(e => e.id !== id));
+        router.refresh();
+      } else {
+        alert(res.error || "Error al eliminar la inscripción");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al conectar con el servidor");
     }
   };
 
@@ -311,10 +346,10 @@ export function AdminDashboard({
 
             {/* Metrics cards */}
             {(() => {
-              const total = enrollments.length;
-              const inicial = enrollments.filter(e => e.studentLevel.toLowerCase().includes("inicial")).length;
-              const primario = enrollments.filter(e => e.studentLevel.toLowerCase().includes("primario")).length;
-              const secundario = enrollments.filter(e => e.studentLevel.toLowerCase().includes("secundario")).length;
+              const total = enrollmentList.length;
+              const inicial = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("inicial")).length;
+              const primario = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("primario")).length;
+              const secundario = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("secundario")).length;
 
               return (
                 <>
@@ -339,7 +374,7 @@ export function AdminDashboard({
 
                   <h3 className="text-lg font-bold text-brand-blue mb-4">Vista en Fichas</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {enrollments.map(e => {
+                    {enrollmentList.map(e => {
                       const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
                       let levelColor = "bg-brand-yellow/10 text-brand-yellow-dark border-brand-yellow/20";
                       if (e.studentLevel.toLowerCase().includes("primario")) {
@@ -381,18 +416,25 @@ export function AdminDashboard({
                             )}
                           </div>
 
-                          <div className="flex gap-2 border-t pt-3">
+                          <div className="flex items-center gap-2 border-t pt-3">
                             <a href={`mailto:${e.tutorEmail}`} className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors">
                               Enviar Mail
                             </a>
                             <a href={`tel:${e.tutorPhone}`} className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors">
                               Llamar
                             </a>
+                            <button 
+                              onClick={() => handleDeleteEnrollment(e.id)} 
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0" 
+                              title="Eliminar inscripción"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                       );
                     })}
-                    {enrollments.length === 0 && <p className="text-brand-gray text-sm italic col-span-full text-center py-4">No hay fichas de inscripción.</p>}
+                    {enrollmentList.length === 0 && <p className="text-brand-gray text-sm italic col-span-full text-center py-4">No hay fichas de inscripción.</p>}
                   </div>
 
                   <h3 className="text-lg font-bold text-brand-blue mb-4">Lista Detallada</h3>
@@ -406,10 +448,11 @@ export function AdminDashboard({
                           <th className="p-4 font-bold border-b">Tutor</th>
                           <th className="p-4 font-bold border-b">Contacto</th>
                           <th className="p-4 font-bold border-b">Comentarios</th>
+                          <th className="p-4 font-bold border-b text-right">Acción</th>
                         </tr>
                       </thead>
                       <tbody className="text-sm">
-                        {enrollments.map(e => (
+                        {enrollmentList.map(e => (
                           <tr key={e.id} className="border-b last:border-0 hover:bg-brand-green/5 transition-colors">
                             <td className="p-4 text-brand-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
                             <td className="p-4 font-semibold text-brand-blue">{e.studentName}</td>
@@ -421,9 +464,18 @@ export function AdminDashboard({
                             <td className="p-4 font-medium">{e.tutorName}</td>
                             <td className="p-4 text-xs text-brand-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
                             <td className="p-4 max-w-[150px] truncate text-xs" title={e.comments || ""}>{e.comments || "-"}</td>
+                            <td className="p-4 text-right">
+                              <button 
+                                onClick={() => handleDeleteEnrollment(e.id)} 
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
+                                title="Eliminar inscripción"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
-                        {enrollments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-brand-gray">No hay solicitudes nuevas.</td></tr>}
+                        {enrollmentList.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-brand-gray">No hay solicitudes nuevas.</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -438,12 +490,12 @@ export function AdminDashboard({
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-brand-blue">Consultas de Contacto</h2>
               <span className="text-xs font-bold px-3 py-1 bg-teal-100 text-teal-800 rounded-full">
-                Total: {contactMessages.length} consultas
+                Total: {contactList.length} consultas
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {contactMessages.map((msg) => {
+              {contactList.map((msg) => {
                 const initials = msg.name
                   .split(" ")
                   .map((n) => n[0])
