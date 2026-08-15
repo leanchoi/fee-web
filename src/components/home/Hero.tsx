@@ -25,12 +25,14 @@ export function Hero() {
         style={{ y: bgY }}
         className="absolute inset-0 z-0"
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img 
-          src="/hero-bg.png" 
-          alt="Fundación Educativa Esquel background" 
-          className="w-full h-full object-cover opacity-20 scale-105"
+          src="/photos/fee_photo_11.jpg" 
+          alt="Comunidad Fundación Educativa Esquel en la Patagonia" 
+          className="w-full h-full object-cover object-center transform scale-105 filter brightness-95"
         />
-        <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-background via-background/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-blue/95 via-brand-blue/80 to-brand-blue/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-blue via-transparent to-black/30" />
       </motion.div>
 
       {/* Shapes Overlay - Subtle Patagonian Glows */}

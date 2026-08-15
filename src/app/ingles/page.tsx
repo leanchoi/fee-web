@@ -227,6 +227,29 @@ export default function InglesPage() {
           </div>
         </div>
       </section>
+
+      {/* Visual Concert Feature */}
+      <section className="container mx-auto px-6 lg:px-12 my-12">
+        <div className="rounded-[2.5rem] overflow-hidden shadow-xl border border-brand-gray/10 relative h-72 sm:h-96 md:h-[420px]">
+          <img 
+            src="/photos/fee_photo_12.jpg" 
+            alt="English Concert & Drama Festival - Fundación Educativa Esquel" 
+            className="w-full h-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/90 via-brand-blue/30 to-transparent" />
+          <div className="absolute bottom-6 left-6 right-6 text-white max-w-2xl">
+            <span className="bg-brand-yellow text-brand-blue text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider inline-block mb-2">
+              Teatro, Arte y Expresión Bilingüe
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+              El aprendizaje del idioma en acción sobre el escenario
+            </h3>
+            <p className="text-sm text-white/90 font-medium hidden sm:block">
+              Cada año nuestros alumnos protagonizan el tradicional English Concert, integrando fluidez comunicativa, canto y expresión dramática.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

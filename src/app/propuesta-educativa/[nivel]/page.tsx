@@ -11,7 +11,7 @@ const nivelesData = {
     title: "Nivel Inicial (Escuela N° 1030)",
     subtitle: "Salas de 3, 4 y 5 años. Aprendizaje significativo basado en el juego, la exploración y la contención afectiva.",
     color: "brand-yellow",
-    image: "/nivel-inicial.png",
+    image: "/photos/fee_photo_01.jpg",
     ejeCentral: "El juego es el motor del aprendizaje: potencia la creatividad, la imaginación, la autonomía y la comprensión del mundo en un marco de contención y respeto por los tiempos de cada niño y niña.",
     egresadoTitle: "Perfil del Egresado (Inicial)",
     egresadoPoints: [
@@ -26,7 +26,7 @@ const nivelesData = {
     title: "Nivel Primario (Escuela N° 1030)",
     subtitle: "Excelencia académica con enfoque en valores, educación personalizada e inglés intensivo.",
     color: "brand-green",
-    image: "/nivel-primario.png",
+    image: "/photos/fee_photo_24.jpg",
     ejeCentral: "En el Nivel Primario entendemos que cada estudiante recorre una trayectoria escolar única. Fomentamos el aprendizaje contextualizado y el desarrollo del pensamiento crítico, integrando la tecnología como herramienta pedagógica y estimulando la curiosidad científica y humanística.",
     egresadoTitle: "Perfil del Estudiante Egresado (Primario)",
     egresadoPoints: [
@@ -41,7 +41,7 @@ const nivelesData = {
     title: "Nivel Secundario (Escuela N° 1739)",
     subtitle: "Orientación en Ciencias Naturales, formación ciudadana, pensamiento crítico y preparación académica superior.",
     color: "brand-blue",
-    image: "/nivel-secundario.png",
+    image: "/photos/fee_photo_02.jpg",
     ejeCentral: "Ofrece un Ciclo Básico Común y un Ciclo Orientado en Ciencias Naturales. Brinda una formación integral caracterizada por la cultura del diálogo, el rigor académico, el acompañamiento en la diversidad y la articulación con estudios superiores y el mundo laboral.",
     egresadoTitle: "Perfil del Estudiante Egresado (Secundario)",
     egresadoPoints: [

@@ -15,9 +15,9 @@ export default function ComunidadPage() {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="/comunidad-hero.png" 
-            alt="Comunidad FEE" 
-            className="w-full h-full object-cover opacity-20"
+            src="/photos/fee_photo_14.jpg" 
+            alt="Comunidad FEE - Encuentro de Familias y Kermesse" 
+            className="w-full h-full object-cover opacity-25"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-blue via-brand-blue/80 to-brand-blue" />
         </div>
