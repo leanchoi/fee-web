@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { 
   logoutAdmin, 
   createPost, 
@@ -41,7 +41,19 @@ import {
   Sparkles,
   Check,
   Upload,
-  Loader2
+  Loader2,
+  BarChart3,
+  PieChart,
+  TrendingUp,
+  Filter,
+  Search,
+  LayoutGrid,
+  List,
+  CalendarDays,
+  SlidersHorizontal,
+  Printer,
+  Clock,
+  ChevronRight
 } from "lucide-react";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
@@ -91,6 +103,63 @@ export function AdminDashboard({
   // Enrollments and Contacts State
   const [enrollmentList, setEnrollmentList] = useState<Enrollment[]>(enrollments || []);
   const [contactList, setContactList] = useState<ContactMessage[]>(contactMessages || []);
+
+  // Enrollments Filtering & Analytics State
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("");
+  const [enrollmentLevelFilter, setEnrollmentLevelFilter] = useState<"all" | "inicial" | "primario" | "secundario">("all");
+  const [enrollmentDatePreset, setEnrollmentDatePreset] = useState<"all" | "7days" | "30days" | "thisYear" | "custom">("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [enrollmentViewMode, setEnrollmentViewMode] = useState<"cards" | "table">("cards");
+
+  const filteredEnrollments = useMemo(() => {
+    return enrollmentList.filter(e => {
+      // 1. Search Query
+      if (enrollmentSearchQuery.trim()) {
+        const q = enrollmentSearchQuery.toLowerCase();
+        const matchName = (e.studentName || "").toLowerCase().includes(q);
+        const matchTutor = (e.tutorName || "").toLowerCase().includes(q);
+        const matchEmail = (e.tutorEmail || "").toLowerCase().includes(q);
+        const matchPhone = (e.tutorPhone || "").toLowerCase().includes(q);
+        const matchGrade = (e.studentGrade || "").toLowerCase().includes(q);
+        const matchComments = (e.comments || "").toLowerCase().includes(q);
+        if (!matchName && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchComments) {
+          return false;
+        }
+      }
+
+      // 2. Level Filter
+      if (enrollmentLevelFilter !== "all") {
+        const lvl = (e.studentLevel || "").toLowerCase();
+        if (!lvl.includes(enrollmentLevelFilter)) return false;
+      }
+
+      // 3. Date Preset Filter
+      const itemDate = new Date(e.createdAt);
+      const now = new Date();
+      if (enrollmentDatePreset === "7days") {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (itemDate < sevenDaysAgo) return false;
+      } else if (enrollmentDatePreset === "30days") {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        if (itemDate < thirtyDaysAgo) return false;
+      } else if (enrollmentDatePreset === "thisYear") {
+        if (itemDate.getFullYear() !== now.getFullYear()) return false;
+      } else if (enrollmentDatePreset === "custom") {
+        if (customStartDate) {
+          const start = new Date(customStartDate + "T00:00:00");
+          if (itemDate < start) return false;
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate + "T23:59:59");
+          if (itemDate > end) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [enrollmentList, enrollmentSearchQuery, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
   
   // User Management State
   const [userError, setUserError] = useState("");
@@ -342,143 +411,347 @@ export function AdminDashboard({
 
         {hasEnrollmentsPerm && activeTab === "enrollments" && (
           <div>
-            <h2 className="text-2xl font-bold text-brand-green mb-6">Inscripciones Recibidas</h2>
+            {/* Header with Title and Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-brand-green">Inscripciones y Solicitudes</h2>
+                <p className="text-xs text-brand-foreground/70 mt-1 font-medium">
+                  Gestioná los aspirantes, filtrá por niveles o períodos y consultá las métricas de admisión.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <button 
+                  onClick={() => setShowAnalyticsModal(true)}
+                  className="flex items-center gap-2 bg-brand-green text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-full hover:bg-brand-blue transition-all shadow-md shrink-0 cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4" /> Estadísticas & Métricas
+                </button>
+                <div className="bg-brand-gray/10 p-1 rounded-full flex items-center shrink-0 border">
+                  <button
+                    onClick={() => setEnrollmentViewMode("cards")}
+                    className={cn(
+                      "p-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      enrollmentViewMode === "cards" ? "bg-white text-brand-blue shadow-sm" : "text-brand-foreground/60 hover:text-brand-blue"
+                    )}
+                    title="Vista en Fichas"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Fichas</span>
+                  </button>
+                  <button
+                    onClick={() => setEnrollmentViewMode("table")}
+                    className={cn(
+                      "p-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      enrollmentViewMode === "table" ? "bg-white text-brand-blue shadow-sm" : "text-brand-foreground/60 hover:text-brand-blue"
+                    )}
+                    title="Vista en Tabla"
+                  >
+                    <List className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Tabla</span>
+                  </button>
+                </div>
+              </div>
+            </div>
 
-            {/* Metrics cards */}
+            {/* Quick Metrics KPI Banner */}
             {(() => {
-              const total = enrollmentList.length;
-              const inicial = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("inicial")).length;
-              const primario = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("primario")).length;
-              const secundario = enrollmentList.filter(e => e.studentLevel.toLowerCase().includes("secundario")).length;
+              const totalAll = enrollmentList.length;
+              const inicialCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("inicial")).length;
+              const primarioCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("primario")).length;
+              const secundarioCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("secundario")).length;
 
               return (
                 <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-brand-blue/5 border border-brand-blue/10 p-5 rounded-2xl">
-                      <span className="text-xs text-brand-blue font-bold uppercase tracking-wider block mb-1">Total Solicitudes</span>
-                      <span className="text-3xl font-extrabold text-brand-blue">{total}</span>
-                    </div>
-                    <div className="bg-brand-yellow/10 border border-brand-yellow/20 p-5 rounded-2xl">
-                      <span className="text-xs text-brand-yellow-dark font-bold uppercase tracking-wider block mb-1">Nivel Inicial</span>
-                      <span className="text-3xl font-extrabold text-brand-yellow-dark">{inicial}</span>
-                    </div>
-                    <div className="bg-brand-green/5 border border-brand-green/10 p-5 rounded-2xl">
-                      <span className="text-xs text-brand-green font-bold uppercase tracking-wider block mb-1">Nivel Primario</span>
-                      <span className="text-3xl font-extrabold text-brand-green">{primario}</span>
-                    </div>
-                    <div className="bg-brand-lightblue/5 border border-brand-lightblue/10 p-5 rounded-2xl">
-                      <span className="text-xs text-brand-lightblue font-bold uppercase tracking-wider block mb-1">Nivel Secundario</span>
-                      <span className="text-3xl font-extrabold text-brand-lightblue">{secundario}</span>
-                    </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                    <button
+                      onClick={() => setEnrollmentLevelFilter("all")}
+                      className={cn(
+                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "all" ? "bg-brand-blue text-white shadow-md scale-[1.02] border-brand-blue" : "bg-brand-blue/5 border-brand-blue/10 hover:bg-brand-blue/10"
+                      )}
+                    >
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "all" ? "text-white/80" : "text-brand-blue")}>
+                        Total General
+                      </span>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "all" ? "text-white" : "text-brand-blue")}>
+                        {totalAll}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setEnrollmentLevelFilter("inicial")}
+                      className={cn(
+                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "inicial" ? "bg-brand-yellow-dark text-white shadow-md scale-[1.02] border-brand-yellow-dark" : "bg-brand-yellow/10 border-brand-yellow/20 hover:bg-brand-yellow/20"
+                      )}
+                    >
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "inicial" ? "text-white/80" : "text-brand-yellow-dark")}>
+                        Nivel Inicial
+                      </span>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "inicial" ? "text-white" : "text-brand-yellow-dark")}>
+                        {inicialCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setEnrollmentLevelFilter("primario")}
+                      className={cn(
+                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "primario" ? "bg-brand-green text-white shadow-md scale-[1.02] border-brand-green" : "bg-brand-green/5 border-brand-green/10 hover:bg-brand-green/10"
+                      )}
+                    >
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "primario" ? "text-white/80" : "text-brand-green")}>
+                        Nivel Primario
+                      </span>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "primario" ? "text-white" : "text-brand-green")}>
+                        {primarioCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setEnrollmentLevelFilter("secundario")}
+                      className={cn(
+                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "secundario" ? "bg-brand-lightblue text-white shadow-md scale-[1.02] border-brand-lightblue" : "bg-brand-lightblue/5 border-brand-lightblue/10 hover:bg-brand-lightblue/10"
+                      )}
+                    >
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "secundario" ? "text-white/80" : "text-brand-lightblue")}>
+                        Nivel Secundario
+                      </span>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "secundario" ? "text-white" : "text-brand-lightblue")}>
+                        {secundarioCount}
+                      </span>
+                    </button>
                   </div>
 
-                  <h3 className="text-lg font-bold text-brand-blue mb-4">Vista en Fichas</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {enrollmentList.map(e => {
-                      const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
-                      let levelColor = "bg-brand-yellow/10 text-brand-yellow-dark border-brand-yellow/20";
-                      if (e.studentLevel.toLowerCase().includes("primario")) {
-                        levelColor = "bg-brand-green/10 text-brand-green border-brand-green/20";
-                      } else if (e.studentLevel.toLowerCase().includes("secundario")) {
-                        levelColor = "bg-brand-blue/10 text-brand-blue border-brand-blue/20";
-                      }
-                      return (
-                        <div key={e.id} className="bg-white border rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-                          <div>
-                            <div className="flex justify-between items-start gap-4 mb-4">
-                              <div className="w-10 h-10 rounded-full bg-brand-gray/10 flex items-center justify-center font-extrabold text-brand-blue shrink-0">
-                                {initial}
-                              </div>
-                              <div className="text-right">
-                                <span className="text-[10px] text-brand-foreground/50 font-medium block">
-                                  {new Date(e.createdAt).toLocaleDateString()}
-                                </span>
-                                <span className={cn("inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1", levelColor)}>
-                                  {e.studentLevel}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
-                            <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
-                            
-                            <div className="space-y-2 border-t pt-3 text-xs mb-4">
-                              <p className="text-brand-foreground/75"><span className="font-bold">Tutor:</span> {e.tutorName}</p>
-                              <p className="text-brand-foreground/75 flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5 text-brand-blue" /> {e.tutorEmail}</p>
-                              <p className="text-brand-foreground/75 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-green" /> {e.tutorPhone}</p>
-                            </div>
+                  {/* Filter & Search Bar */}
+                  <div className="bg-white border rounded-2xl p-4 sm:p-5 shadow-sm mb-6 space-y-4">
+                    <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+                      {/* Search Bar */}
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 text-brand-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={enrollmentSearchQuery}
+                          onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
+                          placeholder="Buscar por aspirante, tutor, email, teléfono o comentarios..."
+                          className="w-full pl-10 pr-9 py-2 border rounded-xl text-xs sm:text-sm font-medium bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
+                        />
+                        {enrollmentSearchQuery && (
+                          <button
+                            onClick={() => setEnrollmentSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-foreground/40 hover:text-brand-blue"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
 
-                            {e.comments && (
-                              <div className="bg-brand-gray/5 border p-2.5 rounded-xl text-[11px] text-brand-foreground/80 leading-normal max-h-24 overflow-y-auto mb-4">
-                                <span className="font-bold block mb-0.5">Comentarios:</span>
-                                {e.comments}
-                              </div>
+                      {/* Period Presets */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-brand-foreground/60 mr-1 flex items-center gap-1">
+                          <CalendarDays className="w-3.5 h-3.5" /> Período:
+                        </span>
+                        {[
+                          { key: "all", label: "Todo" },
+                          { key: "7days", label: "7 Días" },
+                          { key: "30days", label: "Último Mes" },
+                          { key: "thisYear", label: "Este Año" },
+                          { key: "custom", label: "Personalizado 📅" },
+                        ].map((preset) => (
+                          <button
+                            key={preset.key}
+                            type="button"
+                            onClick={() => setEnrollmentDatePreset(preset.key as any)}
+                            className={cn(
+                              "text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer",
+                              enrollmentDatePreset === preset.key
+                                ? "bg-brand-blue text-white shadow-sm"
+                                : "bg-brand-gray/10 hover:bg-brand-gray/20 text-brand-foreground/70"
                             )}
-                          </div>
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                          <div className="flex items-center gap-2 border-t pt-3">
-                            <a href={`mailto:${e.tutorEmail}`} className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors">
-                              Enviar Mail
-                            </a>
-                            <a href={`tel:${e.tutorPhone}`} className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors">
-                              Llamar
-                            </a>
-                            <button 
-                              onClick={() => handleDeleteEnrollment(e.id)} 
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0" 
-                              title="Eliminar inscripción"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                    {/* Custom Date Range Selector (if selected) */}
+                    {enrollmentDatePreset === "custom" && (
+                      <div className="pt-3 border-t flex flex-wrap items-center gap-3 text-xs font-bold text-brand-blue bg-brand-blue/5 p-3 rounded-xl">
+                        <span>Filtrar fechas:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-normal text-brand-foreground/70">Desde:</span>
+                          <input
+                            type="date"
+                            value={customStartDate}
+                            onChange={(e) => setCustomStartDate(e.target.value)}
+                            className="px-2.5 py-1 border rounded-lg bg-white text-xs"
+                          />
                         </div>
-                      );
-                    })}
-                    {enrollmentList.length === 0 && <p className="text-brand-gray text-sm italic col-span-full text-center py-4">No hay fichas de inscripción.</p>}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-normal text-brand-foreground/70">Hasta:</span>
+                          <input
+                            type="date"
+                            value={customEndDate}
+                            onChange={(e) => setCustomEndDate(e.target.value)}
+                            className="px-2.5 py-1 border rounded-lg bg-white text-xs"
+                          />
+                        </div>
+                        {(customStartDate || customEndDate) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomStartDate("");
+                              setCustomEndDate("");
+                            }}
+                            className="text-[11px] text-red-500 hover:underline ml-auto"
+                          >
+                            Limpiar fechas
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Active Filters Summary */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs">
+                      <span className="text-brand-foreground/70 font-semibold">
+                        Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {enrollmentList.length} inscripciones
+                      </span>
+                      {(enrollmentSearchQuery || enrollmentLevelFilter !== "all" || enrollmentDatePreset !== "all" || customStartDate || customEndDate) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEnrollmentSearchQuery("");
+                            setEnrollmentLevelFilter("all");
+                            setEnrollmentDatePreset("all");
+                            setCustomStartDate("");
+                            setCustomEndDate("");
+                          }}
+                          className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" /> Reestablecer filtros
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <h3 className="text-lg font-bold text-brand-blue mb-4">Lista Detallada</h3>
-                  <div className="overflow-x-auto rounded-xl border">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-brand-gray/5 text-brand-green text-sm">
-                          <th className="p-4 font-bold border-b">Recibido</th>
-                          <th className="p-4 font-bold border-b">Aspirante</th>
-                          <th className="p-4 font-bold border-b">Nivel / Grado</th>
-                          <th className="p-4 font-bold border-b">Tutor</th>
-                          <th className="p-4 font-bold border-b">Contacto</th>
-                          <th className="p-4 font-bold border-b">Comentarios</th>
-                          <th className="p-4 font-bold border-b text-right">Acción</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm">
-                        {enrollmentList.map(e => (
-                          <tr key={e.id} className="border-b last:border-0 hover:bg-brand-green/5 transition-colors">
-                            <td className="p-4 text-brand-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
-                            <td className="p-4 font-semibold text-brand-blue">{e.studentName}</td>
-                            <td className="p-4">
-                              <span className="px-2 py-1 bg-brand-green/10 text-brand-green rounded-md font-semibold text-xs">
-                                {e.studentLevel} ({e.studentGrade})
-                              </span>
-                            </td>
-                            <td className="p-4 font-medium">{e.tutorName}</td>
-                            <td className="p-4 text-xs text-brand-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
-                            <td className="p-4 max-w-[150px] truncate text-xs" title={e.comments || ""}>{e.comments || "-"}</td>
-                            <td className="p-4 text-right">
+                  {/* Render Cards or Table */}
+                  {enrollmentViewMode === "cards" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                      {filteredEnrollments.map((e) => {
+                        const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
+                        let levelColor = "bg-brand-yellow/10 text-brand-yellow-dark border-brand-yellow/20";
+                        if ((e.studentLevel || "").toLowerCase().includes("primario")) {
+                          levelColor = "bg-brand-green/10 text-brand-green border-brand-green/20";
+                        } else if ((e.studentLevel || "").toLowerCase().includes("secundario")) {
+                          levelColor = "bg-brand-blue/10 text-brand-blue border-brand-blue/20";
+                        }
+                        return (
+                          <div key={e.id} className="bg-white border rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                            <div>
+                              <div className="flex justify-between items-start gap-4 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-brand-gray/10 flex items-center justify-center font-extrabold text-brand-blue shrink-0">
+                                  {initial}
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] text-brand-foreground/50 font-medium block">
+                                    {new Date(e.createdAt).toLocaleDateString()}
+                                  </span>
+                                  <span className={cn("inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1", levelColor)}>
+                                    {e.studentLevel}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
+                              <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
+                              
+                              <div className="space-y-2 border-t pt-3 text-xs mb-4">
+                                <p className="text-brand-foreground/75"><span className="font-bold">Tutor:</span> {e.tutorName}</p>
+                                <p className="text-brand-foreground/75 flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5 text-brand-blue" /> {e.tutorEmail}</p>
+                                <p className="text-brand-foreground/75 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-green" /> {e.tutorPhone}</p>
+                              </div>
+
+                              {e.comments && (
+                                <div className="bg-brand-gray/5 border p-2.5 rounded-xl text-[11px] text-brand-foreground/80 leading-normal max-h-24 overflow-y-auto mb-4">
+                                  <span className="font-bold block mb-0.5">Comentarios:</span>
+                                  {e.comments}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 border-t pt-3">
+                              <a href={`mailto:${e.tutorEmail}`} className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors">
+                                Enviar Mail
+                              </a>
+                              <a href={`tel:${e.tutorPhone}`} className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors">
+                                Llamar
+                              </a>
                               <button 
                                 onClick={() => handleDeleteEnrollment(e.id)} 
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer" 
                                 title="Eliminar inscripción"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                            </td>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {filteredEnrollments.length === 0 && (
+                        <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
+                          No se encontraron inscripciones con los filtros seleccionados.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border mb-8">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-brand-gray/5 text-brand-green text-sm">
+                            <th className="p-4 font-bold border-b">Recibido</th>
+                            <th className="p-4 font-bold border-b">Aspirante</th>
+                            <th className="p-4 font-bold border-b">Nivel / Grado</th>
+                            <th className="p-4 font-bold border-b">Tutor</th>
+                            <th className="p-4 font-bold border-b">Contacto</th>
+                            <th className="p-4 font-bold border-b">Comentarios</th>
+                            <th className="p-4 font-bold border-b text-right">Acción</th>
                           </tr>
-                        ))}
-                        {enrollmentList.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-brand-gray">No hay solicitudes nuevas.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="text-sm">
+                          {filteredEnrollments.map((e) => (
+                            <tr key={e.id} className="border-b last:border-0 hover:bg-brand-green/5 transition-colors">
+                              <td className="p-4 text-brand-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
+                              <td className="p-4 font-semibold text-brand-blue">{e.studentName}</td>
+                              <td className="p-4">
+                                <span className="px-2 py-1 bg-brand-green/10 text-brand-green rounded-md font-semibold text-xs">
+                                  {e.studentLevel} ({e.studentGrade})
+                                </span>
+                              </td>
+                              <td className="p-4 font-medium">{e.tutorName}</td>
+                              <td className="p-4 text-xs text-brand-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
+                              <td className="p-4 max-w-[150px] truncate text-xs" title={e.comments || ""}>{e.comments || "-"}</td>
+                              <td className="p-4 text-right">
+                                <button 
+                                  onClick={() => handleDeleteEnrollment(e.id)} 
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
+                                  title="Eliminar inscripción"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {filteredEnrollments.length === 0 && (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-brand-gray">
+                                No se encontraron solicitudes con los filtros aplicados.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </>
               );
             })()}
@@ -759,6 +1032,14 @@ export function AdminDashboard({
           onSave={(updatedList) => {
             setGalleryList(updatedList);
           }}
+        />
+      )}
+
+      {/* Analytics Dashboard Modal */}
+      {showAnalyticsModal && (
+        <EnrollmentAnalyticsModal 
+          enrollments={enrollmentList}
+          onClose={() => setShowAnalyticsModal(false)}
         />
       )}
     </div>
@@ -1610,6 +1891,361 @@ function GalleryEditorModal({
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EnrollmentAnalyticsModal({
+  enrollments,
+  onClose
+}: {
+  enrollments: Enrollment[];
+  onClose: () => void;
+}) {
+  const total = enrollments.length;
+  const inicialList = enrollments.filter(e => (e.studentLevel || "").toLowerCase().includes("inicial"));
+  const primarioList = enrollments.filter(e => (e.studentLevel || "").toLowerCase().includes("primario"));
+  const secundarioList = enrollments.filter(e => (e.studentLevel || "").toLowerCase().includes("secundario"));
+
+  const inicialCount = inicialList.length;
+  const primarioCount = primarioList.length;
+  const secundarioCount = secundarioList.length;
+
+  const inicialPct = total > 0 ? Math.round((inicialCount / total) * 100) : 0;
+  const primarioPct = total > 0 ? Math.round((primarioCount / total) * 100) : 0;
+  const secundarioPct = total > 0 ? Math.max(0, 100 - inicialPct - primarioPct) : 0;
+
+  // Donut SVG segments calculation (R = 54, Circ = 339.29)
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const inicialStroke = (inicialCount / (total || 1)) * circumference;
+  const primarioStroke = (primarioCount / (total || 1)) * circumference;
+  const secundarioStroke = (secundarioCount / (total || 1)) * circumference;
+
+  const inicialOffset = 0;
+  const primarioOffset = -inicialStroke;
+  const secundarioOffset = -(inicialStroke + primarioStroke);
+
+  // Group by grade/sala
+  const gradeCounts: { [key: string]: number } = {};
+  enrollments.forEach(e => {
+    const g = (e.studentGrade || "Sin especificar").trim();
+    gradeCounts[g] = (gradeCounts[g] || 0) + 1;
+  });
+  const sortedGrades = Object.entries(gradeCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  // Monthly breakdown
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthlyStats = monthNames.map((name, idx) => {
+    const count = enrollments.filter(e => {
+      const d = new Date(e.createdAt);
+      return d.getMonth() === idx;
+    }).length;
+    return { name, count };
+  });
+  const maxMonthCount = Math.max(...monthlyStats.map(m => m.count), 1);
+
+  // Data completeness
+  const withComments = enrollments.filter(e => e.comments && e.comments.trim().length > 0).length;
+  const withPhone = enrollments.filter(e => e.tutorPhone && e.tutorPhone.trim().length > 0).length;
+  const withEmail = enrollments.filter(e => e.tutorEmail && e.tutorEmail.trim().length > 0).length;
+
+  return (
+    <div className="fixed inset-0 bg-brand-blue/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden relative my-auto border border-brand-gray/10 animate-in fade-in zoom-in duration-200">
+        
+        {/* Modal Header */}
+        <div className="p-6 md:p-8 border-b bg-gradient-to-r from-brand-blue/5 via-brand-green/5 to-brand-yellow/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-brand-green text-white flex items-center justify-center shadow-md shadow-brand-green/20 shrink-0">
+              <BarChart3 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-xl md:text-2xl font-extrabold text-brand-blue">
+                Dashboard Analítico de Inscripciones
+              </h3>
+              <p className="text-xs text-brand-foreground/70 font-medium">
+                Métricas consolidadas, distribución por niveles y tendencias temporales de solicitudes.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="p-2.5 text-brand-blue hover:bg-white rounded-full transition-colors border shadow-sm flex items-center gap-1.5 text-xs font-bold bg-white/80 cursor-pointer"
+              title="Imprimir / Exportar reporte"
+            >
+              <Printer className="w-4 h-4" /> <span className="hidden sm:inline">Imprimir</span>
+            </button>
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="p-2.5 text-brand-blue hover:bg-brand-gray/10 rounded-full transition-colors bg-white shadow-sm border cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 md:p-8 overflow-y-auto flex-1 space-y-8">
+          
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-brand-blue/5 border border-brand-blue/15 p-5 rounded-2xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[11px] font-bold text-brand-blue uppercase tracking-wider">Total Recibidas</span>
+                <Users className="w-4 h-4 text-brand-blue/60" />
+              </div>
+              <span className="text-3xl sm:text-4xl font-black text-brand-blue">{total}</span>
+              <span className="text-[10px] text-brand-foreground/60 mt-1 font-semibold">100% de la demanda</span>
+            </div>
+
+            <div className="bg-brand-yellow/10 border border-brand-yellow/30 p-5 rounded-2xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[11px] font-bold text-brand-yellow-dark uppercase tracking-wider">Nivel Inicial</span>
+                <span className="text-xs font-extrabold bg-brand-yellow/40 text-brand-yellow-dark px-2 py-0.5 rounded-full">{inicialPct}%</span>
+              </div>
+              <span className="text-3xl sm:text-4xl font-black text-brand-yellow-dark">{inicialCount}</span>
+              <div className="w-full bg-brand-yellow/20 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="bg-brand-yellow-dark h-full rounded-full" style={{ width: `${inicialPct}%` }}></div>
+              </div>
+            </div>
+
+            <div className="bg-brand-green/5 border border-brand-green/20 p-5 rounded-2xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[11px] font-bold text-brand-green uppercase tracking-wider">Nivel Primario</span>
+                <span className="text-xs font-extrabold bg-brand-green/20 text-brand-green px-2 py-0.5 rounded-full">{primarioPct}%</span>
+              </div>
+              <span className="text-3xl sm:text-4xl font-black text-brand-green">{primarioCount}</span>
+              <div className="w-full bg-brand-green/20 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="bg-brand-green h-full rounded-full" style={{ width: `${primarioPct}%` }}></div>
+              </div>
+            </div>
+
+            <div className="bg-brand-lightblue/5 border border-brand-lightblue/20 p-5 rounded-2xl flex flex-col justify-between">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[11px] font-bold text-brand-lightblue uppercase tracking-wider">Nivel Secundario</span>
+                <span className="text-xs font-extrabold bg-brand-lightblue/20 text-brand-lightblue px-2 py-0.5 rounded-full">{secundarioPct}%</span>
+              </div>
+              <span className="text-3xl sm:text-4xl font-black text-brand-lightblue">{secundarioCount}</span>
+              <div className="w-full bg-brand-lightblue/20 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div className="bg-brand-lightblue h-full rounded-full" style={{ width: `${secundarioPct}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            {/* Chart 1: Donut Chart Distribución por Nivel */}
+            <div className="md:col-span-5 bg-white border border-brand-gray/15 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-brand-blue" />
+                  <h4 className="font-bold text-brand-blue text-sm">Distribución por Nivel</h4>
+                </div>
+                <span className="text-[10px] font-bold text-brand-foreground/50 uppercase">Proporción</span>
+              </div>
+
+              <div className="relative flex items-center justify-center my-4">
+                <svg width="170" height="170" viewBox="0 0 140 140" className="transform -rotate-90">
+                  {/* Background Track */}
+                  <circle
+                    cx="70"
+                    cy="70"
+                    r={radius}
+                    fill="none"
+                    stroke="#f1f5f9"
+                    strokeWidth="18"
+                  />
+                  {total > 0 && (
+                    <>
+                      {/* Inicial Segment */}
+                      <circle
+                        cx="70"
+                        cy="70"
+                        r={radius}
+                        fill="none"
+                        stroke="#F9A825"
+                        strokeWidth="18"
+                        strokeDasharray={`${inicialStroke} ${circumference}`}
+                        strokeDashoffset={inicialOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                      {/* Primario Segment */}
+                      <circle
+                        cx="70"
+                        cy="70"
+                        r={radius}
+                        fill="none"
+                        stroke="#2E7D32"
+                        strokeWidth="18"
+                        strokeDasharray={`${primarioStroke} ${circumference}`}
+                        strokeDashoffset={primarioOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                      {/* Secundario Segment */}
+                      <circle
+                        cx="70"
+                        cy="70"
+                        r={radius}
+                        fill="none"
+                        stroke="#172A45"
+                        strokeWidth="18"
+                        strokeDasharray={`${secundarioStroke} ${circumference}`}
+                        strokeDashoffset={secundarioOffset}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                    </>
+                  )}
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-black text-brand-blue">{total}</span>
+                  <span className="text-[10px] font-bold text-brand-foreground/60 uppercase tracking-wider">Aspirantes</span>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-brand-yellow-dark"></span>
+                    <span className="font-semibold text-brand-foreground/80">Inicial</span>
+                  </div>
+                  <span className="font-bold text-brand-blue">{inicialCount} ({inicialPct}%)</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-brand-green"></span>
+                    <span className="font-semibold text-brand-foreground/80">Primario</span>
+                  </div>
+                  <span className="font-bold text-brand-blue">{primarioCount} ({primarioPct}%)</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-brand-blue"></span>
+                    <span className="font-semibold text-brand-foreground/80">Secundario</span>
+                  </div>
+                  <span className="font-bold text-brand-blue">{secundarioCount} ({secundarioPct}%)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Chart 2: Evolución Mensual */}
+            <div className="md:col-span-7 bg-white border border-brand-gray/15 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-brand-green" />
+                  <h4 className="font-bold text-brand-blue text-sm">Evolución de Solicitudes por Mes</h4>
+                </div>
+                <span className="text-[10px] font-bold text-brand-foreground/50 uppercase">Año en Curso</span>
+              </div>
+
+              {/* Bar Chart */}
+              <div className="h-48 flex items-end justify-between gap-1 sm:gap-2 px-2 pt-6 pb-2 border-b border-brand-gray/10">
+                {monthlyStats.map((m, idx) => {
+                  const barHeight = m.count > 0 ? Math.max(12, Math.round((m.count / maxMonthCount) * 100)) : 4;
+                  const isCurrentMonth = new Date().getMonth() === idx;
+                  return (
+                    <div key={m.name} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div className="text-[10px] font-bold text-brand-blue opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 bg-brand-blue/10 px-1.5 py-0.5 rounded">
+                        {m.count}
+                      </div>
+                      <div 
+                        className={cn(
+                          "w-full rounded-t-lg transition-all duration-300 group-hover:brightness-110",
+                          m.count > 0 ? (isCurrentMonth ? "bg-brand-green shadow-sm shadow-brand-green/30" : "bg-brand-blue/70") : "bg-brand-gray/20"
+                        )}
+                        style={{ height: `${barHeight}%` }}
+                      ></div>
+                      <span className={cn("text-[10px] font-bold", isCurrentMonth ? "text-brand-green" : "text-brand-foreground/60")}>
+                        {m.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-between pt-4 text-[11px] text-brand-foreground/70">
+                <span>Mes con mayor demanda: <strong className="text-brand-blue">{monthlyStats.reduce((max, m) => m.count > max.count ? m : max, monthlyStats[0]).name}</strong></span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand-green"></span> Mes Actual</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary Details: Top Grados & Calidad */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Top Grados / Salas */}
+            <div className="bg-brand-gray/5 border border-brand-gray/10 rounded-3xl p-6">
+              <h4 className="font-bold text-brand-blue text-sm mb-4 flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-brand-yellow-dark" />
+                Grados y Salas más Solicitados
+              </h4>
+              <div className="space-y-3">
+                {sortedGrades.map(([grade, count]) => {
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <div key={grade} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-bold text-brand-blue">{grade}</span>
+                        <span className="font-semibold text-brand-foreground/70">{count} aspirantes ({pct}%)</span>
+                      </div>
+                      <div className="w-full bg-brand-gray/15 h-2 rounded-full overflow-hidden">
+                        <div className="bg-brand-blue h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {sortedGrades.length === 0 && <p className="text-xs text-brand-gray italic">Sin datos de grados.</p>}
+              </div>
+            </div>
+
+            {/* Eficiencia y Calidad de Contacto */}
+            <div className="bg-brand-gray/5 border border-brand-gray/10 rounded-3xl p-6 flex flex-col justify-between">
+              <div>
+                <h4 className="font-bold text-brand-blue text-sm mb-4 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-brand-green" />
+                  Calidad de Información de Contacto
+                </h4>
+                <div className="grid grid-cols-3 gap-3 text-center mb-4">
+                  <div className="bg-white p-3 rounded-2xl border">
+                    <span className="text-lg font-bold text-brand-blue">{withEmail}</span>
+                    <span className="block text-[10px] font-semibold text-brand-foreground/60 uppercase">Emails Válidos</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-2xl border">
+                    <span className="text-lg font-bold text-brand-green">{withPhone}</span>
+                    <span className="block text-[10px] font-semibold text-brand-foreground/60 uppercase">Teléfonos</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-2xl border">
+                    <span className="text-lg font-bold text-brand-yellow-dark">{withComments}</span>
+                    <span className="block text-[10px] font-semibold text-brand-foreground/60 uppercase">Comentarios</span>
+                  </div>
+                </div>
+                <p className="text-xs text-brand-foreground/70 leading-relaxed">
+                  Todas las solicitudes cuentan con datos completos de contacto para seguimiento telefónico o invitación a entrevistas de admisión.
+                </p>
+              </div>
+              <div className="pt-4 border-t border-brand-gray/10 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2 rounded-full text-xs font-bold bg-brand-blue text-white hover:bg-brand-green transition-colors cursor-pointer"
+                >
+                  Cerrar Dashboard
+                </button>
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </div>
     </div>
