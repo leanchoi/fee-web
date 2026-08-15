@@ -53,7 +53,7 @@ export const metadata: Metadata = {
       "Más que una escuela, una comunidad comprometida con el futuro. Formamos mentes libres y corazones solidarios bajo un ideario de excelencia en la Patagonia.",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og-banner-v2.jpg",
         width: 1200,
         height: 630,
         alt: "Fundación Educativa Esquel - Comunidad Educativa",
@@ -66,7 +66,7 @@ export const metadata: Metadata = {
     title: "Fundación Educativa Esquel | Educación Bilingüe y Valores",
     description:
       "Comunidad educativa comprometida con el futuro y la excelencia en Esquel, Chubut.",
-    images: ["/og-image.jpg"],
+    images: ["/og-banner-v2.jpg"],
   },
   icons: {
     icon: "/logo.png",
@@ -83,8 +83,8 @@ export default function RootLayout({
   return (
     <html lang="es" className="scroll-smooth">
       <head>
-        <meta property="og:image" content="https://fundacionesquel.edu.ar/og-image.jpg" />
-        <meta property="og:image:secure_url" content="https://fundacionesquel.edu.ar/og-image.jpg" />
+        <meta property="og:image" content="https://fundacionesquel.edu.ar/og-banner-v2.jpg" />
+        <meta property="og:image:secure_url" content="https://fundacionesquel.edu.ar/og-banner-v2.jpg" />
         <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
