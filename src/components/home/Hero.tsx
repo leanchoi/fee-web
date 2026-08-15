@@ -29,9 +29,10 @@ export function Hero() {
         <img 
           src="/photos/fee_photo_11.jpg" 
           alt="Fundación Educativa Esquel background" 
-          className="w-full h-full object-cover opacity-20 scale-105"
+          className="w-full h-full object-cover opacity-45 scale-105"
         />
-        <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-background via-background/85 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent md:hidden" />
       </motion.div>
 
       {/* Shapes Overlay - Subtle Patagonian Glows */}

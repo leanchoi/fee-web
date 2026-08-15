@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Mail, Phone, MapPin } from "lucide-react";
+import { Mail, Phone, MapPin, Lock } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -162,9 +162,16 @@ export function Footer() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/contacto" className="hover:text-white transition-colors">Contacto Completo</Link>
+            <Link href="/contacto" className="hover:text-white transition-colors">Contacto</Link>
             <span className="opacity-30">|</span>
-            <Link href="/admin" className="hover:text-white transition-colors">Acceso Restringido</Link>
+            <Link 
+              href="/admin" 
+              className="text-white/40 hover:text-brand-yellow transition-colors p-1.5 rounded-full hover:bg-white/10 flex items-center justify-center" 
+              title="Acceso Intranet"
+              aria-label="Acceso Intranet"
+            >
+              <Lock className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </div>

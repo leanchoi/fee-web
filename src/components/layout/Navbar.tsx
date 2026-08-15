@@ -37,7 +37,11 @@ export function Navbar() {
     <header
       className={cn(
         "fixed top-0 left-0 w-full z-50 transition-all duration-300",
-        (scrolled || pathname !== "/") ? "bg-white/90 backdrop-blur-md shadow-sm py-2" : "bg-transparent py-4"
+        mobileMenuOpen
+          ? "bg-[#172A45] py-3 shadow-lg"
+          : (scrolled || pathname !== "/")
+          ? "bg-white/95 backdrop-blur-md shadow-sm py-2"
+          : "bg-transparent py-4"
       )}
     >
       <div className="container mx-auto px-6 lg:px-12 flex justify-between items-center">
@@ -50,10 +54,16 @@ export function Navbar() {
             />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg lg:text-xl font-bold text-brand-green leading-tight group-hover:text-brand-blue transition-colors">
+            <span className={cn(
+              "text-lg lg:text-xl font-bold leading-tight transition-colors",
+              mobileMenuOpen ? "text-white" : "text-brand-green group-hover:text-brand-blue"
+            )}>
               FUNDACIÓN
             </span>
-            <span className="text-xs lg:text-sm font-semibold text-brand-blue tracking-wider leading-none opacity-80">
+            <span className={cn(
+              "text-xs lg:text-sm font-semibold tracking-wider leading-none",
+              mobileMenuOpen ? "text-brand-yellow" : "text-brand-blue opacity-80"
+            )}>
               EDUCATIVA ESQUEL
             </span>
           </div>
@@ -88,7 +98,7 @@ export function Navbar() {
           <Link
             href="/admin"
             className="text-brand-blue/30 hover:text-brand-blue transition-colors p-2.5 rounded-full flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"
-            title="Acceso Restringido"
+            title="Acceso Intranet"
             aria-label="Acceso administrativo"
           >
             <Lock size={15} />
@@ -99,7 +109,7 @@ export function Navbar() {
         <button
           className={cn(
             "lg:hidden z-50 p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow",
-            mobileMenuOpen ? "text-white" : "text-brand-blue"
+            mobileMenuOpen ? "text-white hover:text-brand-yellow" : "text-brand-blue"
           )}
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú de navegación"}
@@ -108,14 +118,14 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* Mobile Nav Overlay */}
+      {/* Mobile Nav Overlay (Solid Opaque Background) */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-brand-blue/95 backdrop-blur-lg z-40 flex flex-col pt-28 px-8 pb-12 lg:hidden"
+            className="fixed inset-0 bg-[#172A45] z-40 flex flex-col pt-28 px-8 pb-12 lg:hidden overflow-y-auto"
           >
             <nav className="flex flex-col gap-5 items-center w-full my-auto">
               {links.map((l, i) => (
@@ -156,15 +166,15 @@ export function Navbar() {
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-auto w-full border-t border-white/10 pt-8 flex flex-col items-center gap-4 text-center text-white/60 text-xs"
+              transition={{ delay: 0.4 }}
+              className="mt-auto w-full border-t border-white/15 pt-8 flex flex-col items-center gap-4 text-center text-white/75 text-xs"
             >
               <div className="flex gap-4 items-center">
                 <a 
                   href="https://www.facebook.com/fundacioneducativaesquel/?locale=es_LA" 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="hover:text-brand-yellow transition-colors py-1 px-2"
+                  className="hover:text-brand-yellow transition-colors py-1 px-2 font-medium"
                 >
                   Facebook
                 </a>
@@ -172,20 +182,20 @@ export function Navbar() {
                   href="https://www.instagram.com/fundacioneducativaesquel/" 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="hover:text-brand-yellow transition-colors py-1 px-2"
+                  className="hover:text-brand-yellow transition-colors py-1 px-2 font-medium"
                 >
                   Instagram
                 </a>
                 <Link 
                   href="/admin" 
-                  className="text-white/30 hover:text-brand-yellow transition-colors flex items-center justify-center p-2 rounded-full min-w-[36px] min-h-[36px]" 
-                  title="Acceso docente / administrativo"
-                  aria-label="Acceso docente / administrativo"
+                  className="text-white/40 hover:text-brand-yellow transition-colors flex items-center justify-center p-2 rounded-full min-w-[36px] min-h-[36px]" 
+                  title="Acceso Intranet"
+                  aria-label="Acceso Intranet"
                 >
                   <Lock size={14} />
                 </Link>
               </div>
-              <p>Chacabuco 1314 / Gob. Galina 950 — Esquel</p>
+              <p className="opacity-80">Chacabuco 1029 / Gob. Galina 2888 — Esquel, Chubut</p>
             </motion.div>
           </motion.div>
         )}

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, GraduationCap, Users, BookOpen, ArrowRight } from "lucide-react";
+import { CheckCircle2, GraduationCap, Users, BookOpen, ArrowRight, Sparkles } from "lucide-react";
 
 const docentePerfilStandard = `Nuestros equipos docentes enseñan desde propuestas pedagógicas contextualizadas y significativas, adaptando sus estrategias a la diversidad de trayectorias escolares. Acompañan de manera personalizada los procesos de aprendizaje, respetando los tiempos y necesidades de cada estudiante, y promueven vínculos basados en el respeto, la confianza y los valores institucionales. Sostienen una comunicación permanente con las familias y trabajan colaborativamente con el Equipo de Orientación Escolar (EOE).`;
 
@@ -20,6 +20,10 @@ const nivelesData = {
       "Comprenden y respetan normas simples de convivencia democrática.",
       "Se inician de forma natural en la lectura, la matemática y la experiencia del inglés."
     ],
+    featureImage: "/photos/fee_photo_08.jpg",
+    featureTag: "JUEGO, ARTE Y EXPRESIÓN",
+    featureTitle: "La primera infancia aprendiendo a través de la creatividad y la imaginación",
+    featureDesc: "En las salas de 3, 4 y 5 años cada jornada es un espacio de descubrimiento sensible, contención afectiva y exploración activa."
   },
   primario: {
     slug: "primario",
@@ -35,6 +39,10 @@ const nivelesData = {
       "Practica la empatía, el trabajo en equipo y la resolución pacífica de conflictos basada en los AEC.",
       "Hace un uso responsable de las tecnologías y respeta el medio ambiente."
     ],
+    featureImage: "/photos/fee_photo_21.jpg",
+    featureTag: "SALIDAS EDUCATIVAS Y NATURALEZA",
+    featureTitle: "Aprender haciendo en el entorno natural patagónico",
+    featureDesc: "Salidas de estudio por el bosque andino, campamentos formativos y proyectos en ciencias que enriquecen los conocimientos del aula con experiencias inolvidables."
   },
   secundario: {
     slug: "secundario",
@@ -50,6 +58,10 @@ const nivelesData = {
       "Compromiso con la inclusión, la ciudadanía democrática y el desarrollo sustentable de la Patagonia.",
       "Preparados para la transición universitaria y proyectos de vida profesionales con ética."
     ],
+    featureImage: "/photos/fee_photo_17.jpg",
+    featureTag: "CIENCIAS NATURALES Y PROYECCIÓN",
+    featureTitle: "Investigación, trabajo de campo y autonomía ciudadana",
+    featureDesc: "Experiencias de laboratorio, viajes de estudio interdisciplinarios y sólida formación bilingüe para el ingreso a la universidad."
   },
 };
 
@@ -229,6 +241,31 @@ export default async function NivelPage({ params }: { params: Promise<Params> })
           </div>
         </div>
       </section>
+
+      {/* Visual Level Feature Banner with Real Photo */}
+      {data.featureImage && (
+        <section className="container mx-auto px-6 lg:px-12 my-16">
+          <div className="rounded-[2.5rem] overflow-hidden shadow-xl border border-brand-gray/10 relative h-80 sm:h-96 md:h-[440px]">
+            <img 
+              src={data.featureImage} 
+              alt={data.featureTitle} 
+              className="w-full h-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-blue/90 via-brand-blue/40 to-transparent" />
+            <div className="absolute bottom-8 left-8 right-8 text-white max-w-3xl">
+              <span className="bg-brand-yellow text-brand-blue text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider inline-block mb-3">
+                {data.featureTag}
+              </span>
+              <h3 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 leading-tight">
+                {data.featureTitle}
+              </h3>
+              <p className="text-sm sm:text-base text-white/90 font-medium leading-relaxed max-w-2xl">
+                {data.featureDesc}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Section 3: Institutional Projects (Symmetrical Grid) */}
       <section className="py-16 md:py-20">
