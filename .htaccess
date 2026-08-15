@@ -1,6 +1,28 @@
+# ==============================================================================
+# SEGURIDAD Y CONFIGURACIÓN DEL SERVIDOR - FUNDACIÓN EDUCATIVA ESQUEL
+# ==============================================================================
+
+# 1. Deshabilitar listado de directorios
+Options -Indexes
+
+# 2. Bloquear acceso a archivos sensibles y bases de datos
+<FilesMatch "\.(json|db|sqlite|sqlite3|tar\.gz|zip|log|env|bak|conf|sql|ini|sh|md)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# 3. Bloquear acceso a .git y archivos ocultos
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Bloquear carpetas y archivos ocultos (excepto .well-known)
+  RewriteRule (^|/)\.(?!well-known) - [F]
 
   # Pasar encabezado de autorización a PHP
   RewriteCond %{HTTP:Authorization} .
@@ -17,4 +39,13 @@
 
   RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
   RewriteRule ^(.*)$ /$1/index.html [L]
+</IfModule>
+
+# 4. Cabeceras de Seguridad HTTP
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
 </IfModule>

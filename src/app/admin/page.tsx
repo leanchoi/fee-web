@@ -34,6 +34,9 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-brand-gray/5 pb-24">
+      <head>
+        <meta name="robots" content="noindex, nofollow" />
+      </head>
       <header className="bg-brand-blue text-white py-6 shadow-md mb-12">
         <div className="container mx-auto px-6 lg:px-12 flex justify-between items-center">
           <span className="text-xl font-bold tracking-tight">FEE <span className="text-brand-yellow">Intranet</span></span>

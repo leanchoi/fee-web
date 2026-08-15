@@ -41,7 +41,7 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
         <Lock className="w-8 h-8" />
       </div>
       <h1 className="text-2xl font-bold text-brand-blue mb-2">Acceso Restringido</h1>
-      <p className="text-brand-foreground/70 text-sm mb-8">Ingresá tus credenciales o la clave maestra.</p>
+      <p className="text-brand-foreground/70 text-sm mb-8">Ingresá con tus credenciales institucionales.</p>
       
       <form onSubmit={handleLogin} className="flex flex-col gap-4 text-left">
         {error && <p className="text-red-500 text-sm font-semibold bg-red-50 py-2 rounded-lg text-center">{error}</p>}

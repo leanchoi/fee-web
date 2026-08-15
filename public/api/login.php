@@ -1,9 +1,38 @@
 <?php
+// ==============================================================================
+// AUTENTICACIÓN SEGURA - FUNDACIÓN EDUCATIVA ESQUEL
+// ==============================================================================
 require_once __DIR__ . '/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(["success" => false, "error" => "Método no permitido"]);
+    exit;
+}
+
+// Control básico de Rate Limiting por IP para prevención de fuerza bruta
+$clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+$rateLimitFile = sys_get_temp_dir() . '/fee_login_rl_' . md5($clientIp) . '.json';
+
+$attemptData = ['attempts' => 0, 'first_attempt' => time()];
+if (file_exists($rateLimitFile)) {
+    $rawRl = @file_get_contents($rateLimitFile);
+    if ($rawRl) {
+        $parsedRl = json_decode($rawRl, true);
+        if (is_array($parsedRl)) {
+            $attemptData = $parsedRl;
+        }
+    }
+}
+
+// Reiniciar ventana de 15 minutos
+if (time() - $attemptData['first_attempt'] > 900) {
+    $attemptData = ['attempts' => 0, 'first_attempt' => time()];
+}
+
+if ($attemptData['attempts'] >= 6) {
+    http_response_code(429);
+    echo json_encode(["success" => false, "error" => "Demasiados intentos fallidos. Por favor intente en 15 minutos."]);
     exit;
 }
 
@@ -19,70 +48,57 @@ if (empty($email) || empty($password)) {
     exit;
 }
 
-// 1. Acceso Maestro (Inmediato)
-$isMasterUser = ($email === 'admin' || $email === 'admin@fundacioneducativaesquel.com.ar' || $email === 'admin@esquel.edu.ar');
-$isMasterPass = ($password === 'admin123' || $password === 'esquel2026' || $password === 'Arcoiris1986' || $password === 'Munecodenieve2026');
-
-if ($isMasterUser && $isMasterPass) {
-    $payload = [
-        'userId'      => 'master',
-        'role'        => 'SUPER_ADMIN',
-        'name'        => 'Super Administrador',
-        'permissions' => 'blog,contacts,enrollments,users',
-        'exp'         => time() + (60 * 60 * 24 * 7) // 7 días
-    ];
-    $token = generateToken($payload);
-    
-    // Set cookie
-    setcookie('admin_session', $token, [
-        'expires'  => time() + (60 * 60 * 24 * 7),
-        'path'     => '/',
-        'httponly' => false,
-        'samesite' => 'Lax'
-    ]);
-
-    echo json_encode([
-        "success" => true,
-        "token"   => $token,
-        "user"    => $payload
-    ]);
-    exit;
-}
-
-// 2. Consulta en la tabla User de MySQL
+// Consulta exclusivamente autenticada contra la base de datos
 try {
     $pdo = getPDO();
+    if (!$pdo) {
+        throw new Exception("No database connection available");
+    }
+
     $stmt = $pdo->prepare("SELECT * FROM `User` WHERE LOWER(email) = :email LIMIT 1");
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch();
 
-    if (!$user) {
+    $authSuccess = false;
+    if ($user) {
+        // Validación estricta con password_verify
+        if (password_verify($password, $user['password'])) {
+            $authSuccess = true;
+        }
+    }
+
+    if (!$authSuccess) {
+        // Incrementar contador de intentos fallidos
+        $attemptData['attempts']++;
+        @file_put_contents($rateLimitFile, json_encode($attemptData));
+
         http_response_code(401);
-        echo json_encode(["success" => false, "error" => "Usuario o contraseña incorrectos"]);
+        echo json_encode(["success" => false, "error" => "Credenciales inválidas"]);
         exit;
     }
 
-    $passwordValid = password_verify($password, $user['password']) || ($password === $user['password']);
-    if (!$passwordValid) {
-        http_response_code(401);
-        echo json_encode(["success" => false, "error" => "Contraseña incorrecta"]);
-        exit;
+    // Limpiar intentos tras login exitoso
+    if (file_exists($rateLimitFile)) {
+        @unlink($rateLimitFile);
     }
 
     $payload = [
         'userId'      => $user['id'],
-        'role'        => $user['role'],
+        'role'        => $user['role'] ?? 'EDITOR',
         'name'        => $user['name'] ?: $user['email'],
         'email'       => $user['email'],
-        'permissions' => $user['permissions'],
-        'exp'         => time() + (60 * 60 * 24 * 7)
+        'permissions' => $user['permissions'] ?? 'blog',
+        'exp'         => time() + (60 * 60 * 12) // 12 horas
     ];
     $token = generateToken($payload);
 
+    // Cookie segura: HttpOnly, Secure, SameSite
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
     setcookie('admin_session', $token, [
-        'expires'  => time() + (60 * 60 * 24 * 7),
+        'expires'  => time() + (60 * 60 * 12),
         'path'     => '/',
-        'httponly' => false,
+        'httponly' => true,
+        'secure'   => $isSecure,
         'samesite' => 'Lax'
     ]);
 
@@ -92,6 +108,7 @@ try {
         "user"    => $payload
     ]);
 } catch (Exception $e) {
+    error_log("Login server error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Error al autenticar: " . $e->getMessage()]);
+    echo json_encode(["success" => false, "error" => "Error interno del servidor al procesar la autenticación"]);
 }

@@ -9,10 +9,27 @@
 # production
 /build
 
+# sensitive databases and archives
+*.db
+*.sqlite
+*.sqlite3
+*.tar.gz
+*.zip
+*.pem
+*.log
+fee_deploy.tar.gz
+fee_src_updated.tar.gz
+temp_*
+downloaded_images/
+scripts/drive_dump.html
+
+# private config and backups
+fee-config.php
+api/data/*.json
+public/api/data/*.json
+
 # misc
 .DS_Store
-*.pem
-fee_deploy.tar.gz
 
 # debug
 npm-debug.log*

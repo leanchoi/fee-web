@@ -1,4 +1,7 @@
 <?php
+// ==============================================================================
+// FORMULARIO DE INSCRIPCIÓN SEGURO - FUNDACIÓN EDUCATIVA ESQUEL
+// ==============================================================================
 require_once __DIR__ . '/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -6,6 +9,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(["success" => false, "error" => "Método no permitido"]);
     exit;
 }
+
+// 1. Anti-spam Rate Limiting por IP
+$clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+$rateLimitFile = sys_get_temp_dir() . '/fee_enroll_rl_' . md5($clientIp) . '.json';
+
+$attemptData = ['count' => 0, 'start' => time()];
+if (file_exists($rateLimitFile)) {
+    $rawRl = @file_get_contents($rateLimitFile);
+    if ($rawRl) {
+        $parsedRl = json_decode($rawRl, true);
+        if (is_array($parsedRl)) $attemptData = $parsedRl;
+    }
+}
+
+if (time() - $attemptData['start'] > 60) {
+    $attemptData = ['count' => 0, 'start' => time()];
+}
+
+if ($attemptData['count'] >= 10) {
+    http_response_code(429);
+    echo json_encode(["success" => false, "error" => "Demasiadas solicitudes. Por favor espere un momento."]);
+    exit;
+}
+
+$attemptData['count']++;
+@file_put_contents($rateLimitFile, json_encode($attemptData));
 
 $rawInput = file_get_contents('php://input');
 $data = json_decode($rawInput, true);
@@ -16,13 +45,20 @@ if (!$data) {
     exit;
 }
 
-$tutorName    = trim($data['tutorName'] ?? '');
+// 2. Honeypot check para bots automatizados
+if (!empty($data['website_url']) || !empty($data['bot_check'])) {
+    // Responder con éxito falso para no alertar a los spammers
+    echo json_encode(["success" => true, "id" => "fake-" . time()]);
+    exit;
+}
+
+$tutorName    = htmlspecialchars(trim($data['tutorName'] ?? ''), ENT_QUOTES, 'UTF-8');
 $tutorEmail   = trim($data['tutorEmail'] ?? '');
-$tutorPhone   = trim($data['tutorPhone'] ?? '');
-$studentName  = trim($data['studentName'] ?? '');
-$studentLevel = trim($data['studentLevel'] ?? '');
-$studentGrade = trim($data['studentGrade'] ?? '');
-$comments     = trim($data['comments'] ?? '');
+$tutorPhone   = htmlspecialchars(trim($data['tutorPhone'] ?? ''), ENT_QUOTES, 'UTF-8');
+$studentName  = htmlspecialchars(trim($data['studentName'] ?? ''), ENT_QUOTES, 'UTF-8');
+$studentLevel = htmlspecialchars(trim($data['studentLevel'] ?? ''), ENT_QUOTES, 'UTF-8');
+$studentGrade = htmlspecialchars(trim($data['studentGrade'] ?? ''), ENT_QUOTES, 'UTF-8');
+$comments     = htmlspecialchars(trim($data['comments'] ?? ''), ENT_QUOTES, 'UTF-8');
 
 if (empty($tutorName) || empty($tutorEmail) || empty($tutorPhone) || empty($studentName) || empty($studentLevel) || empty($studentGrade)) {
     http_response_code(422);
@@ -51,20 +87,35 @@ $record = [
     'createdAt'    => $now
 ];
 
-// 1. Guardar en almacenamiento seguro JSON de respaldo garantizado
+// 3. Guardar en almacenamiento protegido con flock y límite de tamaño
 $dataDir = __DIR__ . '/data';
 if (!is_dir($dataDir)) {
-    @mkdir($dataDir, 0755, true);
+    @mkdir($dataDir, 0750, true);
 }
 $dataFile = $dataDir . '/enrollments.json';
-$existing = [];
-if (file_exists($dataFile)) {
-    $existing = json_decode(file_get_contents($dataFile), true) ?: [];
+$fp = @fopen($dataFile, 'c+');
+if ($fp) {
+    if (flock($fp, LOCK_EX)) {
+        $filesize = filesize($dataFile);
+        $existing = [];
+        if ($filesize > 0) {
+            $content = fread($fp, $filesize);
+            $existing = json_decode($content, true) ?: [];
+        }
+        array_unshift($existing, $record);
+        if (count($existing) > 1000) {
+            $existing = array_slice($existing, 0, 1000);
+        }
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+    }
+    fclose($fp);
 }
-array_unshift($existing, $record);
-@file_put_contents($dataFile, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-// 2. Sincronizar en tiempo real con Google Sheets
+// 4. Sincronizar en tiempo real con Google Sheets
 $googlePayload = [
     'type'         => 'enrollment',
     'id'           => $id,
@@ -78,7 +129,7 @@ $googlePayload = [
 ];
 syncToGoogleSheets($googlePayload);
 
-// 3. Intentar guardar en MySQL si la conexión está lista
+// 5. Guardar en MySQL
 try {
     $pdo = getPDO();
     if ($pdo) {
@@ -97,6 +148,8 @@ try {
             ':comments'     => $comments
         ]);
     }
-} catch (Exception $e) {}
+} catch (Exception $e) {
+    error_log("Enrollment DB insert error: " . $e->getMessage());
+}
 
 echo json_encode(["success" => true, "id" => $id]);

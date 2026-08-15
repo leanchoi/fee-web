@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+Allow: /
+
+Sitemap: https://fundacionesquel.edu.ar/sitemap.xml

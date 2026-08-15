@@ -1,4 +1,7 @@
 <?php
+// ==============================================================================
+// PANEL DE ADMINISTRACIÓN SEGURO - FUNDACIÓN EDUCATIVA ESQUEL
+// ==============================================================================
 require_once __DIR__ . '/config.php';
 
 $token = getBearerToken();
@@ -6,15 +9,28 @@ $session = verifyToken($token);
 
 if (!$session) {
     http_response_code(401);
-    echo json_encode(["success" => false, "authenticated" => false, "error" => "No autorizado. Inicie sesión para continuar."]);
+    echo json_encode(["success" => false, "authenticated" => false, "error" => "No autorizado. Sesión inválida o expirada."]);
     exit;
 }
 
-$action = $_GET['action'] ?? ($_POST['action'] ?? '');
-if (!$action && $_SERVER['REQUEST_METHOD'] === 'POST') {
+// Inicializar variables de entrada de forma segura
+$bodyData = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rawInput = file_get_contents('php://input');
-    $bodyData = json_decode($rawInput, true);
-    $action = $bodyData['action'] ?? '';
+    if (!empty($rawInput)) {
+        $bodyData = json_decode($rawInput, true) ?: [];
+    }
+}
+
+$action = $_GET['action'] ?? ($bodyData['action'] ?? ($_POST['action'] ?? ''));
+
+// Verificador de permisos granular del lado del servidor
+function checkPermission($session, $requiredPerm) {
+    if (($session['role'] ?? '') === 'SUPER_ADMIN') {
+        return true;
+    }
+    $userPerms = array_map('trim', explode(',', $session['permissions'] ?? ''));
+    return in_array($requiredPerm, $userPerms, true);
 }
 
 // 3 Noticias institucionales iniciales por defecto
@@ -58,7 +74,7 @@ $initialPosts = [
 ];
 
 switch ($action) {
-    // 1. Obtener todos los datos para el Dashboard
+    // 1. Obtener todos los datos para el Dashboard (Filtrado por permisos)
     case 'get_dashboard_data':
     case 'get_data':
         $enrollments = [];
@@ -66,48 +82,60 @@ switch ($action) {
         $posts       = [];
         $users       = [];
 
-        // Leer datos desde MySQL
+        $canEnrollments = checkPermission($session, 'enrollments');
+        $canContacts    = checkPermission($session, 'contacts');
+        $canBlog        = checkPermission($session, 'blog');
+        $isSuperAdmin   = ($session['role'] ?? '') === 'SUPER_ADMIN';
+
         try {
             $pdo = getPDO();
             if ($pdo) {
-                $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                $contacts    = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                $posts       = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                
-                if ($session['role'] === 'SUPER_ADMIN') {
+                if ($canEnrollments) {
+                    $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                }
+                if ($canContacts) {
+                    $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                }
+                if ($canBlog) {
+                    $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                }
+                if ($isSuperAdmin) {
                     $users = $pdo->query("SELECT `id`, `email`, `name`, `role`, `permissions`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
                 }
             }
         } catch (Exception $e) {
-            // MySQL error handled gracefully
+            error_log("Dashboard query error: " . $e->getMessage());
         }
 
-        // Combinar con almacenamiento JSON de respaldo
+        // Combinar con almacenamiento JSON de respaldo solo si el usuario tiene permisos
         $dataDir = __DIR__ . '/data';
-        $enrollFile = $dataDir . '/enrollments.json';
-        if (file_exists($enrollFile)) {
-            $jsonEnrollments = json_decode(file_get_contents($enrollFile), true) ?: [];
-            $existingIds = array_column($enrollments, 'id');
-            foreach ($jsonEnrollments as $item) {
-                if (!in_array($item['id'], $existingIds)) {
-                    $enrollments[] = $item;
+        if ($canEnrollments) {
+            $enrollFile = $dataDir . '/enrollments.json';
+            if (file_exists($enrollFile)) {
+                $jsonEnrollments = json_decode(file_get_contents($enrollFile), true) ?: [];
+                $existingIds = array_column($enrollments, 'id');
+                foreach ($jsonEnrollments as $item) {
+                    if (!in_array($item['id'], $existingIds)) {
+                        $enrollments[] = $item;
+                    }
                 }
             }
         }
 
-        $contactFile = $dataDir . '/contacts.json';
-        if (file_exists($contactFile)) {
-            $jsonContacts = json_decode(file_get_contents($contactFile), true) ?: [];
-            $existingIds = array_column($contacts, 'id');
-            foreach ($jsonContacts as $item) {
-                if (!in_array($item['id'], $existingIds)) {
-                    $contacts[] = $item;
+        if ($canContacts) {
+            $contactFile = $dataDir . '/contacts.json';
+            if (file_exists($contactFile)) {
+                $jsonContacts = json_decode(file_get_contents($contactFile), true) ?: [];
+                $existingIds = array_column($contacts, 'id');
+                foreach ($jsonContacts as $item) {
+                    if (!in_array($item['id'], $existingIds)) {
+                        $contacts[] = $item;
+                    }
                 }
             }
         }
 
-        // Si no hay posts en base de datos, mostrar los 3 posts iniciales
-        if (empty($posts)) {
+        if ($canBlog && empty($posts)) {
             $posts = $initialPosts;
         }
 
@@ -123,12 +151,19 @@ switch ($action) {
 
     // 2. Actualizar estado de inscripción
     case 'update_enrollment_status':
-        $id     = $bodyData['id'] ?? ($_POST['id'] ?? '');
-        $status = $bodyData['status'] ?? ($_POST['status'] ?? '');
+        if (!checkPermission($session, 'enrollments')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id     = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
+        $status = strtoupper(trim($bodyData['status'] ?? ($_POST['status'] ?? '')));
         
-        if (!$id || !$status) {
+        $allowedStatuses = ['PENDING', 'REVIEWED', 'CONTACTED'];
+        if (!$id || !in_array($status, $allowedStatuses, true)) {
             http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Parámetros incompletos"]);
+            echo json_encode(["success" => false, "error" => "Parámetros inválidos o estado no permitido"]);
             exit;
         }
 
@@ -150,14 +185,22 @@ switch ($action) {
                 $stmt = $pdo->prepare("UPDATE `Enrollment` SET `status` = :status WHERE `id` = :id");
                 $stmt->execute([':status' => $status, ':id' => $id]);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Update enrollment error: " . $e->getMessage());
+        }
 
         echo json_encode(["success" => true]);
         break;
 
     // 3. Eliminar inscripción
     case 'delete_enrollment':
-        $id = $bodyData['id'] ?? ($_POST['id'] ?? '');
+        if (!checkPermission($session, 'enrollments')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
         if (!$id) {
             http_response_code(400);
             echo json_encode(["success" => false, "error" => "ID requerido"]);
@@ -177,14 +220,22 @@ switch ($action) {
                 $stmt = $pdo->prepare("DELETE FROM `Enrollment` WHERE `id` = :id");
                 $stmt->execute([':id' => $id]);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Delete enrollment error: " . $e->getMessage());
+        }
 
         echo json_encode(["success" => true]);
         break;
 
     // 4. Eliminar mensaje de contacto
     case 'delete_contact':
-        $id = $bodyData['id'] ?? ($_POST['id'] ?? '');
+        if (!checkPermission($session, 'contacts')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
         if (!$id) {
             http_response_code(400);
             echo json_encode(["success" => false, "error" => "ID requerido"]);
@@ -204,13 +255,21 @@ switch ($action) {
                 $stmt = $pdo->prepare("DELETE FROM `ContactMessage` WHERE `id` = :id");
                 $stmt->execute([':id' => $id]);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Delete contact error: " . $e->getMessage());
+        }
 
         echo json_encode(["success" => true]);
         break;
 
     // 5. Guardar / Editar Post de Blog
     case 'save_post':
+        if (!checkPermission($session, 'blog')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
         $title     = trim($bodyData['title'] ?? '');
         $slug      = trim($bodyData['slug'] ?? '');
         $content   = $bodyData['content'] ?? '';
@@ -264,13 +323,21 @@ switch ($action) {
                     ]);
                 }
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Save post error: " . $e->getMessage());
+        }
 
         echo json_encode(["success" => true]);
         break;
 
     // 6. Eliminar Post
     case 'delete_post':
+        if (!checkPermission($session, 'blog')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
         $id = $bodyData['id'] ?? ($_POST['id'] ?? '');
         try {
             $pdo = getPDO();
@@ -278,16 +345,22 @@ switch ($action) {
                 $stmt = $pdo->prepare("DELETE FROM `Post` WHERE `id` = :id");
                 $stmt->execute([':id' => $id]);
             }
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log("Delete post error: " . $e->getMessage());
+        }
 
         echo json_encode(["success" => true]);
         break;
 
     // 7. Cerrar Sesión
     case 'logout':
+        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
         setcookie('admin_session', '', [
-            'expires' => time() - 3600,
-            'path'    => '/'
+            'expires'  => time() - 3600,
+            'path'     => '/',
+            'httponly' => true,
+            'secure'   => $isSecure,
+            'samesite' => 'Lax'
         ]);
         echo json_encode(["success" => true]);
         break;
