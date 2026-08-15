@@ -117,7 +117,15 @@ export async function deleteUser(id: string): Promise<{ success: boolean; error?
 }
 
 export async function uploadMediaAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
-  return { success: true, url: "/logo.png" };
+  try {
+    const res = await fetch("/api/upload.php", {
+      method: "POST",
+      body: formData,
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al subir archivo" };
+  }
 }
 
 export async function getGalleryItemsAction() {

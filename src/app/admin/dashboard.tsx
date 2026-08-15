@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
   logoutAdmin, 
   createPost, 
@@ -38,7 +36,9 @@ import {
   Phone,
   Calendar,
   Sparkles,
-  Check
+  Check,
+  Upload,
+  Loader2
 } from "lucide-react";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
@@ -1300,27 +1300,32 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
 }
 
 const AVAILABLE_PHOTOS = [
-  { url: "/photos/fee_photo_01.jpg", label: "Inicial: Pintura en el patio" },
-  { url: "/photos/fee_photo_02.jpg", label: "Secundaria: Aula audiovisual" },
-  { url: "/photos/fee_photo_03.jpg", label: "Secundaria: Ronda institucional" },
-  { url: "/photos/fee_photo_04.jpg", label: "Primaria: Biblioteca y lectura" },
-  { url: "/photos/fee_photo_06.jpg", label: "Ciencias: Instituto Balseiro RA-6" },
-  { url: "/photos/fee_photo_07.jpg", label: "Institucional: Abanderados patrios" },
-  { url: "/photos/fee_photo_08.jpg", label: "Secundaria: Egresados y fiesta" },
-  { url: "/photos/fee_photo_09.jpg", label: "Tecnología: Taller de netbooks" },
-  { url: "/photos/fee_photo_10.jpg", label: "Inglés: Feria del libro en inglés" },
-  { url: "/photos/fee_photo_11.jpg", label: "Hero: Panorámica cordillera Esquel" },
-  { url: "/photos/fee_photo_12.jpg", label: "Inglés: Concert & Drama en escenario" },
-  { url: "/photos/fee_photo_14.jpg", label: "Comunidad: Gran Kermesse de familias" },
-  { url: "/photos/fee_photo_15.jpg", label: "Inicial: Patio soleado y juegos" },
-  { url: "/photos/fee_photo_17.jpg", label: "Primaria: Salida Península Valdés" },
-  { url: "/photos/fee_photo_19.jpg", label: "Campamento: Fogón nocturno" },
-  { url: "/photos/fee_photo_20.jpg", label: "Naturaleza: Navegación en el lago" },
-  { url: "/photos/fee_photo_21.jpg", label: "Salidas: Trekking Los Alerces" },
-  { url: "/photos/fee_photo_22.jpg", label: "Inglés: Diplomas Cambridge" },
-  { url: "/photos/fee_photo_23.jpg", label: "Naturaleza: Avistaje de ballenas" },
-  { url: "/photos/fee_photo_24.jpg", label: "Campamento: Picnic en el lago" },
-  { url: "/photos/fee_photo_26.jpg", label: "Campamento: Juegos al aire libre" }
+  { url: "/photos/fee_photo_01.jpg", label: "01. Inicial: Ronda de pintura y arte" },
+  { url: "/photos/fee_photo_02.jpg", label: "02. Secundaria: Clase en aula audiovisual" },
+  { url: "/photos/fee_photo_03.jpg", label: "03. Secundaria: Encuentro institucional" },
+  { url: "/photos/fee_photo_04.jpg", label: "04. Primaria: Biblioteca y lectura" },
+  { url: "/photos/fee_photo_05.jpg", label: "05. Primaria: Taller de expresión" },
+  { url: "/photos/fee_photo_06.jpg", label: "06. Ciencias: Instituto Balseiro RA-6" },
+  { url: "/photos/fee_photo_07.jpg", label: "07. Institucional: Abanderados patrios" },
+  { url: "/photos/fee_photo_08.jpg", label: "08. Secundaria: Egresados y fiesta" },
+  { url: "/photos/fee_photo_09.jpg", label: "09. Tecnología: Taller de programación" },
+  { url: "/photos/fee_photo_10.jpg", label: "10. Inglés: Feria del libro en inglés" },
+  { url: "/photos/fee_photo_11.jpg", label: "11. Hero: Panorámica cordillera Esquel" },
+  { url: "/photos/fee_photo_12.jpg", label: "12. Inglés: Concert & Drama en escenario" },
+  { url: "/photos/fee_photo_13.jpg", label: "13. Arte: Celebraciones y disfraces" },
+  { url: "/photos/fee_photo_14.jpg", label: "14. Comunidad: Gran Kermesse en SUM" },
+  { url: "/photos/fee_photo_15.jpg", label: "15. Inicial: Patio soleado y juegos" },
+  { url: "/photos/fee_photo_16.jpg", label: "16. Primaria: Actividades grupales" },
+  { url: "/photos/fee_photo_17.jpg", label: "17. Salidas: Península Valdés dunas" },
+  { url: "/photos/fee_photo_18.jpg", label: "18. Inglés: Teatro y canciones" },
+  { url: "/photos/fee_photo_19.jpg", label: "19. Campamento: Fogón nocturno" },
+  { url: "/photos/fee_photo_20.jpg", label: "20. Naturaleza: Navegación en el lago" },
+  { url: "/photos/fee_photo_21.jpg", label: "21. Salidas: Trekking Los Alerces" },
+  { url: "/photos/fee_photo_22.jpg", label: "22. Inglés: Diplomas Cambridge" },
+  { url: "/photos/fee_photo_23.jpg", label: "23. Naturaleza: Avistaje de ballenas" },
+  { url: "/photos/fee_photo_24.jpg", label: "24. Campamento: Picnic en el lago" },
+  { url: "/photos/fee_photo_25.jpg", label: "25. Recreación: Deportes y juegos" },
+  { url: "/photos/fee_photo_26.jpg", label: "26. Campamento: Juegos al aire libre" }
 ];
 
 function GalleryEditorModal({ 
@@ -1333,10 +1338,32 @@ function GalleryEditorModal({
   onSave: (savedList: any[]) => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [image, setImage] = useState(item?.image || "/photos/fee_photo_21.jpg");
   const [category, setCategory] = useState(item?.category || "Salidas Educativas");
   const [title, setTitle] = useState(item?.title || "");
   const [desc, setDesc] = useState(item?.desc || "");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await uploadMediaAction(fd);
+      if (res.success && res.url) {
+        setImage(res.url);
+      } else {
+        alert(res.error || "Error al subir la imagen");
+      }
+    } catch (err: any) {
+      alert("Error al conectar con el servidor para la subida");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1395,17 +1422,48 @@ function GalleryEditorModal({
                 </div>
               </div>
 
+              {/* Botón para subir archivo desde la PC */}
+              <div className="mb-4 bg-brand-blue/5 p-4 rounded-2xl border border-brand-blue/15 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <span className="block text-xs font-bold text-brand-blue">Subir foto desde tu dispositivo</span>
+                  <span className="text-[11px] text-brand-foreground/70">JPG, PNG o WebP desde tu computadora o celular.</span>
+                </div>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileUpload} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-brand-blue text-white px-5 py-2 rounded-full text-xs font-bold hover:bg-brand-green transition-all shadow-sm flex items-center gap-2 shrink-0 cursor-pointer"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Subiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" /> Elegir Archivo
+                    </>
+                  )}
+                </button>
+              </div>
+
               <label className="block text-xs font-bold text-brand-foreground/75 mb-1.5">
-                Elegí una foto real de la escuela:
+                O elegí una foto del archivo escolar (26 disponibles):
               </label>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-brand-gray/5 rounded-xl border">
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-44 overflow-y-auto p-2 bg-brand-gray/5 rounded-xl border">
                 {AVAILABLE_PHOTOS.map((p) => (
                   <button
                     key={p.url}
                     type="button"
                     onClick={() => setImage(p.url)}
                     className={cn(
-                      "relative rounded-lg overflow-hidden aspect-square border-2 transition-all group",
+                      "relative rounded-lg overflow-hidden aspect-square border-2 transition-all group cursor-pointer",
                       image === p.url ? "border-brand-green ring-2 ring-brand-green/30 scale-95" : "border-transparent opacity-70 hover:opacity-100"
                     )}
                     title={p.label}
@@ -1421,7 +1479,7 @@ function GalleryEditorModal({
               </div>
 
               <div className="mt-2">
-                <label className="block text-[11px] font-semibold text-brand-foreground/60 mb-1">O pegá la ruta / URL de otra imagen:</label>
+                <label className="block text-[11px] font-semibold text-brand-foreground/60 mb-1">O pegá la ruta / URL directa de la imagen:</label>
                 <input 
                   type="text" 
                   value={image} 
@@ -1444,12 +1502,12 @@ function GalleryEditorModal({
                 placeholder="Ej: Salidas Educativas, Inglés & Teatro, Campamentos, Robótica"
               />
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {["Salidas Educativas", "Inglés & Teatro", "Campamentos & Convivencia", "Identidad & Valores", "Comunidad de Familias", "Tecnología & Innovación", "Nivel Inicial", "Ciencias Naturales"].map((cat) => (
+                {["Salidas Educativas", "Inglés & Teatro", "Campamentos & Convivencia", "Identidad & Valores", "Comunidad de Familias", "Tecnología & Innovación", "Nivel Inicial", "Ciencias Naturales", "Certificaciones"].map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className="text-[10px] font-bold px-2.5 py-1 bg-brand-gray/10 hover:bg-brand-yellow/30 text-brand-blue rounded-full transition-colors"
+                    className="text-[10px] font-bold px-2.5 py-1 bg-brand-gray/10 hover:bg-brand-yellow/30 text-brand-blue rounded-full transition-colors cursor-pointer"
                   >
                     + {cat}
                   </button>
@@ -1487,14 +1545,14 @@ function GalleryEditorModal({
               <button 
                 type="button" 
                 onClick={onClose} 
-                className="px-6 py-2.5 rounded-full text-xs font-bold text-brand-gray hover:bg-brand-gray/10 transition-colors"
+                className="px-6 py-2.5 rounded-full text-xs font-bold text-brand-gray hover:bg-brand-gray/10 transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
-                disabled={loading}
-                className="px-8 py-2.5 rounded-full text-xs font-bold bg-brand-green text-white hover:bg-brand-blue transition-colors shadow-md flex items-center gap-2"
+                disabled={loading || uploading}
+                className="px-8 py-2.5 rounded-full text-xs font-bold bg-brand-green text-white hover:bg-brand-blue transition-colors shadow-md flex items-center gap-2 cursor-pointer"
               >
                 {loading ? "Guardando..." : "Guardar en Galería"}
               </button>
@@ -1505,4 +1563,5 @@ function GalleryEditorModal({
     </div>
   );
 }
+
 
