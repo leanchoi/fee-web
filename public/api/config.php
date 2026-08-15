@@ -10,20 +10,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$db_host = 'localhost';
-$db_name = 'u769174130_escueladb';
-$db_user = 'u769174130_admin_db';
-$db_pass = 'Arcoiris1986';
+$db_hosts = ['localhost', '127.0.0.1', 'srv1199.hstgr.io'];
+$db_name  = 'u769174130_escueladb';
+$db_user  = 'u769174130_admin_db';
+$db_pass  = 'Arcoiris1986';
 
-try {
-    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
-} catch (PDOException $e) {
+$pdo = null;
+$lastError = '';
+
+foreach ($db_hosts as $host) {
+    try {
+        $pdo = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::ATTR_TIMEOUT => 2,
+        ]);
+        if ($pdo) {
+            break;
+        }
+    } catch (PDOException $e) {
+        $lastError = $e->getMessage();
+    }
+}
+
+if (!$pdo) {
     http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Error de conexión a la base de datos"]);
+    echo json_encode(["success" => false, "error" => "Error de conexión a la base de datos: " . $lastError]);
     exit;
 }
 
