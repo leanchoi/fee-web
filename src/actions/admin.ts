@@ -15,6 +15,12 @@ export async function logoutAdmin() {
   try {
     await fetch("/api/admin.php?action=logout", { method: "POST" });
   } catch (e) {}
+  try {
+    await fetch("/api/logout.php", { method: "POST" });
+  } catch (e) {}
+  if (typeof document !== "undefined") {
+    document.cookie = "admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0;";
+  }
 }
 
 export async function getDashboardData() {

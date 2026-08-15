@@ -184,14 +184,16 @@ export function AdminDashboard({
   contactMessages = [],
   users, 
   gallery = [],
-  session 
+  session,
+  onLogout 
 }: { 
   posts: Post[], 
   enrollments: Enrollment[], 
   contactMessages: ContactMessage[],
   users: User[], 
   gallery?: any[],
-  session: any 
+  session: any,
+  onLogout?: () => void 
 }) {
   const router = useRouter();
   
@@ -305,8 +307,17 @@ export function AdminDashboard({
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(!!session.mustChangePassword);
 
   const handleLogout = async () => {
-    await logoutAdmin();
-    router.refresh();
+    try {
+      await logoutAdmin();
+    } catch (e) {}
+    if (typeof document !== "undefined") {
+      document.cookie = "admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0;";
+    }
+    if (onLogout) {
+      onLogout();
+    } else {
+      window.location.href = "/admin";
+    }
   };
 
   const handleNewGalleryItem = () => {

@@ -122,6 +122,21 @@ if (($_GET['action'] ?? '') === 'get_gallery') {
     exit;
 }
 
+// Permitir logout directo aún si el token estuviera expirado
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
+    setcookie('admin_session', '', [
+        'expires'  => time() - 86400,
+        'path'     => '/',
+        'httponly' => true,
+        'secure'   => $isSecure,
+        'samesite' => 'Lax'
+    ]);
+    header("Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax", false);
+    echo json_encode(["success" => true, "message" => "Sesión cerrada"]);
+    exit;
+}
+
 $token = getBearerToken();
 $session = verifyToken($token);
 

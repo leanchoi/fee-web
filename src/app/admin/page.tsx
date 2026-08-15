@@ -63,6 +63,9 @@ export default function AdminPage() {
             users={data.users || []} 
             gallery={data.gallery || []}
             session={data.user} 
+            onLogout={() => {
+              setData(null);
+            }}
           />
         ) : (
           <LoginForm onLoginSuccess={loadData} />
