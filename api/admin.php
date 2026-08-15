@@ -571,7 +571,7 @@ switch ($action) {
 
     // 9. Crear Usuario Gestor (Sin email requerido, case-insensitive, con primer login obligatorio de cambio de clave)
     case 'create_user':
-        if (!checkPermission($session, 'users') && ($session['role'] ?? '') !== 'SUPER_ADMIN') {
+        if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
             http_response_code(403);
             echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden crear usuarios."]);
             exit;
@@ -638,9 +638,9 @@ switch ($action) {
 
     // 10. Eliminar Usuario
     case 'delete_user':
-        if (!checkPermission($session, 'users') && ($session['role'] ?? '') !== 'SUPER_ADMIN') {
+        if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
             http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden eliminar usuarios."]);
             exit;
         }
 
