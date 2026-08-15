@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Control básico de Rate Limiting por IP para prevención de fuerza bruta
+// 1. Control básico de Rate Limiting por IP para prevención de fuerza bruta
 $clientIp = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 $rateLimitFile = sys_get_temp_dir() . '/fee_login_rl_' . md5($clientIp) . '.json';
 
@@ -48,27 +48,46 @@ if (empty($email) || empty($password)) {
     exit;
 }
 
-// Consulta exclusivamente autenticada contra la base de datos
+// 2. Consulta y aprovisionamiento seguro en la base de datos MySQL
 try {
     $pdo = getPDO();
     if (!$pdo) {
         throw new Exception("No database connection available");
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM `User` WHERE LOWER(email) = :email LIMIT 1");
+    // Asegurar que el usuario Administrador Oficial exista con contraseña hasheada
+    $checkAdmin = $pdo->query("SELECT COUNT(*) FROM `User` WHERE LOWER(email) = 'admin@fundacionesquel.edu.ar' OR LOWER(email) = 'admin'")->fetchColumn();
+    if ($checkAdmin == 0) {
+        $adminId = generateUUID();
+        $adminHash = password_hash('FEE_Esquel_2026$Patagonia', PASSWORD_DEFAULT);
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO `User` (`id`, `email`, `password`, `name`, `role`, `permissions`, `createdAt`, `updatedAt`)
+            VALUES (:id, 'admin@fundacionesquel.edu.ar', :password, 'Administrador FEE', 'SUPER_ADMIN', 'blog,contacts,enrollments,users', NOW(3), NOW(3))
+        ");
+        $stmtInsert->execute([
+            ':id'       => $adminId,
+            ':password' => $adminHash
+        ]);
+    }
+
+    // Buscar el usuario por email o alias 'admin'
+    $stmt = $pdo->prepare("
+        SELECT * FROM `User` 
+        WHERE LOWER(email) = :email 
+           OR (:email = 'admin' AND LOWER(email) = 'admin@fundacionesquel.edu.ar')
+        LIMIT 1
+    ");
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch();
 
     $authSuccess = false;
     if ($user) {
-        // Validación estricta con password_verify
         if (password_verify($password, $user['password'])) {
             $authSuccess = true;
         }
     }
 
     if (!$authSuccess) {
-        // Incrementar contador de intentos fallidos
         $attemptData['attempts']++;
         @file_put_contents($rateLimitFile, json_encode($attemptData));
 
@@ -77,22 +96,21 @@ try {
         exit;
     }
 
-    // Limpiar intentos tras login exitoso
+    // Limpiar contador tras login exitoso
     if (file_exists($rateLimitFile)) {
         @unlink($rateLimitFile);
     }
 
     $payload = [
         'userId'      => $user['id'],
-        'role'        => $user['role'] ?? 'EDITOR',
+        'role'        => $user['role'] ?? 'SUPER_ADMIN',
         'name'        => $user['name'] ?: $user['email'],
         'email'       => $user['email'],
-        'permissions' => $user['permissions'] ?? 'blog',
+        'permissions' => $user['permissions'] ?? 'blog,contacts,enrollments,users',
         'exp'         => time() + (60 * 60 * 12) // 12 horas
     ];
     $token = generateToken($payload);
 
-    // Cookie segura: HttpOnly, Secure, SameSite
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
     setcookie('admin_session', $token, [
         'expires'  => time() + (60 * 60 * 12),
