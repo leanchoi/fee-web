@@ -226,7 +226,7 @@ export function AdminDashboard({
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("");
   const [enrollmentLevelFilter, setEnrollmentLevelFilter] = useState<"all" | "inicial" | "primario" | "secundario">("all");
-  const [enrollmentDatePreset, setEnrollmentDatePreset] = useState<"all" | "7days" | "30days" | "thisYear" | "custom">("all");
+  const [enrollmentDatePreset, setEnrollmentDatePreset] = useState<"all" | "today" | "yesterday" | "7days" | "30days" | "thisYear" | "custom">("all");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [enrollmentViewMode, setEnrollmentViewMode] = useState<"cards" | "table">("cards");
@@ -256,7 +256,15 @@ export function AdminDashboard({
       // 3. Date Preset Filter
       const itemDate = new Date(e.createdAt);
       const now = new Date();
-      if (enrollmentDatePreset === "7days") {
+      if (enrollmentDatePreset === "today") {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        if (itemDate < startOfToday || itemDate > endOfToday) return false;
+      } else if (enrollmentDatePreset === "yesterday") {
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+        const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+        if (itemDate < startOfYesterday || itemDate > endOfYesterday) return false;
+      } else if (enrollmentDatePreset === "7days") {
         const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         if (itemDate < sevenDaysAgo) return false;
       } else if (enrollmentDatePreset === "30days") {
@@ -736,6 +744,8 @@ export function AdminDashboard({
                         </span>
                         {[
                           { key: "all", label: "Todo" },
+                          { key: "today", label: "Hoy" },
+                          { key: "yesterday", label: "Ayer" },
                           { key: "7days", label: "7 Días" },
                           { key: "30days", label: "Último Mes" },
                           { key: "thisYear", label: "Este Año" },
