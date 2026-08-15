@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -12,10 +12,67 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#172A45",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
-  title: "Fundación Educativa Esquel - Educando con Valores",
+  metadataBase: new URL("https://fundacionesquel.edu.ar"),
+  title: {
+    default: "Fundación Educativa Esquel | Educación Bilingüe y Valores",
+    template: "%s | Fundación Educativa Esquel",
+  },
   description:
-    "Más que una escuela, una comunidad comprometida con el futuro. Formamos mentes libres y corazones solidarios bajo un ideario de excelencia institucional.",
+    "Comunidad educativa en Esquel, Chubut. Educación integral desde Nivel Inicial, Primario hasta Secundario, con enseñanza intensiva de inglés y formación en valores.",
+  keywords: [
+    "Fundación Educativa Esquel",
+    "Escuela Esquel",
+    "Colegio Bilingüe Esquel",
+    "Escuela Primaria Esquel",
+    "Secundario Esquel",
+    "Educación Patagonia Chubut",
+    "Inscripciones Escolares Esquel"
+  ],
+  authors: [{ name: "Fundación Educativa Esquel" }],
+  creator: "Fundación Educativa Esquel",
+  publisher: "Fundación Educativa Esquel",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: "https://fundacionesquel.edu.ar/",
+    siteName: "Fundación Educativa Esquel",
+    title: "Fundación Educativa Esquel | Educación Bilingüe y Valores",
+    description:
+      "Más que una escuela, una comunidad comprometida con el futuro. Formamos mentes libres y corazones solidarios bajo un ideario de excelencia en la Patagonia.",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Fundación Educativa Esquel - Comunidad Educativa",
+        type: "image/jpeg",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fundación Educativa Esquel | Educación Bilingüe y Valores",
+    description:
+      "Comunidad educativa comprometida con el futuro y la excelencia en Esquel, Chubut.",
+    images: ["/og-image.jpg"],
+  },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -25,6 +82,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className="scroll-smooth">
+      <head>
+        <meta property="og:image" content="https://fundacionesquel.edu.ar/og-image.jpg" />
+        <meta property="og:image:secure_url" content="https://fundacionesquel.edu.ar/og-image.jpg" />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Fundación Educativa Esquel" />
+      </head>
       <body
         className={cn(
           montserrat.variable,
