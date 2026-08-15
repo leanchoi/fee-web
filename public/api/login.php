@@ -19,7 +19,7 @@ if (empty($email) || empty($password)) {
     exit;
 }
 
-// 1. Acceso Maestro
+// 1. Acceso Maestro (Inmediato)
 $isMasterUser = ($email === 'admin' || $email === 'admin@fundacioneducativaesquel.com.ar' || $email === 'admin@esquel.edu.ar');
 $isMasterPass = ($password === 'admin123' || $password === 'esquel2026' || $password === 'Arcoiris1986' || $password === 'Munecodenieve2026');
 
@@ -37,7 +37,7 @@ if ($isMasterUser && $isMasterPass) {
     setcookie('admin_session', $token, [
         'expires'  => time() + (60 * 60 * 24 * 7),
         'path'     => '/',
-        'httponly' => false, // accesible para que el dashboard Next.js lo lea si lo necesita
+        'httponly' => false,
         'samesite' => 'Lax'
     ]);
 
@@ -51,6 +51,7 @@ if ($isMasterUser && $isMasterPass) {
 
 // 2. Consulta en la tabla User de MySQL
 try {
+    $pdo = getPDO();
     $stmt = $pdo->prepare("SELECT * FROM `User` WHERE LOWER(email) = :email LIMIT 1");
     $stmt->execute([':email' => $email]);
     $user = $stmt->fetch();
@@ -61,7 +62,6 @@ try {
         exit;
     }
 
-    // Verificar hash o texto plano si fue recién creada
     $passwordValid = password_verify($password, $user['password']) || ($password === $user['password']);
     if (!$passwordValid) {
         http_response_code(401);
@@ -91,7 +91,7 @@ try {
         "token"   => $token,
         "user"    => $payload
     ]);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Error de servidor al autenticar"]);
+    echo json_encode(["success" => false, "error" => "Error al autenticar: " . $e->getMessage()]);
 }

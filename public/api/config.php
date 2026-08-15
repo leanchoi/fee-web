@@ -10,38 +10,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$db_hosts = ['localhost', '127.0.0.1', 'srv1199.hstgr.io'];
-$db_name  = 'u769174130_escueladb';
-$db_user  = 'u769174130_admin_db';
-$db_pass  = 'Arcoiris1986';
-
-$pdo = null;
-$lastError = '';
-
-foreach ($db_hosts as $host) {
-    try {
-        $pdo = new PDO("mysql:host=$host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-            PDO::ATTR_TIMEOUT => 2,
-        ]);
-        if ($pdo) {
-            break;
-        }
-    } catch (PDOException $e) {
-        $lastError = $e->getMessage();
-    }
-}
-
-if (!$pdo) {
-    http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Error de conexión a la base de datos: " . $lastError]);
-    exit;
-}
-
 // Clave secreta para tokens de sesión
 define('JWT_SECRET', 'fee_esquel_secret_patagonia_2026_hostinger_key');
+
+function getPDO() {
+    static $pdo = null;
+    if ($pdo !== null) return $pdo;
+
+    $db_name = 'u769174130_escueladb';
+    $db_user = 'u769174130_admin_db';
+    $db_pass = 'Arcoiris1986';
+
+    $attempts = [
+        "mysql:host=localhost;dbname=$db_name;charset=utf8mb4",
+        "mysql:host=127.0.0.1;port=3306;dbname=$db_name;charset=utf8mb4",
+    ];
+
+    $lastErr = '';
+    foreach ($attempts as $dsn) {
+        try {
+            $pdo = new PDO($dsn, $db_user, $db_pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]);
+            return $pdo;
+        } catch (PDOException $e) {
+            $lastErr = $e->getMessage();
+        }
+    }
+    throw new Exception($lastErr ?: 'No se pudo conectar a la base de datos');
+}
 
 function generateToken($payload) {
     $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));

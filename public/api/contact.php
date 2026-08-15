@@ -36,6 +36,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 $id = generateUUID();
 
 try {
+    $pdo = getPDO();
     $stmt = $pdo->prepare("
         INSERT INTO `ContactMessage` (`id`, `name`, `email`, `subject`, `message`, `createdAt`)
         VALUES (:id, :name, :email, :subject, :message, NOW(3))
@@ -50,7 +51,7 @@ try {
     ]);
 
     echo json_encode(["success" => true, "id" => $id]);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Error al enviar el mensaje"]);
+    echo json_encode(["success" => false, "error" => "Error al enviar el mensaje: " . $e->getMessage()]);
 }

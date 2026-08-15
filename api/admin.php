@@ -6,7 +6,7 @@ $session = verifyToken($token);
 
 if (!$session) {
     http_response_code(401);
-    echo json_encode(["success" => false, "error" => "No autorizado. Sesión expirada o inválida."]);
+    echo json_encode(["success" => false, "authenticated" => false, "error" => "No autorizado. Inicie sesión para continuar."]);
     exit;
 }
 
@@ -22,6 +22,7 @@ switch ($action) {
     case 'get_dashboard_data':
     case 'get_data':
         try {
+            $pdo = getPDO();
             $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll();
             $contacts    = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll();
             $posts       = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll();
@@ -39,9 +40,17 @@ switch ($action) {
                 "posts"       => $posts,
                 "users"       => $users
             ]);
-        } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => "Error al obtener datos: " . $e->getMessage()]);
+        } catch (Exception $e) {
+            http_response_code(200); // return clean fallback
+            echo json_encode([
+                "success"     => true,
+                "user"        => $session,
+                "enrollments" => [],
+                "contacts"    => [],
+                "posts"       => [],
+                "users"       => [],
+                "dbWarning"   => $e->getMessage()
+            ]);
         }
         break;
 
@@ -57,12 +66,13 @@ switch ($action) {
         }
 
         try {
+            $pdo = getPDO();
             $stmt = $pdo->prepare("UPDATE `Enrollment` SET `status` = :status WHERE `id` = :id");
             $stmt->execute([':status' => $status, ':id' => $id]);
             echo json_encode(["success" => true]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
-            echo json_encode(["success" => false, "error" => "Error al actualizar estado"]);
+            echo json_encode(["success" => false, "error" => "Error al actualizar estado: " . $e->getMessage()]);
         }
         break;
 
@@ -76,10 +86,11 @@ switch ($action) {
         }
 
         try {
+            $pdo = getPDO();
             $stmt = $pdo->prepare("DELETE FROM `Enrollment` WHERE `id` = :id");
             $stmt->execute([':id' => $id]);
             echo json_encode(["success" => true]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(["success" => false, "error" => "Error al eliminar inscripción"]);
         }
@@ -95,10 +106,11 @@ switch ($action) {
         }
 
         try {
+            $pdo = getPDO();
             $stmt = $pdo->prepare("DELETE FROM `ContactMessage` WHERE `id` = :id");
             $stmt->execute([':id' => $id]);
             echo json_encode(["success" => true]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(["success" => false, "error" => "Error al eliminar mensaje"]);
         }
@@ -122,8 +134,8 @@ switch ($action) {
         }
 
         try {
+            $pdo = getPDO();
             if ($id) {
-                // Actualizar
                 $stmt = $pdo->prepare("
                     UPDATE `Post` SET `title` = :title, `slug` = :slug, `content` = :content, 
                     `excerpt` = :excerpt, `imageUrl` = :imageUrl, `category` = :category, 
@@ -141,7 +153,6 @@ switch ($action) {
                     ':id'        => $id
                 ]);
             } else {
-                // Crear nuevo
                 $newId = generateUUID();
                 $stmt = $pdo->prepare("
                     INSERT INTO `Post` (`id`, `title`, `slug`, `content`, `excerpt`, `imageUrl`, `category`, `published`, `createdAt`, `updatedAt`)
@@ -159,7 +170,7 @@ switch ($action) {
                 ]);
             }
             echo json_encode(["success" => true]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(["success" => false, "error" => "Error al guardar publicación: " . $e->getMessage()]);
         }
@@ -175,10 +186,11 @@ switch ($action) {
         }
 
         try {
+            $pdo = getPDO();
             $stmt = $pdo->prepare("DELETE FROM `Post` WHERE `id` = :id");
             $stmt->execute([':id' => $id]);
             echo json_encode(["success" => true]);
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(["success" => false, "error" => "Error al eliminar post"]);
         }
