@@ -61,6 +61,7 @@ export default function AdminPage() {
             enrollments={data.enrollments || []} 
             contactMessages={data.contacts || []} 
             users={data.users || []} 
+            gallery={data.gallery || []}
             session={data.user} 
           />
         ) : (

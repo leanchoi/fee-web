@@ -10,7 +10,9 @@ import {
   createUserAction, 
   deleteUser, 
   uploadMediaAction,
-  deleteContactMessage
+  deleteContactMessage,
+  saveGalleryItemAction,
+  deleteGalleryItemAction
 } from "@/actions/admin";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -34,7 +36,9 @@ import {
   UserCheck,
   Mail,
   Phone,
-  Calendar
+  Calendar,
+  Sparkles,
+  Check
 } from "lucide-react";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
@@ -49,12 +53,14 @@ export function AdminDashboard({
   enrollments, 
   contactMessages = [],
   users, 
+  gallery = [],
   session 
 }: { 
   posts: Post[], 
   enrollments: Enrollment[], 
   contactMessages: ContactMessage[],
   users: User[], 
+  gallery?: any[],
   session: any 
 }) {
   const router = useRouter();
@@ -65,7 +71,7 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "enrollments" | "contacts" | "users">(() => {
+  const [activeTab, setActiveTab] = useState<"posts" | "enrollments" | "contacts" | "users" | "gallery">(() => {
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
     if (userPerms.includes("enrollments")) return "enrollments";
     if (userPerms.includes("contacts")) return "contacts";
@@ -73,6 +79,11 @@ export function AdminDashboard({
   });
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
+
+  // Gallery State
+  const [galleryList, setGalleryList] = useState<any[]>(gallery || []);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [editingGalleryItem, setEditingGalleryItem] = useState<any | null>(null);
   
   // User Management State
   const [userError, setUserError] = useState("");
@@ -81,6 +92,30 @@ export function AdminDashboard({
   const handleLogout = async () => {
     await logoutAdmin();
     router.refresh();
+  };
+
+  const handleNewGalleryItem = () => {
+    setEditingGalleryItem(null);
+    setShowGalleryModal(true);
+  };
+
+  const handleEditGalleryItem = (item: any) => {
+    setEditingGalleryItem(item);
+    setShowGalleryModal(true);
+  };
+
+  const handleDeleteGalleryItem = async (id: string) => {
+    if (!confirm("¿Eliminar esta foto de la galería principal?")) return;
+    try {
+      const res = await deleteGalleryItemAction(id);
+      if (res.success && res.gallery) {
+        setGalleryList(res.gallery);
+      } else {
+        setGalleryList(prev => prev.filter(it => it.id !== id));
+      }
+    } catch (err: any) {
+      alert("Error al eliminar");
+    }
   };
 
   const handleDeletePost = async (id: string) => {
@@ -164,6 +199,15 @@ export function AdminDashboard({
               className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "posts" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
             >
               <FileText className="w-4 h-4" /> Novedades
+            </button>
+          )}
+
+          {hasBlogPerm && (
+            <button 
+              onClick={() => setActiveTab("gallery")}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "gallery" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
+            >
+              <ImageIcon className="w-4 h-4" /> Galería Home
             </button>
           )}
           
@@ -581,6 +625,64 @@ export function AdminDashboard({
             </div>
           </div>
         )}
+        {hasBlogPerm && activeTab === "gallery" && (
+          <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-brand-blue">Vida de la Escuela en Fotos (Home)</h2>
+                <p className="text-xs text-brand-foreground/70 mt-1">
+                  Administrá las fotos, categorías, títulos y descripciones que aparecen en el carrusel de la portada.
+                </p>
+              </div>
+              <button 
+                onClick={handleNewGalleryItem}
+                className="flex items-center gap-2 bg-brand-blue text-white font-bold text-sm px-6 py-3 rounded-full hover:bg-brand-green transition-all shadow-md shrink-0"
+              >
+                <PlusCircle className="w-5 h-5" /> Agregar Foto
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {galleryList.map((item, idx) => (
+                <div key={item.id || idx} className="bg-white border rounded-[2rem] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="relative h-48 overflow-hidden bg-brand-gray/10">
+                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                      <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-md text-brand-blue text-[11px] font-bold px-3 py-1 rounded-full shadow-sm">
+                        {item.category}
+                      </span>
+                    </div>
+                    <div className="p-5">
+                      <h3 className="font-bold text-brand-blue text-base mb-1">{item.title}</h3>
+                      <p className="text-xs text-brand-foreground/75 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                  <div className="p-4 border-t bg-brand-gray/5 flex justify-end gap-2">
+                    <button 
+                      onClick={() => handleEditGalleryItem(item)}
+                      className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                      title="Editar"
+                    >
+                      <Edit className="w-4 h-4" /> Editar
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteGalleryItem(item.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" /> Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {galleryList.length === 0 && (
+                <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
+                  No hay fotos en la galería. Hacé clic en "Agregar Foto" para comenzar.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Editor Modal */}
@@ -591,6 +693,20 @@ export function AdminDashboard({
             setShowModal(false);
             setEditingPost(null);
           }} 
+        />
+      )}
+
+      {/* Gallery Editor Modal */}
+      {showGalleryModal && (
+        <GalleryEditorModal 
+          item={editingGalleryItem}
+          onClose={() => {
+            setShowGalleryModal(false);
+            setEditingGalleryItem(null);
+          }}
+          onSave={(updatedList) => {
+            setGalleryList(updatedList);
+          }}
         />
       )}
     </div>
@@ -1182,3 +1298,211 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
     </div>
   );
 }
+
+const AVAILABLE_PHOTOS = [
+  { url: "/photos/fee_photo_01.jpg", label: "Inicial: Pintura en el patio" },
+  { url: "/photos/fee_photo_02.jpg", label: "Secundaria: Aula audiovisual" },
+  { url: "/photos/fee_photo_03.jpg", label: "Secundaria: Ronda institucional" },
+  { url: "/photos/fee_photo_04.jpg", label: "Primaria: Biblioteca y lectura" },
+  { url: "/photos/fee_photo_06.jpg", label: "Ciencias: Instituto Balseiro RA-6" },
+  { url: "/photos/fee_photo_07.jpg", label: "Institucional: Abanderados patrios" },
+  { url: "/photos/fee_photo_08.jpg", label: "Secundaria: Egresados y fiesta" },
+  { url: "/photos/fee_photo_09.jpg", label: "Tecnología: Taller de netbooks" },
+  { url: "/photos/fee_photo_10.jpg", label: "Inglés: Feria del libro en inglés" },
+  { url: "/photos/fee_photo_11.jpg", label: "Hero: Panorámica cordillera Esquel" },
+  { url: "/photos/fee_photo_12.jpg", label: "Inglés: Concert & Drama en escenario" },
+  { url: "/photos/fee_photo_14.jpg", label: "Comunidad: Gran Kermesse de familias" },
+  { url: "/photos/fee_photo_15.jpg", label: "Inicial: Patio soleado y juegos" },
+  { url: "/photos/fee_photo_17.jpg", label: "Primaria: Salida Península Valdés" },
+  { url: "/photos/fee_photo_19.jpg", label: "Campamento: Fogón nocturno" },
+  { url: "/photos/fee_photo_20.jpg", label: "Naturaleza: Navegación en el lago" },
+  { url: "/photos/fee_photo_21.jpg", label: "Salidas: Trekking Los Alerces" },
+  { url: "/photos/fee_photo_22.jpg", label: "Inglés: Diplomas Cambridge" },
+  { url: "/photos/fee_photo_23.jpg", label: "Naturaleza: Avistaje de ballenas" },
+  { url: "/photos/fee_photo_24.jpg", label: "Campamento: Picnic en el lago" },
+  { url: "/photos/fee_photo_26.jpg", label: "Campamento: Juegos al aire libre" }
+];
+
+function GalleryEditorModal({ 
+  item, 
+  onClose, 
+  onSave 
+}: { 
+  item: any | null; 
+  onClose: () => void; 
+  onSave: (savedList: any[]) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState(item?.image || "/photos/fee_photo_21.jpg");
+  const [category, setCategory] = useState(item?.category || "Salidas Educativas");
+  const [title, setTitle] = useState(item?.title || "");
+  const [desc, setDesc] = useState(item?.desc || "");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!image || !title) {
+      alert("Por favor completá la imagen y el título");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await saveGalleryItemAction({
+        id: item?.id,
+        image,
+        category,
+        title,
+        desc
+      });
+      if (res.success && res.gallery) {
+        onSave(res.gallery);
+        onClose();
+      } else {
+        alert(res.error || "Error al guardar");
+      }
+    } catch (err: any) {
+      alert("Error al conectar con el servidor");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-brand-blue/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 p-2 text-brand-blue hover:bg-brand-gray/10 rounded-full transition-colors z-50 bg-white shadow-sm border"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="p-6 md:p-8 overflow-y-auto flex-1">
+          <h3 className="text-2xl font-extrabold text-brand-blue mb-2">
+            {item ? "Editar Foto de la Galería" : "Agregar Foto a la Galería"}
+          </h3>
+          <p className="text-xs text-brand-foreground/70 mb-6 font-medium">
+            Esta tarjeta se mostrará en el carrusel &quot;La Vida Escolar en Imágenes&quot; de la página principal.
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Image Preview & Selector */}
+            <div>
+              <label className="block text-xs font-bold text-brand-blue mb-2">Foto Seleccionada</label>
+              <div className="relative rounded-2xl overflow-hidden aspect-video bg-brand-gray/10 border mb-3">
+                <img src={image} alt="Vista previa" className="w-full h-full object-cover" />
+                <div className="absolute top-3 left-3 bg-white/95 text-brand-blue text-xs font-bold px-3 py-1 rounded-full shadow">
+                  {category}
+                </div>
+              </div>
+
+              <label className="block text-xs font-bold text-brand-foreground/75 mb-1.5">
+                Elegí una foto real de la escuela:
+              </label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-brand-gray/5 rounded-xl border">
+                {AVAILABLE_PHOTOS.map((p) => (
+                  <button
+                    key={p.url}
+                    type="button"
+                    onClick={() => setImage(p.url)}
+                    className={cn(
+                      "relative rounded-lg overflow-hidden aspect-square border-2 transition-all group",
+                      image === p.url ? "border-brand-green ring-2 ring-brand-green/30 scale-95" : "border-transparent opacity-70 hover:opacity-100"
+                    )}
+                    title={p.label}
+                  >
+                    <img src={p.url} alt={p.label} className="w-full h-full object-cover" />
+                    {image === p.url && (
+                      <div className="absolute inset-0 bg-brand-green/30 flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-2">
+                <label className="block text-[11px] font-semibold text-brand-foreground/60 mb-1">O pegá la ruta / URL de otra imagen:</label>
+                <input 
+                  type="text" 
+                  value={image} 
+                  onChange={(e) => setImage(e.target.value)} 
+                  className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white font-medium"
+                  placeholder="/photos/fee_photo_01.jpg"
+                />
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="block text-xs font-bold text-brand-blue mb-1">Categoría / Etiqueta</label>
+              <input 
+                type="text" 
+                required 
+                value={category} 
+                onChange={(e) => setCategory(e.target.value)} 
+                className="w-full px-4 py-2 border rounded-xl bg-brand-gray/5 text-sm font-semibold"
+                placeholder="Ej: Salidas Educativas, Inglés & Teatro, Campamentos, Robótica"
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {["Salidas Educativas", "Inglés & Teatro", "Campamentos & Convivencia", "Identidad & Valores", "Comunidad de Familias", "Tecnología & Innovación", "Nivel Inicial", "Ciencias Naturales"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className="text-[10px] font-bold px-2.5 py-1 bg-brand-gray/10 hover:bg-brand-yellow/30 text-brand-blue rounded-full transition-colors"
+                  >
+                    + {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-bold text-brand-blue mb-1">Título de la Tarjeta</label>
+              <input 
+                type="text" 
+                required 
+                value={title} 
+                onChange={(e) => setTitle(e.target.value)} 
+                className="w-full px-4 py-2 border rounded-xl bg-brand-gray/5 text-sm font-bold text-brand-blue"
+                placeholder="Ej: Exploración en los Bosques Andinos"
+              />
+            </div>
+
+            {/* Desc */}
+            <div>
+              <label className="block text-xs font-bold text-brand-blue mb-1">Descripción / Subtítulo</label>
+              <textarea 
+                rows={3} 
+                required 
+                value={desc} 
+                onChange={(e) => setDesc(e.target.value)} 
+                className="w-full px-4 py-2 border rounded-xl bg-brand-gray/5 text-sm font-medium"
+                placeholder="Breve reseña sobre la actividad, vivencia o proyecto..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="px-6 py-2.5 rounded-full text-xs font-bold text-brand-gray hover:bg-brand-gray/10 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="px-8 py-2.5 rounded-full text-xs font-bold bg-brand-green text-white hover:bg-brand-blue transition-colors shadow-md flex items-center gap-2"
+              >
+                {loading ? "Guardando..." : "Guardar en Galería"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+

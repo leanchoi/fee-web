@@ -120,6 +120,42 @@ export async function uploadMediaAction(formData: FormData): Promise<{ success: 
   return { success: true, url: "/logo.png" };
 }
 
+export async function getGalleryItemsAction() {
+  try {
+    const res = await fetch("/api/admin.php?action=get_gallery");
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveGalleryItemAction(data: { id?: string; image: string; category: string; title: string; desc: string }) {
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save_gallery_item", ...data }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteGalleryItemAction(id: string) {
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_gallery_item", id }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function getSession() {
   return null;
 }
+

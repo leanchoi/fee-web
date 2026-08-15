@@ -4,6 +4,17 @@
 // ==============================================================================
 require_once __DIR__ . '/config.php';
 
+// Endpoint público para obtener fotos de la galería Home
+if (($_GET['action'] ?? '') === 'get_gallery') {
+    $galleryFile = __DIR__ . '/data/gallery.json';
+    $items = [];
+    if (file_exists($galleryFile)) {
+        $items = json_decode(file_get_contents($galleryFile), true) ?: [];
+    }
+    echo json_encode(["success" => true, "gallery" => $items]);
+    exit;
+}
+
 $token = getBearerToken();
 $session = verifyToken($token);
 
@@ -81,6 +92,7 @@ switch ($action) {
         $contacts    = [];
         $posts       = [];
         $users       = [];
+        $gallery     = [];
 
         $canEnrollments = checkPermission($session, 'enrollments');
         $canContacts    = checkPermission($session, 'contacts');
@@ -139,13 +151,20 @@ switch ($action) {
             $posts = $initialPosts;
         }
 
+        // Cargar galería de fotos
+        $galleryFile = $dataDir . '/gallery.json';
+        if (file_exists($galleryFile)) {
+            $gallery = json_decode(file_get_contents($galleryFile), true) ?: [];
+        }
+
         echo json_encode([
             "success"     => true,
             "user"        => $session,
             "enrollments" => $enrollments,
             "contacts"    => $contacts,
             "posts"       => $posts,
-            "users"       => $users
+            "users"       => $users,
+            "gallery"     => $gallery
         ]);
         break;
 
@@ -167,7 +186,6 @@ switch ($action) {
             exit;
         }
 
-        // Actualizar en JSON
         $enrollFile = __DIR__ . '/data/enrollments.json';
         if (file_exists($enrollFile)) {
             $items = json_decode(file_get_contents($enrollFile), true) ?: [];
@@ -352,7 +370,82 @@ switch ($action) {
         echo json_encode(["success" => true]);
         break;
 
-    // 7. Cerrar Sesión
+    // 7. Guardar / Editar Item de Galería de Fotos
+    case 'save_gallery_item':
+        if (!checkPermission($session, 'blog')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $galleryFile = __DIR__ . '/data/gallery.json';
+        $items = [];
+        if (file_exists($galleryFile)) {
+            $items = json_decode(file_get_contents($galleryFile), true) ?: [];
+        }
+
+        $id       = trim($bodyData['id'] ?? '');
+        $image    = trim($bodyData['image'] ?? '');
+        $category = trim($bodyData['category'] ?? 'Experiencias');
+        $title    = trim($bodyData['title'] ?? '');
+        $desc     = trim($bodyData['desc'] ?? '');
+
+        if (empty($image) || empty($title)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "Imagen y título son requeridos"]);
+            exit;
+        }
+
+        $found = false;
+        if ($id) {
+            foreach ($items as &$it) {
+                if ($it['id'] === $id) {
+                    $it['image']    = $image;
+                    $it['category'] = $category;
+                    $it['title']    = $title;
+                    $it['desc']     = $desc;
+                    $found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$found) {
+            $items[] = [
+                'id'       => $id ?: ('gal-' . time()),
+                'image'    => $image,
+                'category' => $category,
+                'title'    => $title,
+                'desc'     => $desc,
+                'order'    => count($items) + 1
+            ];
+        }
+
+        @file_put_contents($galleryFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        echo json_encode(["success" => true, "gallery" => $items]);
+        break;
+
+    // 8. Eliminar Item de Galería de Fotos
+    case 'delete_gallery_item':
+        if (!checkPermission($session, 'blog')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
+        $galleryFile = __DIR__ . '/data/gallery.json';
+        $items = [];
+        if (file_exists($galleryFile)) {
+            $items = json_decode(file_get_contents($galleryFile), true) ?: [];
+            $items = array_values(array_filter($items, fn($it) => $it['id'] !== $id));
+            @file_put_contents($galleryFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+
+        echo json_encode(["success" => true, "gallery" => $items]);
+        break;
+
+    // 9. Cerrar Sesión
     case 'logout':
         $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
         setcookie('admin_session', '', [

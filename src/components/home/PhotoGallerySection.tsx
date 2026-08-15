@@ -1,49 +1,77 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Compass } from "lucide-react";
 
-const galleryItems = [
+interface GalleryItem {
+  id?: string;
+  image: string;
+  category: string;
+  title: string;
+  desc: string;
+}
+
+const defaultGalleryItems: GalleryItem[] = [
   {
+    id: "gal-1",
     image: "/photos/fee_photo_21.jpg",
     category: "Salidas Educativas",
     title: "Exploración en los Bosques Andinos",
     desc: "Caminatas y salidas de estudio en contacto con la flora y fauna nativa de la región.",
   },
   {
+    id: "gal-2",
     image: "/photos/fee_photo_12.jpg",
     category: "Inglés & Teatro",
     title: "English Concert & Drama Festival",
     desc: "Obras teatrales y musicales íntegramente en inglés sobre el escenario.",
   },
   {
+    id: "gal-3",
     image: "/photos/fee_photo_24.jpg",
     category: "Campamentos & Convivencia",
     title: "Jornadas Recreativas en la Naturaleza",
     desc: "Campamentos anuales y picnics formativos para afianzar vínculos y compañerismo.",
   },
   {
+    id: "gal-4",
     image: "/photos/fee_photo_07.jpg",
     category: "Identidad & Valores",
     title: "Compromiso Cívico e Institucional",
     desc: "Nuestros abanderados y escoltas portando los símbolos de la escuela y la bandera patria.",
   },
   {
+    id: "gal-5",
     image: "/photos/fee_photo_14.jpg",
     category: "Comunidad de Familias",
     title: "Kermesse y Encuentros Solidarios",
     desc: "El gimnasio colmado de familias en celebraciones y proyectos cooperativos.",
   },
   {
-    image: "/photos/fee_photo_01.jpg",
-    category: "Nivel Inicial",
-    title: "Creatividad, Arte y Juego",
-    desc: "Murales colectivos y expresión artística en el patio junto a las docentes.",
+    id: "gal-6",
+    image: "/photos/fee_photo_09.jpg",
+    category: "Tecnología & Innovación",
+    title: "Robótica y Pensamiento Digital",
+    desc: "Alumnos experimentando con proyectos digitales y herramientas informáticas en el aula.",
   },
 ];
 
 export function PhotoGallerySection() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [items, setItems] = useState<GalleryItem[]>(defaultGalleryItems);
+
+  useEffect(() => {
+    fetch("/api/admin.php?action=get_gallery")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.gallery) && data.gallery.length > 0) {
+          setItems(data.gallery);
+        }
+      })
+      .catch(() => {
+        // Usa los valores por defecto si falla la petición
+      });
+  }, []);
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -96,9 +124,9 @@ export function PhotoGallerySection() {
           className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-6 scrollbar-none"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {galleryItems.map((item, idx) => (
+          {items.map((item, idx) => (
             <div
-              key={idx}
+              key={item.id || idx}
               className="min-w-[300px] sm:min-w-[360px] md:min-w-[400px] snap-start bg-white rounded-[2rem] overflow-hidden border border-brand-gray/10 shadow-md hover:shadow-xl transition-all duration-300 group flex flex-col"
             >
               <div className="relative h-64 sm:h-72 overflow-hidden">

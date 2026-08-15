@@ -20,10 +20,10 @@ const nivelesData = {
       "Comprenden y respetan normas simples de convivencia democrática.",
       "Se inician de forma natural en la lectura, la matemática y la experiencia del inglés."
     ],
-    featureImage: "/photos/fee_photo_08.jpg",
-    featureTag: "JUEGO, ARTE Y EXPRESIÓN",
+    featureImage: "/photos/fee_photo_15.jpg",
+    featureTag: "JUEGO, ARTE Y EXPLORACIÓN",
     featureTitle: "La primera infancia aprendiendo a través de la creatividad y la imaginación",
-    featureDesc: "En las salas de 3, 4 y 5 años cada jornada es un espacio de descubrimiento sensible, contención afectiva y exploración activa."
+    featureDesc: "En las salas de 3, 4 y 5 años cada jornada es un espacio de descubrimiento sensible, contención afectiva y exploración activa en el patio y las salas."
   },
   primario: {
     slug: "primario",
@@ -39,10 +39,10 @@ const nivelesData = {
       "Practica la empatía, el trabajo en equipo y la resolución pacífica de conflictos basada en los AEC.",
       "Hace un uso responsable de las tecnologías y respeta el medio ambiente."
     ],
-    featureImage: "/photos/fee_photo_21.jpg",
-    featureTag: "SALIDAS EDUCATIVAS Y NATURALEZA",
-    featureTitle: "Aprender haciendo en el entorno natural patagónico",
-    featureDesc: "Salidas de estudio por el bosque andino, campamentos formativos y proyectos en ciencias que enriquecen los conocimientos del aula con experiencias inolvidables."
+    featureImage: "/photos/fee_photo_09.jpg",
+    featureTag: "TECNOLOGÍA, CIENCIAS Y NATURALEZA",
+    featureTitle: "Innovación pedagógica, pensamiento digital y proyectos colaborativos",
+    featureDesc: "Acompañamos a nuestros alumnos en el uso creativo y responsable de las tecnologías digitales en el aula, complementado con salidas de estudio en el entorno patagónico."
   },
   secundario: {
     slug: "secundario",
@@ -58,10 +58,10 @@ const nivelesData = {
       "Compromiso con la inclusión, la ciudadanía democrática y el desarrollo sustentable de la Patagonia.",
       "Preparados para la transición universitaria y proyectos de vida profesionales con ética."
     ],
-    featureImage: "/photos/fee_photo_17.jpg",
-    featureTag: "CIENCIAS NATURALES Y PROYECCIÓN",
-    featureTitle: "Investigación, trabajo de campo y autonomía ciudadana",
-    featureDesc: "Experiencias de laboratorio, viajes de estudio interdisciplinarios y sólida formación bilingüe para el ingreso a la universidad."
+    featureImage: "/photos/fee_photo_06.jpg",
+    featureTag: "CIENCIAS NATURALES Y EXCELENCIA ACADÉMICA",
+    featureTitle: "Viajes de estudio e inmersión científica en el Instituto Balseiro",
+    featureDesc: "Experiencias directas en centros de investigación nuclear (CNEA RA-6), laboratorios de física y ciencias naturales que preparan a nuestros estudiantes para los máximos desafíos universitarios."
   },
 };
 
