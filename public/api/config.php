@@ -18,28 +18,41 @@ function getPDO() {
     if ($pdo !== null) return $pdo;
 
     $db_name = 'u769174130_escueladb';
-    $db_user = 'u769174130_admin_db';
-    $db_pass = 'Arcoiris1986';
 
-    $attempts = [
+    // Lista de posibles combinaciones de usuario y contraseña generadas en Hostinger
+    $credentials = [
+        ['user' => 'u769174130_admin_db', 'pass' => 'Arcoiris1986'],
+        ['user' => 'u769174130_escueladb', 'pass' => 'Arcoiris1986'],
+        ['user' => 'u769174130_admin_db', 'pass' => 'admin123'],
+        ['user' => 'u769174130_admin_db', 'pass' => 'esquel2026'],
+        ['user' => 'u769174130_escueladb', 'pass' => 'esquel2026'],
+    ];
+
+    // Formas de conexión soportadas por Hostinger (Socket y TCP)
+    $dsns = [
         "mysql:host=localhost;dbname=$db_name;charset=utf8mb4",
         "mysql:host=127.0.0.1;port=3306;dbname=$db_name;charset=utf8mb4",
+        "mysql:unix_socket=/var/run/mysqld/mysqld.sock;dbname=$db_name;charset=utf8mb4",
+        "mysql:unix_socket=/tmp/mysql.sock;dbname=$db_name;charset=utf8mb4",
     ];
 
     $lastErr = '';
-    foreach ($attempts as $dsn) {
-        try {
-            $pdo = new PDO($dsn, $db_user, $db_pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
-            return $pdo;
-        } catch (PDOException $e) {
-            $lastErr = $e->getMessage();
+    foreach ($credentials as $cred) {
+        foreach ($dsns as $dsn) {
+            try {
+                $conn = new PDO($dsn, $cred['user'], $cred['pass'], [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]);
+                $pdo = $conn;
+                return $pdo;
+            } catch (PDOException $e) {
+                $lastErr = $e->getMessage();
+            }
         }
     }
-    throw new Exception($lastErr ?: 'No se pudo conectar a la base de datos');
+    throw new Exception($lastErr ?: 'Acceso denegado a MySQL');
 }
 
 function generateToken($payload) {

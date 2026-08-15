@@ -55,7 +55,7 @@ export function NewsPreview() {
           {recentPosts.map((post) => (
             <Link 
               key={post.id} 
-              href={`/blog/post/${post.id}`}
+              href="/blog"
               className="group flex flex-col bg-background rounded-3xl overflow-hidden hover:shadow-lg transition-all duration-300 border border-brand-gray/10"
             >
               <div className={`h-2 ${post.color}`} />
