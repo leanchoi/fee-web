@@ -63,6 +63,105 @@ interface Block {
   data: any;
 }
 
+const DEFAULT_GALLERY_ITEMS = [
+  {
+    id: "gal-1",
+    image: "/photos/fee_photo_21.jpg",
+    category: "Salidas Educativas",
+    title: "Exploración en los Bosques Andinos",
+    desc: "Caminatas y salidas de estudio en contacto con la flora y fauna nativa de la región.",
+    order: 1
+  },
+  {
+    id: "gal-2",
+    image: "/photos/fee_photo_12.jpg",
+    category: "Inglés & Teatro",
+    title: "English Concert & Drama Festival",
+    desc: "Obras teatrales y musicales íntegramente en inglés sobre el escenario.",
+    order: 2
+  },
+  {
+    id: "gal-3",
+    image: "/photos/fee_photo_24.jpg",
+    category: "Campamentos & Convivencia",
+    title: "Jornadas Recreativas en la Naturaleza",
+    desc: "Campamentos anuales y picnics formativos para afianzar vínculos y compañerismo.",
+    order: 3
+  },
+  {
+    id: "gal-4",
+    image: "/photos/fee_photo_07.jpg",
+    category: "Identidad & Valores",
+    title: "Compromiso Cívico e Institucional",
+    desc: "Nuestros abanderados y escoltas portando los símbolos de la escuela y la bandera patria.",
+    order: 4
+  },
+  {
+    id: "gal-5",
+    image: "/photos/fee_photo_14.jpg",
+    category: "Comunidad de Familias",
+    title: "Kermesse y Encuentros Solidarios",
+    desc: "El gimnasio colmado de familias en celebraciones y proyectos cooperativos.",
+    order: 5
+  },
+  {
+    id: "gal-6",
+    image: "/photos/fee_photo_09.jpg",
+    category: "Tecnología & Innovación",
+    title: "Robótica y Pensamiento Digital",
+    desc: "Alumnos experimentando con proyectos digitales y herramientas informáticas en el aula.",
+    order: 6
+  },
+  {
+    id: "gal-7",
+    image: "/photos/fee_photo_06.jpg",
+    category: "Ciencias Naturales",
+    title: "Inmersión Científica en Instituto Balseiro",
+    desc: "Salidas de estudio a centros de investigación nuclear (CNEA RA-6) y laboratorios avanzados.",
+    order: 7
+  },
+  {
+    id: "gal-8",
+    image: "/photos/fee_photo_15.jpg",
+    category: "Nivel Inicial",
+    title: "Juego y Socialización en el Patio",
+    desc: "Jornadas de descubrimiento y contención afectiva en las salas de 3, 4 y 5 años.",
+    order: 8
+  },
+  {
+    id: "gal-9",
+    image: "/photos/fee_photo_22.jpg",
+    category: "Certificaciones",
+    title: "Acreditaciones Internacionales Cambridge",
+    desc: "Entrega de diplomas y reconocimiento al mérito académico en idioma inglés.",
+    order: 9
+  },
+  {
+    id: "gal-10",
+    image: "/photos/fee_photo_20.jpg",
+    category: "Vida al Aire Libre",
+    title: "Navegación y Campamentos en Lagos Andinos",
+    desc: "Experiencias de travesía y aprendizaje en contacto con el agua y la montaña.",
+    order: 10
+  },
+  {
+    id: "gal-11",
+    image: "/photos/fee_photo_10.jpg",
+    category: "Cultura y Lengua",
+    title: "Feria del Libro en Inglés (Book Fair)",
+    desc: "Fomento del hábito lector y exploración de literatura bilingüe en biblioteca.",
+    order: 11
+  },
+  {
+    id: "gal-12",
+    image: "/photos/fee_photo_08.jpg",
+    category: "Nivel Secundario",
+    title: "Colación y Fiesta de Egresados",
+    desc: "Cierre de ciclo formativo y celebración del futuro de nuestros estudiantes.",
+    order: 12
+  }
+];
+
 export function AdminDashboard({ 
   posts, 
   enrollments, 
@@ -95,8 +194,11 @@ export function AdminDashboard({
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
-  // Gallery State
-  const [galleryList, setGalleryList] = useState<any[]>(gallery || []);
+  // Gallery State (default to preloaded official 12 items if empty)
+  const [galleryList, setGalleryList] = useState<any[]>(() => {
+    if (Array.isArray(gallery) && gallery.length > 0) return gallery;
+    return DEFAULT_GALLERY_ITEMS;
+  });
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [editingGalleryItem, setEditingGalleryItem] = useState<any | null>(null);
 
