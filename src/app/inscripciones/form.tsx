@@ -46,13 +46,30 @@ export function EnrollmentForm() {
     setIsSubmitting(true);
     setErrorObj(null);
     try {
-      const result = await submitEnrollment(data);
+      const res = await fetch("/api/enroll.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
       if (result.success) {
         setSuccess(true);
       } else {
-        setErrorObj(result.error || "Error desconocido");
+        const fallbackRes = await submitEnrollment(data);
+        if (fallbackRes.success) {
+          setSuccess(true);
+        } else {
+          setErrorObj(result.error || fallbackRes.error || "Error al procesar la solicitud");
+        }
       }
     } catch (e) {
+      try {
+        const fallbackRes = await submitEnrollment(data);
+        if (fallbackRes.success) {
+          setSuccess(true);
+          return;
+        }
+      } catch (err) {}
       setErrorObj("Ocurrió un error de red. Intenta nuevamente.");
     } finally {
       setIsSubmitting(false);

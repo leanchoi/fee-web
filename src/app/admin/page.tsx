@@ -1,34 +1,36 @@
-import { getSession } from "@/actions/admin";
+"use client";
+
+import { useEffect, useState } from "react";
 import { AdminDashboard } from "./dashboard";
 import { LoginForm } from "./login";
-import { Metadata } from "next";
-import prisma from "@/lib/prisma";
-import type { Post, Enrollment, User, ContactMessage } from "@prisma/client";
+import { getDashboardData } from "@/actions/admin";
+import { Loader2 } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Admin Panel | Fundación Educativa Esquel",
-  robots: { index: false, follow: false },
-};
+export default function AdminPage() {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
 
-export default async function AdminPage() {
-  const session = await getSession();
-  const isAuth = !!session;
-
-  let posts: Post[] = [];
-  let enrollments: Enrollment[] = [];
-  let contactMessages: ContactMessage[] = [];
-  let users: User[] = [];
-
-  if (session) {
-    posts = await prisma.post.findMany({ orderBy: { createdAt: "desc" } });
-    
-    // Only SUPER_ADMIN can view enrollments, contacts and manage users
-    if (session.role === "SUPER_ADMIN") {
-      enrollments = await prisma.enrollment.findMany({ orderBy: { createdAt: "desc" } });
-      contactMessages = await prisma.contactMessage.findMany({ orderBy: { createdAt: "desc" } });
-      users = await prisma.user.findMany({ orderBy: { createdAt: "desc" } });
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await getDashboardData();
+      if (res && res.success) {
+        setData(res);
+      } else {
+        setData(null);
+      }
+    } catch (e) {
+      setData(null);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const isAuth = !!(data && data.user);
 
   return (
     <div className="min-h-screen bg-brand-gray/5 pb-24">
@@ -37,24 +39,29 @@ export default async function AdminPage() {
           <span className="text-xl font-bold tracking-tight">FEE <span className="text-brand-yellow">Intranet</span></span>
           {isAuth && (
             <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold">{session.name}</span>
-              <span className="text-xs opacity-75 capitalize">{session.role.toLowerCase().replace('_', ' ')}</span>
+              <span className="text-sm font-semibold">{data.user.name}</span>
+              <span className="text-xs opacity-75 capitalize">{data.user.role?.toLowerCase().replace('_', ' ')}</span>
             </div>
           )}
         </div>
       </header>
 
       <main className="container mx-auto px-6 lg:px-12 max-w-5xl">
-        {isAuth ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-24 text-brand-blue">
+            <Loader2 className="w-10 h-10 animate-spin mb-4" />
+            <p className="font-semibold text-sm">Cargando panel de administración...</p>
+          </div>
+        ) : isAuth ? (
           <AdminDashboard 
-            posts={posts} 
-            enrollments={enrollments} 
-            contactMessages={contactMessages}
-            users={users} 
-            session={session} 
+            posts={data.posts || []} 
+            enrollments={data.enrollments || []} 
+            contactMessages={data.contacts || []} 
+            users={data.users || []} 
+            session={data.user} 
           />
         ) : (
-          <LoginForm />
+          <LoginForm onLoginSuccess={loadData} />
         )}
       </main>
     </div>

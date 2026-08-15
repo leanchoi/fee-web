@@ -5,7 +5,7 @@ import { loginAdmin } from "@/actions/admin";
 import { Lock, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export function LoginForm() {
+export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,8 +20,11 @@ export function LoginForm() {
     try {
       const res = await loginAdmin(password, email);
       if (res.success) {
-        // Router refresh re-evaluates server components, triggering the Dashboard render
-        router.refresh();
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        } else {
+          router.refresh();
+        }
       } else {
         setError(res.error || "Error al ingresar");
       }

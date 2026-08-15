@@ -19,17 +19,42 @@ export default function ContactoPage() {
     setStatus(null);
 
     try {
-      const res = await submitContact({ name, email, subject, message });
-      if (res.success) {
+      const res = await fetch("/api/contact.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, subject, message }),
+      });
+      const data = await res.json();
+      if (data.success) {
         setStatus({ type: "success", text: "¡Mensaje enviado con éxito! Nos contactaremos a la brevedad." });
         setName("");
         setEmail("");
         setSubject("");
         setMessage("");
       } else {
-        setStatus({ type: "error", text: res.error || "Ocurrió un error al enviar el mensaje." });
+        const fallbackRes = await submitContact({ name, email, subject, message });
+        if (fallbackRes.success) {
+          setStatus({ type: "success", text: "¡Mensaje enviado con éxito! Nos contactaremos a la brevedad." });
+          setName("");
+          setEmail("");
+          setSubject("");
+          setMessage("");
+        } else {
+          setStatus({ type: "error", text: data.error || fallbackRes.error || "Ocurrió un error al enviar el mensaje." });
+        }
       }
     } catch (err: any) {
+      try {
+        const fallbackRes = await submitContact({ name, email, subject, message });
+        if (fallbackRes.success) {
+          setStatus({ type: "success", text: "¡Mensaje enviado con éxito! Nos contactaremos a la brevedad." });
+          setName("");
+          setEmail("");
+          setSubject("");
+          setMessage("");
+          return;
+        }
+      } catch (e) {}
       setStatus({ type: "error", text: "Error en el servidor al enviar el mensaje." });
     } finally {
       setLoading(false);
