@@ -9,6 +9,7 @@ import {
   togglePostPublish, 
   createUserAction, 
   deleteUser, 
+  changePasswordAction,
   deleteEnrollment,
   uploadMediaAction,
   deleteContactMessage,
@@ -53,7 +54,12 @@ import {
   SlidersHorizontal,
   Printer,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  RefreshCw,
+  KeyRound,
+  ShieldCheck,
+  AlertCircle
 } from "lucide-react";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
@@ -162,6 +168,16 @@ const DEFAULT_GALLERY_ITEMS = [
   }
 ];
 
+function generateSuggestedPassword(): string {
+  const words = ["Esquel", "Patagonia", "Futaleufu", "Cordillera", "Andes", "Nieve", "Puelo", "Maiten"];
+  const symbols = ["#", "$", "!", "&", "@"];
+  const word = words[Math.floor(Math.random() * words.length)];
+  const num = Math.floor(100 + Math.random() * 900);
+  const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+  const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `${word}${symbol}${num}${rand}`;
+}
+
 export function AdminDashboard({ 
   posts, 
   enrollments, 
@@ -264,8 +280,21 @@ export function AdminDashboard({
   }, [enrollmentList, enrollmentSearchQuery, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
   
   // User Management State
+  const [userList, setUserList] = useState<any[]>(users || []);
   const [userError, setUserError] = useState("");
   const [userSuccess, setUserSuccess] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPassword, setNewPassword] = useState(() => generateSuggestedPassword());
+  const [newRole, setNewRole] = useState("EDITOR");
+  const [permBlog, setPermBlog] = useState(true);
+  const [permEnrollments, setPermEnrollments] = useState(false);
+  const [permContacts, setPermContacts] = useState(false);
+  const [copiedToast, setCopiedToast] = useState(false);
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
+  // First Login Mandatory Password Change Modal
+  const [showFirstLoginModal, setShowFirstLoginModal] = useState(!!session.mustChangePassword);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -319,23 +348,69 @@ export function AdminDashboard({
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserError("");
     setUserSuccess("");
-    const fd = new FormData(e.currentTarget);
-    
+    setIsSubmittingUser(true);
+
+    const cleanUsername = newUsername.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+    if (!cleanUsername || cleanUsername.length < 3) {
+      setUserError("El nombre de usuario debe tener al menos 3 caracteres alfanuméricos (sin @ ni espacios).");
+      setIsSubmittingUser(false);
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      setUserError("La contraseña debe contener al menos 6 caracteres.");
+      setIsSubmittingUser(false);
+      return;
+    }
+
+    const permsArray: string[] = [];
+    if (permBlog) permsArray.push("blog");
+    if (permEnrollments) permsArray.push("enrollments");
+    if (permContacts) permsArray.push("contacts");
+
     try {
-      const res = await createUserAction(fd);
+      const res = await createUserAction({
+        username: cleanUsername,
+        name: newName.trim() || cleanUsername,
+        password: newPassword.trim(),
+        role: newRole,
+        permissions: newRole === "SUPER_ADMIN" ? "blog,contacts,enrollments,users,gallery" : permsArray.join(","),
+      });
+
       if (res.success) {
-        setUserSuccess("Usuario creado correctamente.");
-        e.currentTarget.reset();
+        setUserSuccess(res.message || `Usuario '${cleanUsername}' creado correctamente.`);
+        setUserList(prev => [
+          {
+            id: 'user-' + Date.now(),
+            username: cleanUsername,
+            email: cleanUsername + '@fee.local',
+            name: newName.trim() || cleanUsername,
+            role: newRole,
+            permissions: newRole === "SUPER_ADMIN" ? "blog,contacts,enrollments,users,gallery" : permsArray.join(","),
+            mustChangePassword: 1,
+            createdAt: new Date().toISOString()
+          },
+          ...prev
+        ]);
+        setNewUsername("");
+        setNewName("");
+        setNewPassword(generateSuggestedPassword());
+        setNewRole("EDITOR");
+        setPermBlog(true);
+        setPermEnrollments(false);
+        setPermContacts(false);
         router.refresh();
       } else {
         setUserError(res.error || "Error al crear usuario");
       }
     } catch (err: any) {
       setUserError(err.message || "Error al conectar con el servidor");
+    } finally {
+      setIsSubmittingUser(false);
     }
   };
 
@@ -344,13 +419,20 @@ export function AdminDashboard({
     try {
       const res = await deleteUser(id);
       if (res.success) {
+        setUserList(prev => prev.filter(u => u.id !== id));
         router.refresh();
       } else {
-        alert(res.error || "Error al eliminar");
+        alert(res.error || "Error al eliminar usuario");
       }
     } catch (err: any) {
-      alert(err.message || "Error");
+      alert(err.message || "Error al conectar con el servidor");
     }
+  };
+
+  const handleCopyPassword = () => {
+    navigator.clipboard.writeText(newPassword);
+    setCopiedToast(true);
+    setTimeout(() => setCopiedToast(false), 2500);
   };
 
   const handleDeleteContactMessage = async (id: string) => {
@@ -944,107 +1026,260 @@ export function AdminDashboard({
 
         {isSuperAdmin && activeTab === "users" && (
           <div>
-            <h2 className="text-2xl font-bold text-brand-blue mb-6">Gestión de Usuarios</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-brand-blue">Gestión de Usuarios</h2>
+                <p className="text-xs text-brand-foreground/70 mt-1">
+                  Creá y administrá los accesos al panel mediante nombres de usuario (sin necesidad de correo).
+                </p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1.5 bg-brand-blue/10 text-brand-blue rounded-full">
+                Total: {userList.length} cuentas
+              </span>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
               {/* Form to Create User */}
-              <div className="bg-brand-gray/5 p-6 rounded-2xl border border-brand-gray/10 h-max">
-                <h3 className="font-bold text-brand-blue mb-4 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-brand-green" /> Crear Usuario
+              <div className="bg-brand-gray/5 p-6 rounded-3xl border border-brand-gray/15 h-max shadow-sm">
+                <h3 className="font-bold text-brand-blue mb-4 flex items-center gap-2 text-base">
+                  <UserPlus className="w-5 h-5 text-brand-green" /> Crear Nuevo Usuario
                 </h3>
                 
-                {userError && <p className="text-red-500 text-xs font-semibold bg-red-50 p-2 rounded-lg mb-4 text-center">{userError}</p>}
-                {userSuccess && <p className="text-green-600 text-xs font-semibold bg-green-50 p-2 rounded-lg mb-4 text-center">{userSuccess}</p>}
+                {userError && (
+                  <div className="flex items-center gap-2 text-red-600 text-xs font-semibold bg-red-50 p-3 rounded-xl mb-4 border border-red-100">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{userError}</span>
+                  </div>
+                )}
+                {userSuccess && (
+                  <div className="flex items-center gap-2 text-green-700 text-xs font-semibold bg-green-50 p-3 rounded-xl mb-4 border border-green-200">
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span>{userSuccess}</span>
+                  </div>
+                )}
 
                 <form onSubmit={handleCreateUser} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-brand-blue mb-1">Nombre</label>
-                    <input name="name" required className="w-full px-3 py-2 text-sm border rounded-lg" placeholder="Ej: Juan Pérez" />
+                    <label className="block text-xs font-bold text-brand-blue mb-1">
+                      Nombre de Usuario (Login)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-brand-foreground/40 font-bold text-xs">@</span>
+                      <input 
+                        type="text"
+                        value={newUsername}
+                        onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+                        required 
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        className="w-full pl-8 pr-3 py-2 text-sm border rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none font-medium" 
+                        placeholder="ej: preceptor, inicial_dir, secretaria" 
+                      />
+                    </div>
+                    <p className="text-[10px] text-brand-foreground/60 mt-1">
+                      Sin espacios ni @. El ingreso no distingue mayúsculas ni minúsculas.
+                    </p>
                   </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-brand-blue mb-1">Email</label>
-                    <input name="email" type="email" required className="w-full px-3 py-2 text-sm border rounded-lg" placeholder="juan@fundacion.com" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-brand-blue mb-1">Contraseña</label>
-                    <input name="password" type="password" required className="w-full px-3 py-2 text-sm border rounded-lg" placeholder="Clave de acceso" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-brand-blue mb-1">Rol</label>
-                    <select 
-                      name="role" 
+                    <label className="block text-xs font-bold text-brand-blue mb-1">
+                      Nombre Completo / Cargo
+                    </label>
+                    <input 
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
                       required 
-                      defaultValue="EDITOR"
-                      className="w-full px-3 py-2 text-sm border rounded-lg bg-white"
+                      className="w-full px-3 py-2 text-sm border rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none font-medium" 
+                      placeholder="Ej: Lic. Laura Gómez (Preceptoría)" 
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-bold text-brand-blue">
+                        Contraseña Sugerida (Provisoria)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setNewPassword(generateSuggestedPassword())}
+                        className="text-[11px] font-bold text-brand-blue hover:text-brand-green flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Generar otra clave aleatoria"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Generar otra
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required 
+                        className="w-full px-3 py-2 text-sm border rounded-xl bg-amber-50/50 border-amber-200 text-brand-blue font-mono font-bold focus:ring-2 focus:ring-brand-blue outline-none" 
+                        placeholder="Clave provisoria" 
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyPassword}
+                        className="bg-brand-blue/10 hover:bg-brand-blue hover:text-white text-brand-blue font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                        title="Copiar contraseña"
+                      >
+                        {copiedToast ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedToast ? "Copiada" : "Copiar"}
+                      </button>
+                    </div>
+
+                    {/* Security Tip Box */}
+                    <div className="mt-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-300/40 text-[11px] text-amber-900 flex items-start gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>1° Ingreso Seguro:</strong> Al iniciar sesión por primera vez, el sistema le exigirá automáticamente a este usuario cambiar esta clave por una personal y secreta.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-brand-blue mb-1">Tipo de Rol</label>
+                    <select 
+                      value={newRole} 
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none font-medium"
                     >
-                      <option value="EDITOR">Gestor Personalizado</option>
-                      <option value="SUPER_ADMIN">Super Administrador (Todo)</option>
+                      <option value="EDITOR">Gestor Personalizado (Secciones a definir)</option>
+                      <option value="SUPER_ADMIN">Super Administrador (Acceso Total)</option>
                     </select>
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-brand-gray/10">
-                    <label className="block text-xs font-bold text-brand-blue mb-1">Permisos y Accesos (Solo para Gestores)</label>
-                    
-                    <div className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" name="perm_blog" id="perm_blog" defaultChecked />
-                      <label htmlFor="perm_blog" className="font-semibold text-brand-foreground/80">Escribir Entradas de Blog</label>
+                  {newRole === "EDITOR" && (
+                    <div className="space-y-2 pt-3 border-t border-brand-gray/15">
+                      <label className="block text-xs font-bold text-brand-blue mb-1">Permisos de Acceso Asignados</label>
+                      
+                      <label className="flex items-center gap-2.5 text-xs font-semibold text-brand-foreground/80 cursor-pointer bg-white p-2 rounded-lg border border-brand-gray/10 hover:bg-brand-gray/5 transition-all">
+                        <input 
+                          type="checkbox" 
+                          checked={permBlog}
+                          onChange={(e) => setPermBlog(e.target.checked)}
+                          className="rounded text-brand-blue focus:ring-brand-blue w-4 h-4" 
+                        />
+                        <span>Gestionar Novedades, Blog & Galería</span>
+                      </label>
+                      
+                      <label className="flex items-center gap-2.5 text-xs font-semibold text-brand-foreground/80 cursor-pointer bg-white p-2 rounded-lg border border-brand-gray/10 hover:bg-brand-gray/5 transition-all">
+                        <input 
+                          type="checkbox" 
+                          checked={permEnrollments}
+                          onChange={(e) => setPermEnrollments(e.target.checked)}
+                          className="rounded text-brand-blue focus:ring-brand-blue w-4 h-4" 
+                        />
+                        <span>Ver & Gestionar Solicitudes de Inscripción</span>
+                      </label>
+                      
+                      <label className="flex items-center gap-2.5 text-xs font-semibold text-brand-foreground/80 cursor-pointer bg-white p-2 rounded-lg border border-brand-gray/10 hover:bg-brand-gray/5 transition-all">
+                        <input 
+                          type="checkbox" 
+                          checked={permContacts}
+                          onChange={(e) => setPermContacts(e.target.checked)}
+                          className="rounded text-brand-blue focus:ring-brand-blue w-4 h-4" 
+                        />
+                        <span>Ver & Gestionar Mensajes de Contacto</span>
+                      </label>
                     </div>
-                    
-                    <div className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" name="perm_enrollments" id="perm_enrollments" />
-                      <label htmlFor="perm_enrollments" className="font-semibold text-brand-foreground/80">Ver Inscripciones</label>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-xs">
-                      <input type="checkbox" name="perm_contacts" id="perm_contacts" />
-                      <label htmlFor="perm_contacts" className="font-semibold text-brand-foreground/80">Ver Consultas</label>
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-brand-green text-white py-2.5 rounded-lg font-bold hover:bg-brand-blue transition-colors text-sm shadow-md">
-                    Guardar Usuario
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={isSubmittingUser}
+                    className="w-full bg-brand-green text-white py-3 rounded-full font-bold hover:bg-brand-blue transition-colors text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer mt-4"
+                  >
+                    {isSubmittingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                    Guardar y Crear Usuario
                   </button>
                 </form>
               </div>
 
               {/* Users List */}
-              <div className="md:col-span-2 overflow-x-auto rounded-xl border">
+              <div className="lg:col-span-2 overflow-x-auto rounded-3xl border border-brand-gray/15 bg-white shadow-sm h-max">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-brand-gray/5 text-brand-blue text-sm">
-                      <th className="p-4 font-bold border-b">Nombre</th>
-                      <th className="p-4 font-bold border-b">Email</th>
-                      <th className="p-4 font-bold border-b">Rol</th>
-                      <th className="p-4 font-bold border-b text-right">Acción</th>
+                    <tr className="bg-brand-gray/5 text-brand-blue text-xs font-bold uppercase tracking-wider">
+                      <th className="p-4 border-b">Usuario</th>
+                      <th className="p-4 border-b">Nombre / Cargo</th>
+                      <th className="p-4 border-b">Rol & Permisos</th>
+                      <th className="p-4 border-b text-center">Estado Seguridad</th>
+                      <th className="p-4 border-b text-right">Acción</th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm">
-                    {users.map(u => (
-                      <tr key={u.id} className="border-b last:border-0 hover:bg-brand-gray/5 transition-colors">
-                        <td className="p-4 font-medium">{u.name || "-"}</td>
-                        <td className="p-4">{u.email}</td>
-                        <td className="p-4">
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold block w-max ${u.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {u.role}
-                          </span>
-                          {u.role !== 'SUPER_ADMIN' && (
-                            <span className="text-[10px] text-brand-foreground/60 block mt-1">
-                              Permisos: {u.permissions || "ninguno"}
+                  <tbody className="text-sm divide-y divide-brand-gray/10">
+                    {userList.map(u => {
+                      const displayUsername = u.username || (u.email ? u.email.replace('@fee.local', '').replace('@fundacionesquel.edu.ar', '') : 'admin');
+                      const isMasterAdmin = u.id === 'fee-super-admin-01' || displayUsername === 'admin';
+                      const isSelf = u.id === session.userId;
+
+                      return (
+                        <tr key={u.id} className="hover:bg-brand-gray/5 transition-colors">
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span className="w-7 h-7 rounded-full bg-brand-blue text-white flex items-center justify-center font-bold text-xs uppercase">
+                                {displayUsername.slice(0, 2)}
+                              </span>
+                              <div>
+                                <span className="font-bold text-brand-blue block">@{displayUsername}</span>
+                                <span className="text-[10px] text-brand-foreground/50">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Activo'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 font-medium text-brand-foreground/90">{u.name || "-"}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-block ${u.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                              {u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Gestor'}
                             </span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right">
-                          <button 
-                            onClick={() => handleDeleteUser(u.id)} 
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
-                            title="Eliminar usuario"
-                          >
-                            <Trash2 className="w-4 h-4"/>
-                          </button>
+                            {u.role !== 'SUPER_ADMIN' && u.permissions && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {u.permissions.split(',').map((p: string) => (
+                                  <span key={p} className="text-[9px] font-bold px-1.5 py-0.5 bg-brand-gray/10 text-brand-foreground/70 rounded">
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-4 text-center">
+                            {u.mustChangePassword ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200" title="Deberá cambiar su clave en su próximo inicio de sesión">
+                                <KeyRound className="w-3 h-3 text-amber-700" /> 1° Login pendiente
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                                <Check className="w-3 h-3 text-emerald-700" /> Clave Activa
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            {!isMasterAdmin && !isSelf ? (
+                              <button 
+                                onClick={() => handleDeleteUser(u.id)} 
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" 
+                                title="Eliminar usuario"
+                              >
+                                <Trash2 className="w-4 h-4"/>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-brand-foreground/40 font-semibold italic">Protegido</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {userList.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-brand-gray">
+                          No hay usuarios registrados.
                         </td>
                       </tr>
-                    ))}
-                    {users.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-brand-gray">No hay usuarios gestores en la base de datos.</td></tr>}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1142,6 +1377,16 @@ export function AdminDashboard({
         <EnrollmentAnalyticsModal 
           enrollments={enrollmentList}
           onClose={() => setShowAnalyticsModal(false)}
+        />
+      )}
+
+      {/* First Login Mandatory Password Change Modal */}
+      {showFirstLoginModal && (
+        <FirstLoginPasswordChangeModal 
+          session={session}
+          onSuccess={() => {
+            setShowFirstLoginModal(false);
+          }}
         />
       )}
     </div>
@@ -2349,6 +2594,131 @@ function EnrollmentAnalyticsModal({
           </div>
 
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FirstLoginPasswordChangeModal({ session, onSuccess }: { session: any; onSuccess: () => void }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (newPassword.length < 6) {
+      setError("La nueva contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Las contraseñas no coinciden. Verificalas.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await changePasswordAction(newPassword);
+      if (res.success) {
+        setSuccess("¡Contraseña actualizada con éxito! Redirigiendo al panel...");
+        setTimeout(() => {
+          onSuccess();
+        }, 1200);
+      } else {
+        setError(res.error || "No se pudo actualizar la contraseña.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Error al conectar con el servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-brand-blue/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-gray/20 relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="w-16 h-16 bg-amber-500/10 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-5">
+          <KeyRound className="w-8 h-8" />
+        </div>
+
+        <div className="text-center mb-6">
+          <span className="inline-block bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full mb-2 border border-amber-200">
+            Primer Ingreso Requerido
+          </span>
+          <h2 className="text-xl font-bold text-brand-blue">
+            Creá tu Contraseña Personal
+          </h2>
+          <p className="text-xs text-brand-foreground/70 mt-1.5 leading-relaxed">
+            Hola <strong className="text-brand-blue">{session.name || session.username || "Usuario"}</strong>, por políticas de seguridad institucional debés reemplazar la clave provisoria por una clave personal antes de acceder al panel.
+          </p>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 text-red-600 text-xs font-semibold bg-red-50 p-3 rounded-xl mb-4 border border-red-100">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {success && (
+          <div className="flex items-center gap-2 text-green-700 text-xs font-semibold bg-green-50 p-3 rounded-xl mb-4 border border-green-200">
+            <Check className="w-4 h-4 shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-brand-blue mb-1">
+              Nueva Contraseña
+            </label>
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                placeholder="Mínimo 6 caracteres"
+                className="w-full px-4 py-3 rounded-xl border border-brand-gray/20 bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-blue outline-none transition-all text-sm font-medium pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-brand-foreground/40 hover:text-brand-blue cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-brand-blue mb-1">
+              Confirmar Nueva Contraseña
+            </label>
+            <input 
+              type={showPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              placeholder="Reingresá tu nueva clave"
+              className="w-full px-4 py-3 rounded-xl border border-brand-gray/20 bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-blue outline-none transition-all text-sm font-medium"
+            />
+          </div>
+
+          <button 
+            type="submit"
+            disabled={loading || !!success}
+            className="w-full bg-brand-blue text-white py-3.5 rounded-full font-bold shadow-lg hover:bg-brand-green transition-all mt-4 flex justify-center items-center gap-2 cursor-pointer text-sm"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+            Guardar y Acceder al Panel
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -219,7 +219,17 @@ switch ($action) {
                     $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
                 }
                 if ($isSuperAdmin) {
-                    $users = $pdo->query("SELECT `id`, `email`, `name`, `role`, `permissions`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    $users = $pdo->query("SELECT `id`, `username`, `email`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                }
+                if (!empty($session['userId'])) {
+                    $stmtUser = $pdo->prepare("SELECT `mustChangePassword`, `username`, `name` FROM `User` WHERE `id` = :uid LIMIT 1");
+                    $stmtUser->execute([':uid' => $session['userId']]);
+                    $freshUser = $stmtUser->fetch();
+                    if ($freshUser) {
+                        $session['mustChangePassword'] = !empty($freshUser['mustChangePassword']);
+                        if (!empty($freshUser['username'])) $session['username'] = $freshUser['username'];
+                        if (!empty($freshUser['name'])) $session['name'] = $freshUser['name'];
+                    }
                 }
             }
         } catch (Exception $e) {
@@ -559,7 +569,159 @@ switch ($action) {
         echo json_encode(["success" => true, "gallery" => $items]);
         break;
 
-    // 9. Cerrar Sesión
+    // 9. Crear Usuario Gestor (Sin email requerido, case-insensitive, con primer login obligatorio de cambio de clave)
+    case 'create_user':
+        if (!checkPermission($session, 'users') && ($session['role'] ?? '') !== 'SUPER_ADMIN') {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden crear usuarios."]);
+            exit;
+        }
+
+        $rawUsername = trim($bodyData['username'] ?? '');
+        $username    = strtolower(preg_replace('/[^a-zA-Z0-9_.-]/', '', $rawUsername));
+        $name        = trim($bodyData['name'] ?? $username);
+        $password    = trim($bodyData['password'] ?? '');
+        $role        = strtoupper(trim($bodyData['role'] ?? 'EDITOR'));
+        $permissions = trim($bodyData['permissions'] ?? 'blog');
+
+        if (empty($username) || strlen($username) < 3) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "El nombre de usuario debe tener al menos 3 caracteres alfanuméricos (sin espacios ni @)."]);
+            exit;
+        }
+        if (empty($password) || strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "La contraseña provisoria debe tener al menos 6 caracteres."]);
+            exit;
+        }
+
+        $newId = generateUUID();
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $internalEmail = $username . '@fee.local';
+
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                // Chequear si el usuario ya existe (case-insensitive)
+                $check = $pdo->prepare("SELECT `id` FROM `User` WHERE LOWER(username) = :u OR LOWER(email) = :u2 LIMIT 1");
+                $check->execute([':u' => $username, ':u2' => $username]);
+                if ($check->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(["success" => false, "error" => "El nombre de usuario '$username' ya existe. Por favor elegí otro."]);
+                    exit;
+                }
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`)
+                    VALUES (:id, :username, :email, :password, :name, :role, :permissions, 1, NOW(3), NOW(3))
+                ");
+                $stmt->execute([
+                    ':id'          => $newId,
+                    ':username'    => $username,
+                    ':email'       => $internalEmail,
+                    ':password'    => $hash,
+                    ':name'        => $name,
+                    ':role'        => $role,
+                    ':permissions' => $permissions
+                ]);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => "Error en base de datos: " . $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(["success" => true, "message" => "Usuario '$username' creado correctamente con solicitud de cambio de clave en el primer acceso."]);
+        break;
+
+    // 10. Eliminar Usuario
+    case 'delete_user':
+        if (!checkPermission($session, 'users') && ($session['role'] ?? '') !== 'SUPER_ADMIN') {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
+        if ($id === 'fee-super-admin-01' || $id === ($session['userId'] ?? '')) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "No es posible eliminar el Administrador Principal o la cuenta activa."]);
+            exit;
+        }
+
+        try {
+            $pdo = getPDO();
+            if ($pdo && $id) {
+                $stmt = $pdo->prepare("DELETE FROM `User` WHERE `id` = :id");
+                $stmt->execute([':id' => $id]);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(["success" => true]);
+        break;
+
+    // 11. Cambiar Contraseña (Por primer ingreso obligatorio o perfil)
+    case 'change_password':
+        $userId = $session['userId'] ?? '';
+        $newPassword = trim($bodyData['newPassword'] ?? ($bodyData['password'] ?? ''));
+
+        if (empty($userId)) {
+            http_response_code(401);
+            echo json_encode(["success" => false, "error" => "Sesión no válida"]);
+            exit;
+        }
+        if (strlen($newPassword) < 6) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "La nueva contraseña debe contener al menos 6 caracteres."]);
+            exit;
+        }
+
+        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                $stmt = $pdo->prepare("
+                    UPDATE `User` 
+                    SET `password` = :password, `mustChangePassword` = 0, `updatedAt` = NOW(3)
+                    WHERE `id` = :id
+                ");
+                $stmt->execute([
+                    ':password' => $newHash,
+                    ':id'       => $userId
+                ]);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => "Error al actualizar clave: " . $e->getMessage()]);
+            exit;
+        }
+
+        // Actualizar sesión y renovar token sin flag de cambio de clave
+        $session['mustChangePassword'] = false;
+        $newToken = generateToken($session);
+
+        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
+        setcookie('admin_session', $newToken, [
+            'expires'  => time() + (60 * 60 * 24),
+            'path'     => '/',
+            'httponly' => true,
+            'secure'   => $isSecure,
+            'samesite' => 'Lax'
+        ]);
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Contraseña actualizada exitosamente.",
+            "token"   => $newToken,
+            "user"    => $session
+        ]);
+        break;
+
+    // 12. Cerrar Sesión
     case 'logout':
         $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
         setcookie('admin_session', '', [

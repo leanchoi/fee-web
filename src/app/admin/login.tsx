@@ -47,13 +47,16 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
         {error && <p className="text-red-500 text-sm font-semibold bg-red-50 py-2 rounded-lg text-center">{error}</p>}
         
         <div>
-          <label className="block text-xs font-bold text-brand-blue mb-1">Usuario / Email</label>
+          <label className="block text-xs font-bold text-brand-blue mb-1">Nombre de Usuario</label>
           <input 
             type="text" 
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Ej: admin o nombre@correo.com"
-            className="w-full px-4 py-3 rounded-xl border border-brand-gray/20 bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-blue outline-none transition-all text-sm"
+            placeholder="Ej: admin, preceptor, direccion"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full px-4 py-3 rounded-xl border border-brand-gray/20 bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-blue outline-none transition-all text-sm font-medium"
             required
           />
         </div>

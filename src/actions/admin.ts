@@ -108,12 +108,43 @@ export async function togglePostPublish(id: string, current: boolean) {
   return updatePost(id, { published: !current });
 }
 
-export async function createUserAction(data: any): Promise<{ success: boolean; error?: string }> {
-  return { success: true };
+export async function createUserAction(data: any): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create_user", ...data }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al crear usuario" };
+  }
 }
 
 export async function deleteUser(id: string): Promise<{ success: boolean; error?: string }> {
-  return { success: true };
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_user", id }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al eliminar usuario" };
+  }
+}
+
+export async function changePasswordAction(newPassword: string): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "change_password", newPassword }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al actualizar contraseña" };
+  }
 }
 
 export async function uploadMediaAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
