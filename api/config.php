@@ -46,6 +46,43 @@ if (!defined('GOOGLE_SHEET_WEBHOOK_URL')) {
     define('GOOGLE_SHEET_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
 }
 
+// Asegurar automáticamente que la estructura de la tabla User esté al día con username y mustChangePassword
+function ensureUserTableSchema($pdo) {
+    if (!$pdo) return;
+    static $schemaChecked = false;
+    if ($schemaChecked) return;
+
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `User` (
+                `id` VARCHAR(36) PRIMARY KEY,
+                `username` VARCHAR(100) NULL,
+                `email` VARCHAR(191) UNIQUE NOT NULL,
+                `password` VARCHAR(255) NOT NULL,
+                `name` VARCHAR(191) NULL,
+                `role` VARCHAR(50) DEFAULT 'SUPER_ADMIN',
+                `permissions` VARCHAR(255) DEFAULT 'blog,contacts,enrollments,users,gallery',
+                `mustChangePassword` TINYINT(1) DEFAULT 0,
+                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        $stmt = $pdo->query("SHOW COLUMNS FROM `User`");
+        $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        
+        if (!in_array('username', $cols, true)) {
+            @$pdo->exec("ALTER TABLE `User` ADD COLUMN `username` VARCHAR(100) NULL AFTER `id`");
+        }
+        if (!in_array('mustChangePassword', $cols, true)) {
+            @$pdo->exec("ALTER TABLE `User` ADD COLUMN `mustChangePassword` TINYINT(1) DEFAULT 0 AFTER `permissions`");
+        }
+        $schemaChecked = true;
+    } catch (Exception $e) {
+        error_log("Schema auto-migration notice: " . $e->getMessage());
+    }
+}
+
 // Conexión PDO única y segura (sin credential spraying)
 function getPDO() {
     static $pdo = null;
@@ -58,6 +95,7 @@ function getPDO() {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
+        ensureUserTableSchema($pdo);
         return $pdo;
     } catch (PDOException $e) {
         error_log("Database connection failed: " . $e->getMessage());

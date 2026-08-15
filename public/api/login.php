@@ -67,30 +67,12 @@ $authenticatedUser = null;
 try {
     $pdo = getPDO();
     if ($pdo) {
-        // Asegurar que la tabla User exista con columnas username y mustChangePassword
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS `User` (
-                `id` VARCHAR(36) PRIMARY KEY,
-                `username` VARCHAR(100) NULL,
-                `email` VARCHAR(191) UNIQUE NOT NULL,
-                `password` VARCHAR(255) NOT NULL,
-                `name` VARCHAR(191) NULL,
-                `role` VARCHAR(50) DEFAULT 'SUPER_ADMIN',
-                `permissions` VARCHAR(255) DEFAULT 'blog,contacts,enrollments,users,gallery',
-                `mustChangePassword` TINYINT(1) DEFAULT 0,
-                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ");
-
-        // Intentar agregar columnas si la tabla ya existía previamente sin ellas
-        @$pdo->exec("ALTER TABLE `User` ADD COLUMN `username` VARCHAR(100) NULL AFTER `id`");
-        @$pdo->exec("ALTER TABLE `User` ADD COLUMN `mustChangePassword` TINYINT(1) DEFAULT 0 AFTER `permissions`");
+        ensureUserTableSchema($pdo);
 
         // Buscar usuario en base de datos de manera 100% case-insensitive
         $stmt = $pdo->prepare("
             SELECT * FROM `User` 
-            WHERE LOWER(username) = :u 
+            WHERE LOWER(COALESCE(username, '')) = :u 
                OR LOWER(email) = :u 
                OR (:u = 'admin' AND LOWER(email) = 'admin@fundacionesquel.edu.ar')
             LIMIT 1

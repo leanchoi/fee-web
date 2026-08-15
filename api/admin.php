@@ -602,9 +602,11 @@ switch ($action) {
         try {
             $pdo = getPDO();
             if ($pdo) {
+                ensureUserTableSchema($pdo);
+
                 // Chequear si el usuario ya existe (case-insensitive)
-                $check = $pdo->prepare("SELECT `id` FROM `User` WHERE LOWER(username) = :u OR LOWER(email) = :u2 LIMIT 1");
-                $check->execute([':u' => $username, ':u2' => $username]);
+                $check = $pdo->prepare("SELECT `id` FROM `User` WHERE LOWER(COALESCE(username, '')) = :u OR LOWER(email) = :u2 LIMIT 1");
+                $check->execute([':u' => $username, ':u2' => $internalEmail]);
                 if ($check->fetch()) {
                     http_response_code(400);
                     echo json_encode(["success" => false, "error" => "El nombre de usuario '$username' ya existe. Por favor elegí otro."]);
