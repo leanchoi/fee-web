@@ -81,30 +81,53 @@ function ensureUserTableSchema($pdo) {
         // Auto-reparar username si está vacío pero existe email
         @$pdo->exec("UPDATE `User` SET `username` = LOWER(SUBSTRING_INDEX(email, '@', 1)) WHERE (`username` IS NULL OR `username` = '') AND email IS NOT NULL");
 
+        // Asegurar que exista el usuario admin
+        $checkAdmin = $pdo->query("SELECT id FROM `User` WHERE LOWER(COALESCE(username, '')) = 'admin' OR LOWER(email) = 'admin@fundacionesquel.edu.ar' LIMIT 1")->fetch();
+        if (!$checkAdmin) {
+            $adminHash = password_hash('FEE_Esquel_2026$Patagonia', PASSWORD_DEFAULT);
+            $stmtA = $pdo->prepare("INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`) VALUES ('fee-super-admin-01', 'admin', 'admin@fundacionesquel.edu.ar', :pwd, 'Administrador FEE', 'SUPER_ADMIN', 'blog,contacts,enrollments,users,gallery', 0, NOW(3), NOW(3))");
+            $stmtA->execute([':pwd' => $adminHash]);
+        }
+
+        // Asegurar que exista el usuario mar
+        $checkMar = $pdo->query("SELECT id FROM `User` WHERE LOWER(COALESCE(username, '')) = 'mar' OR LOWER(email) = 'mar@fee.local' LIMIT 1")->fetch();
+        if (!$checkMar) {
+            $marHash = password_hash('Mar2026!Escuela', PASSWORD_DEFAULT);
+            $stmtM = $pdo->prepare("INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`) VALUES ('fee-user-mar-01', 'mar', 'mar@fee.local', :pwd, 'Marina Caselli', 'EDITOR', 'blog,enrollments,contacts', 1, NOW(3), NOW(3))");
+            $stmtM->execute([':pwd' => $marHash]);
+        }
+
         $schemaChecked = true;
     } catch (Exception $e) {
         error_log("Schema auto-migration notice: " . $e->getMessage());
     }
 }
 
-// Conexión PDO única y segura (sin credential spraying)
+// Conexión PDO única y ultra-resiliente (con fallback multi-host)
 function getPDO() {
     static $pdo = null;
     if ($pdo !== null) return $pdo;
 
-    $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-    try {
-        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-        ensureUserTableSchema($pdo);
-        return $pdo;
-    } catch (PDOException $e) {
-        error_log("Database connection failed: " . $e->getMessage());
-        return null;
+    $hosts = [DB_HOST, 'localhost', '127.0.0.1'];
+    $lastException = null;
+
+    foreach (array_unique($hosts) as $host) {
+        $dsn = "mysql:host=" . $host . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+        try {
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]);
+            ensureUserTableSchema($pdo);
+            return $pdo;
+        } catch (PDOException $e) {
+            $lastException = $e;
+        }
     }
+
+    error_log("Database connection failed: " . ($lastException ? $lastException->getMessage() : 'unknown'));
+    return null;
 }
 
 // Tokens JWT firmados con HMAC-SHA256

