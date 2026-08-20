@@ -48,17 +48,28 @@ if (empty($username) || empty($password)) {
     exit;
 }
 
-// Hash oficial precalculado para el usuario Super Admin (FEE_Esquel_2026$Patagonia)
-$ADMIN_USERNAME = 'admin';
-$ADMIN_EMAIL    = 'admin@fundacionesquel.edu.ar';
-$adminUserData = [
-    'id'                 => 'fee-super-admin-01',
-    'username'           => $ADMIN_USERNAME,
-    'email'              => $ADMIN_EMAIL,
-    'name'               => 'Administrador FEE',
-    'role'               => 'SUPER_ADMIN',
-    'permissions'        => 'blog,contacts,enrollments,users,gallery',
-    'mustChangePassword' => false
+// Usuarios institucionales nativos garantizados
+$BUILTIN_USERS = [
+    'admin' => [
+        'id'                 => 'fee-super-admin-01',
+        'username'           => 'admin',
+        'email'              => 'admin@fundacionesquel.edu.ar',
+        'name'               => 'Administrador FEE',
+        'role'               => 'SUPER_ADMIN',
+        'permissions'        => 'blog,contacts,enrollments,users,gallery',
+        'default_pass'       => 'FEE_Esquel_2026$Patagonia',
+        'mustChangePassword' => false
+    ],
+    'mar' => [
+        'id'                 => 'fee-user-mar-01',
+        'username'           => 'mar',
+        'email'              => 'mar@fee.local',
+        'name'               => 'Marina Caselli',
+        'role'               => 'EDITOR',
+        'permissions'        => 'blog,enrollments,contacts',
+        'default_pass'       => 'Mar2026!Escuela',
+        'mustChangePassword' => true
+    ]
 ];
 
 $authenticatedUser = null;
@@ -108,19 +119,39 @@ if (!$userFound) {
     }
 }
 
-// 3. Si se encontró el usuario, verificar contraseña con password_verify o clave provisoria directa
-if ($userFound) {
-    $isDirectAdmin = ($password === 'FEE_Esquel_2026$Patagonia' && ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar'));
-    $isDirectMar   = (($password === 'Mar2026!Escuela' || $password === 'Patagonia$2026') && ($username === 'mar' || $username === 'mar@fee.local'));
+// 3. Si aún no se encontró, buscar en usuarios nativos institucionales
+if (!$userFound) {
+    if ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar' || $username === 'administrador') {
+        $userFound = $BUILTIN_USERS['admin'];
+    } elseif ($username === 'mar' || $username === 'mar@fee.local' || $username === 'marina') {
+        $userFound = $BUILTIN_USERS['mar'];
+    }
+}
 
-    if (password_verify($password, $userFound['password']) || $isDirectAdmin || $isDirectMar || ($userFound['password'] === $password)) {
+// 4. Si se encontró el usuario, verificar contraseña
+if ($userFound) {
+    $isDirectAdmin = ($password === 'FEE_Esquel_2026$Patagonia' && ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar' || ($userFound['username'] ?? '') === 'admin'));
+    $isDirectMar   = (($password === 'Mar2026!Escuela' || $password === 'Patagonia$2026') && ($username === 'mar' || $username === 'mar@fee.local' || ($userFound['username'] ?? '') === 'mar'));
+
+    $isValid = false;
+    if (!empty($userFound['password']) && password_verify($password, $userFound['password'])) {
+        $isValid = true;
+    } elseif ($isDirectAdmin || $isDirectMar) {
+        $isValid = true;
+    } elseif (!empty($userFound['default_pass']) && $password === $userFound['default_pass']) {
+        $isValid = true;
+    } elseif (!empty($userFound['password']) && $userFound['password'] === $password) {
+        $isValid = true;
+    }
+
+    if ($isValid) {
         $authenticatedUser = [
             'id'                 => $userFound['id'],
-            'username'           => $userFound['username'] ?: ($userFound['email'] ?: 'admin'),
-            'email'              => $userFound['email'],
-            'name'               => $userFound['name'] ?: ($userFound['username'] ?: $userFound['email']),
-            'role'               => $userFound['role'] ?: 'SUPER_ADMIN',
-            'permissions'        => $userFound['permissions'] ?: 'blog,contacts,enrollments,users,gallery',
+            'username'           => $userFound['username'] ?: ($userFound['email'] ?: $username),
+            'email'              => $userFound['email'] ?? ($username . '@fee.local'),
+            'name'               => $userFound['name'] ?: ($userFound['username'] ?: $username),
+            'role'               => $userFound['role'] ?: 'EDITOR',
+            'permissions'        => $userFound['permissions'] ?: 'blog,contacts,enrollments',
             'mustChangePassword' => !empty($userFound['mustChangePassword'])
         ];
     } else {
@@ -133,38 +164,6 @@ if ($userFound) {
             "error" => "Contraseña incorrecta para el usuario '" . ($userFound['username'] ?? $username) . "'."
         ]);
         exit;
-    }
-}
-
-// 4. Si no se encontró en BD ni JSON, validar credencial maestra institucional de Super Admin
-if (!$authenticatedUser) {
-    $isSuperAdminUser = ($username === 'admin' || $username === $ADMIN_EMAIL || $username === 'administrador');
-    if ($isSuperAdminUser && ($password === 'FEE_Esquel_2026$Patagonia')) {
-        $authenticatedUser = $adminUserData;
-
-        // Auto-sincronizar el usuario en MySQL para futuros logins
-        try {
-            $pdo = getPDO();
-            if ($pdo) {
-                $newHash = password_hash('FEE_Esquel_2026$Patagonia', PASSWORD_DEFAULT);
-                $stmtSync = $pdo->prepare("
-                    INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`)
-                    VALUES (:id, :username, :email, :password, :name, 'SUPER_ADMIN', 'blog,contacts,enrollments,users,gallery', 0, NOW(3), NOW(3))
-                    ON DUPLICATE KEY UPDATE `username` = :username2, `password` = :password2, `updatedAt` = NOW(3)
-                ");
-                $stmtSync->execute([
-                    ':id'        => $adminUserData['id'],
-                    ':username'  => 'admin',
-                    ':email'     => $ADMIN_EMAIL,
-                    ':password'  => $newHash,
-                    ':name'      => $adminUserData['name'],
-                    ':username2' => 'admin',
-                    ':password2' => $newHash
-                ]);
-            }
-        } catch (Exception $ex) {
-            error_log("Auto-sync user to MySQL notice: " . $ex->getMessage());
-        }
     }
 }
 
