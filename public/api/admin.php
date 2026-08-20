@@ -681,6 +681,47 @@ switch ($action) {
         echo json_encode(["success" => true]);
         break;
 
+    // 10b. Resetear Contraseña de Usuario (Solo Super Admin)
+    case 'reset_user_password':
+        if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden resetear contraseñas."]);
+            exit;
+        }
+
+        $targetUserId = trim($bodyData['userId'] ?? '');
+        $newPassword  = trim($bodyData['password'] ?? '');
+
+        if (empty($targetUserId) || strlen($newPassword) < 6) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "ID de usuario y contraseña de al menos 6 caracteres requeridos."]);
+            exit;
+        }
+
+        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                ensureUserTableSchema($pdo);
+                $stmt = $pdo->prepare("
+                    UPDATE `User` 
+                    SET `password` = :password, `mustChangePassword` = 1, `updatedAt` = NOW(3)
+                    WHERE `id` = :id
+                ");
+                $stmt->execute([
+                    ':password' => $newHash,
+                    ':id'       => $targetUserId
+                ]);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => "Error al actualizar contraseña: " . $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(["success" => true, "message" => "Contraseña restablecida exitosamente. Se solicitará cambio en el próximo ingreso."]);
+        break;
+
     // 11. Cambiar Contraseña (Por primer ingreso obligatorio o perfil)
     case 'change_password':
         $userId = $session['userId'] ?? '';

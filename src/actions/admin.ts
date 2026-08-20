@@ -153,6 +153,19 @@ export async function changePasswordAction(newPassword: string): Promise<{ succe
   }
 }
 
+export async function resetUserPasswordAction(userId: string, password: string): Promise<{ success: boolean; error?: string; message?: string }> {
+  try {
+    const res = await fetch("/api/admin.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reset_user_password", userId, password }),
+    });
+    return await res.json();
+  } catch (error: any) {
+    return { success: false, error: error.message || "Error al restablecer contraseña" };
+  }
+}
+
 export async function uploadMediaAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     const res = await fetch("/api/upload.php", {

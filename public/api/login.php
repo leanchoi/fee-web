@@ -69,11 +69,14 @@ try {
     if ($pdo) {
         ensureUserTableSchema($pdo);
 
-        // Buscar usuario en base de datos de manera 100% case-insensitive
+        // Buscar usuario en base de datos de manera 100% flexible y case-insensitive
         $stmt = $pdo->prepare("
             SELECT * FROM `User` 
             WHERE LOWER(COALESCE(username, '')) = :u 
                OR LOWER(email) = :u 
+               OR LOWER(email) = CONCAT(:u, '@fee.local')
+               OR LOWER(SUBSTRING_INDEX(email, '@', 1)) = :u
+               OR LOWER(COALESCE(name, '')) = :u
                OR (:u = 'admin' AND LOWER(email) = 'admin@fundacionesquel.edu.ar')
             LIMIT 1
         ");

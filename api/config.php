@@ -77,6 +77,10 @@ function ensureUserTableSchema($pdo) {
         if (!in_array('mustChangePassword', $cols, true)) {
             @$pdo->exec("ALTER TABLE `User` ADD COLUMN `mustChangePassword` TINYINT(1) DEFAULT 0 AFTER `permissions`");
         }
+
+        // Auto-reparar username si está vacío pero existe email
+        @$pdo->exec("UPDATE `User` SET `username` = LOWER(SUBSTRING_INDEX(email, '@', 1)) WHERE (`username` IS NULL OR `username` = '') AND email IS NOT NULL");
+
         $schemaChecked = true;
     } catch (Exception $e) {
         error_log("Schema auto-migration notice: " . $e->getMessage());

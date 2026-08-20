@@ -10,6 +10,7 @@ import {
   createUserAction, 
   deleteUser, 
   changePasswordAction,
+  resetUserPasswordAction,
   deleteEnrollment,
   uploadMediaAction,
   deleteContactMessage,
@@ -302,6 +303,7 @@ export function AdminDashboard({
   const [permContacts, setPermContacts] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+  const [resetPasswordTargetUser, setResetPasswordTargetUser] = useState<any | null>(null);
 
   // First Login Mandatory Password Change Modal
   const [showFirstLoginModal, setShowFirstLoginModal] = useState(!!session.mustChangePassword);
@@ -1280,13 +1282,24 @@ export function AdminDashboard({
                           </td>
                           <td className="p-4 text-right">
                             {!isMasterAdmin && !isSelf ? (
-                              <button 
-                                onClick={() => handleDeleteUser(u.id)} 
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" 
-                                title="Eliminar usuario"
-                              >
-                                <Trash2 className="w-4 h-4"/>
-                              </button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button 
+                                  type="button"
+                                  onClick={() => setResetPasswordTargetUser(u)} 
+                                  className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors cursor-pointer" 
+                                  title="Resetear o asignar nueva clave"
+                                >
+                                  <KeyRound className="w-4 h-4 text-amber-600"/>
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u.id)} 
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" 
+                                  title="Eliminar usuario"
+                                >
+                                  <Trash2 className="w-4 h-4"/>
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-[10px] text-brand-foreground/40 font-semibold italic">Protegido</span>
                             )}
@@ -1407,6 +1420,19 @@ export function AdminDashboard({
           session={session}
           onSuccess={() => {
             setShowFirstLoginModal(false);
+          }}
+        />
+      )}
+
+      {/* Reset User Password Modal (Super Admin) */}
+      {resetPasswordTargetUser && (
+        <ResetUserPasswordModal 
+          user={resetPasswordTargetUser}
+          onClose={() => setResetPasswordTargetUser(null)}
+          onSuccess={() => {
+            setUserList(prev => prev.map(u => u.id === resetPasswordTargetUser.id ? { ...u, mustChangePassword: 1 } : u));
+            setUserSuccess(`Contraseña restablecida exitosamente para @${resetPasswordTargetUser.username || resetPasswordTargetUser.name}.`);
+            setResetPasswordTargetUser(null);
           }}
         />
       )}
@@ -2739,6 +2765,158 @@ function FirstLoginPasswordChangeModal({ session, onSuccess }: { session: any; o
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
             Guardar y Acceder al Panel
           </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ResetUserPasswordModal({ 
+  user, 
+  onClose, 
+  onSuccess 
+}: { 
+  user: any; 
+  onClose: () => void; 
+  onSuccess: () => void; 
+}) {
+  const [password, setPassword] = useState(() => generateSuggestedPassword());
+  const [showPassword, setShowPassword] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard.writeText(password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleRegenerate = () => {
+    setPassword(generateSuggestedPassword());
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password || password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await resetUserPasswordAction(user.id, password.trim());
+      if (res.success) {
+        onSuccess();
+      } else {
+        setError(res.error || "Error al restablecer contraseña.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Error al conectar con el servidor.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-brand-blue/70 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-gray/20 relative animate-in fade-in zoom-in-95 duration-200">
+        <button 
+          onClick={onClose}
+          className="absolute top-5 right-5 text-brand-foreground/40 hover:text-brand-blue p-2 rounded-full hover:bg-brand-gray/10 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="w-14 h-14 bg-amber-500/10 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <KeyRound className="w-7 h-7" />
+        </div>
+
+        <div className="text-center mb-6">
+          <span className="inline-block bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full mb-1.5 border border-amber-200">
+            Administración de Seguridad
+          </span>
+          <h2 className="text-xl font-bold text-brand-blue">
+            Resetear Clave de @{user.username || user.name}
+          </h2>
+          <p className="text-xs text-brand-foreground/70 mt-1">
+            Asigná una nueva contraseña provisoria. El usuario deberá cambiarla obligatoriamente en su próximo inicio de sesión.
+          </p>
+        </div>
+
+        {error && (
+          <div className="flex items-center gap-2 text-red-600 text-xs font-semibold bg-red-50 p-3 rounded-xl mb-4 border border-red-100">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-xs font-bold text-brand-blue">
+                Nueva Contraseña Provisoria
+              </label>
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                className="text-[11px] font-bold text-brand-blue hover:text-brand-green flex items-center gap-1 cursor-pointer transition-colors"
+                title="Generar otra clave sugerida"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Regenerar
+              </button>
+            </div>
+
+            <div className="relative flex items-center">
+              <input 
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-brand-gray/20 bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-blue outline-none transition-all text-sm font-mono font-bold text-brand-blue pr-20"
+              />
+              <div className="absolute right-2.5 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="p-1.5 text-brand-foreground/50 hover:text-brand-blue hover:bg-brand-gray/10 rounded-lg transition-colors cursor-pointer"
+                  title="Copiar contraseña"
+                >
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-1.5 text-brand-foreground/50 hover:text-brand-blue hover:bg-brand-gray/10 rounded-lg transition-colors cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {copied && <span className="text-[10px] text-green-600 font-bold block mt-1">¡Copiada al portapapeles!</span>}
+          </div>
+
+          <div className="pt-2 flex gap-2">
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-1/3 py-3 rounded-full font-bold text-xs border border-brand-gray/20 text-brand-foreground/70 hover:bg-brand-gray/5 transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-2/3 bg-brand-blue text-white py-3 rounded-full font-bold shadow-md hover:bg-brand-green transition-all flex justify-center items-center gap-2 cursor-pointer text-xs"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              Guardar y Notificar
+            </button>
+          </div>
         </form>
       </div>
     </div>
