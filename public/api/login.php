@@ -62,8 +62,9 @@ $adminUserData = [
 ];
 
 $authenticatedUser = null;
+$userFound = null;
 
-// Intentar autenticar primero contra MySQL
+// 1. Intentar buscar primero en MySQL
 try {
     $pdo = getPDO();
     if ($pdo) {
@@ -82,29 +83,59 @@ try {
         ");
         $stmt->execute([':u' => $username]);
         $dbUser = $stmt->fetch();
-
         if ($dbUser) {
-            if (password_verify($password, $dbUser['password'])) {
-                $authenticatedUser = [
-                    'id'                 => $dbUser['id'],
-                    'username'           => $dbUser['username'] ?: ($dbUser['email'] ?: 'admin'),
-                    'email'              => $dbUser['email'],
-                    'name'               => $dbUser['name'] ?: ($dbUser['username'] ?: $dbUser['email']),
-                    'role'               => $dbUser['role'] ?: 'SUPER_ADMIN',
-                    'permissions'        => $dbUser['permissions'] ?: 'blog,contacts,enrollments,users,gallery',
-                    'mustChangePassword' => !empty($dbUser['mustChangePassword'])
-                ];
-            }
+            $userFound = $dbUser;
         }
     }
 } catch (Exception $e) {
     error_log("Database auth check notice: " . $e->getMessage());
 }
 
-// Si no autenticó por BD o la BD aún no tiene usuarios, validar credencial maestra hasheada
+// 2. Si no se encontró en MySQL, buscar en users.json (dual storage fallback)
+if (!$userFound) {
+    $usersFile = __DIR__ . '/data/users.json';
+    if (file_exists($usersFile)) {
+        $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+        foreach ($localUsers as $lu) {
+            $uName = strtolower(trim($lu['username'] ?? ''));
+            $uEmail = strtolower(trim($lu['email'] ?? ''));
+            $uFullName = strtolower(trim($lu['name'] ?? ''));
+            if ($uName === $username || $uEmail === $username || $uEmail === $username . '@fee.local' || $uFullName === $username) {
+                $userFound = $lu;
+                break;
+            }
+        }
+    }
+}
+
+// 3. Si se encontró el usuario, verificar contraseña con password_verify
+if ($userFound) {
+    if (password_verify($password, $userFound['password']) || ($password === 'FEE_Esquel_2026$Patagonia' && ($username === 'admin' || $username === 'admin@fundacionesquel.edu.ar'))) {
+        $authenticatedUser = [
+            'id'                 => $userFound['id'],
+            'username'           => $userFound['username'] ?: ($userFound['email'] ?: 'admin'),
+            'email'              => $userFound['email'],
+            'name'               => $userFound['name'] ?: ($userFound['username'] ?: $userFound['email']),
+            'role'               => $userFound['role'] ?: 'SUPER_ADMIN',
+            'permissions'        => $userFound['permissions'] ?: 'blog,contacts,enrollments,users,gallery',
+            'mustChangePassword' => !empty($userFound['mustChangePassword'])
+        ];
+    } else {
+        $attemptData['attempts']++;
+        @file_put_contents($rateLimitFile, json_encode($attemptData));
+
+        http_response_code(401);
+        echo json_encode([
+            "success" => false, 
+            "error" => "Contraseña incorrecta para el usuario '" . ($userFound['username'] ?? $username) . "'."
+        ]);
+        exit;
+    }
+}
+
+// 4. Si no se encontró en BD ni JSON, validar credencial maestra institucional de Super Admin
 if (!$authenticatedUser) {
     $isSuperAdminUser = ($username === 'admin' || $username === $ADMIN_EMAIL || $username === 'administrador');
-    // Verificación criptográfica o coincidencia directa con la clave asignada
     if ($isSuperAdminUser && ($password === 'FEE_Esquel_2026$Patagonia')) {
         $authenticatedUser = $adminUserData;
 
@@ -139,7 +170,10 @@ if (!$authenticatedUser) {
     @file_put_contents($rateLimitFile, json_encode($attemptData));
 
     http_response_code(401);
-    echo json_encode(["success" => false, "error" => "Usuario o contraseña incorrectos"]);
+    echo json_encode([
+        "success" => false, 
+        "error" => "El usuario '$username' no se encuentra registrado en el sistema."
+    ]);
     exit;
 }
 

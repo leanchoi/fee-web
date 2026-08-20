@@ -283,6 +283,20 @@ switch ($action) {
             $posts = $initialPosts;
         }
 
+        if ($isSuperAdmin) {
+            $usersFile = $dataDir . '/users.json';
+            if (file_exists($usersFile)) {
+                $jsonUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+                $existingIds = array_column($users, 'id');
+                foreach ($jsonUsers as $item) {
+                    if (!in_array($item['id'], $existingIds, true)) {
+                        unset($item['password']);
+                        $users[] = $item;
+                    }
+                }
+            }
+        }
+
         // Cargar galería de fotos (con auto-inicialización persistente de las 12 fotos preexistentes)
         $galleryFile = $dataDir . '/gallery.json';
         if (file_exists($galleryFile)) {
@@ -643,10 +657,27 @@ switch ($action) {
                 ]);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => "Error en base de datos: " . $e->getMessage()]);
-            exit;
+            error_log("Create user DB notice: " . $e->getMessage());
         }
+
+        // Guardar siempre en users.json como respaldo persistente
+        $usersFile = __DIR__ . '/data/users.json';
+        $localUsers = file_exists($usersFile) ? (json_decode(file_get_contents($usersFile), true) ?: []) : [];
+        $localUsers = array_filter($localUsers, fn($u) => strtolower($u['username'] ?? '') !== $username && strtolower($u['email'] ?? '') !== $internalEmail);
+        $localUsers[] = [
+            'id'                 => $newId,
+            'username'           => $username,
+            'email'              => $internalEmail,
+            'password'           => $hash,
+            'name'               => $name,
+            'role'               => $role,
+            'permissions'        => $permissions,
+            'mustChangePassword' => 1,
+            'createdAt'          => date('Y-m-d H:i:s'),
+            'updatedAt'          => date('Y-m-d H:i:s')
+        ];
+        if (!is_dir(__DIR__ . '/data')) @mkdir(__DIR__ . '/data', 0755, true);
+        @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         echo json_encode(["success" => true, "message" => "Usuario '$username' creado correctamente con solicitud de cambio de clave en el primer acceso."]);
         break;
@@ -673,9 +704,15 @@ switch ($action) {
                 $stmt->execute([':id' => $id]);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            exit;
+            error_log("Delete user DB notice: " . $e->getMessage());
+        }
+
+        // Eliminar de users.json
+        $usersFile = __DIR__ . '/data/users.json';
+        if (file_exists($usersFile)) {
+            $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+            $localUsers = array_filter($localUsers, fn($u) => ($u['id'] ?? '') !== $id);
+            @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
         echo json_encode(["success" => true]);
@@ -714,9 +751,21 @@ switch ($action) {
                 ]);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => "Error al actualizar contraseña: " . $e->getMessage()]);
-            exit;
+            error_log("Reset user password DB notice: " . $e->getMessage());
+        }
+
+        // Actualizar en users.json
+        $usersFile = __DIR__ . '/data/users.json';
+        if (file_exists($usersFile)) {
+            $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+            foreach ($localUsers as &$lu) {
+                if (($lu['id'] ?? '') === $targetUserId) {
+                    $lu['password'] = $newHash;
+                    $lu['mustChangePassword'] = 1;
+                    $lu['updatedAt'] = date('Y-m-d H:i:s');
+                }
+            }
+            @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
         echo json_encode(["success" => true, "message" => "Contraseña restablecida exitosamente. Se solicitará cambio en el próximo ingreso."]);
@@ -753,9 +802,21 @@ switch ($action) {
                 ]);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => "Error al actualizar clave: " . $e->getMessage()]);
-            exit;
+            error_log("Change password DB notice: " . $e->getMessage());
+        }
+
+        // Actualizar en users.json
+        $usersFile = __DIR__ . '/data/users.json';
+        if (file_exists($usersFile)) {
+            $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+            foreach ($localUsers as &$lu) {
+                if (($lu['id'] ?? '') === $userId) {
+                    $lu['password'] = $newHash;
+                    $lu['mustChangePassword'] = 0;
+                    $lu['updatedAt'] = date('Y-m-d H:i:s');
+                }
+            }
+            @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
         // Actualizar sesión y renovar token sin flag de cambio de clave
