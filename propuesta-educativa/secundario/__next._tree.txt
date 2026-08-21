@@ -1,6 +1,6 @@
 :HL["/_next/static/chunks/0mz~v5wvgp.kp.css","style"]
-:HL["/_next/static/chunks/04xi0fhhmzl0n.css","style"]
+:HL["/_next/static/chunks/09lo25s2smorh.css","style"]
 :HL["/_next/static/media/e8f2fbee2754df70-s.p.0fzkl03jw-sdz.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/photos/fee_photo_02.jpg","image"]
 :HL["/photos/fee_photo_06.jpg","image"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"propuesta-educativa","param":null,"prefetchHints":0,"slots":{"children":{"name":"nivel","param":{"type":"d","key":"secundario","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"q2ON8geY7-03SNB4veiAH"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"propuesta-educativa","param":null,"prefetchHints":0,"slots":{"children":{"name":"nivel","param":{"type":"d","key":"secundario","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"SdHWqwNrDjvANIzFWyP7o"}

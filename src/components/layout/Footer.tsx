@@ -144,9 +144,10 @@ export function Footer() {
               <li className="space-y-1 pt-1.5 border-t border-white/10">
                 <div className="flex items-start gap-1.5 text-white font-semibold">
                   <MapPin className="w-3.5 h-3.5 text-brand-lightblue shrink-0 mt-0.5" />
-                  <span>Secundaria (Esc. N° 1739 - Galina 2888)</span>
+                  <span>Secundaria (Esc. N° 1739)</span>
                 </div>
                 <div className="pl-5 space-y-0.5 text-[11px] text-white/70">
+                  <div>Gobernador Galina 2888, Esquel</div>
                   <div className="flex items-center gap-1.5">
                     <Phone className="w-3 h-3 text-brand-lightblue shrink-0" />
                     <span>2945-404000</span>
