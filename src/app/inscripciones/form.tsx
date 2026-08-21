@@ -1236,19 +1236,41 @@ export function EnrollmentForm() {
                   <p className="mt-1 text-slate-600">
                     Cumplidas las condiciones académicas, administrativas y arancelarias previstas en el presente contrato, y sujeto a disponibilidad institucional, LA FUNDACIÓN podrá reinscribir al/la alumno/a para el ciclo lectivo siguiente.
                   </p>
+                  <p className="mt-1 text-slate-600">
+                    Toda decisión de no renovación o negativa de reinscripción deberá fundarse en causas objetivas, razonables y compatibles con la normativa educativa vigente, debiendo ser notificada fehacientemente a LOS RESPONSABLES PARENTALES.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    La prestación del servicio educativo comprende:
+                  </p>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5 text-slate-600 pl-2">
+                    <li>a) La enseñanza oficial correspondiente al nivel y año en el que se encuentre matriculado/a el/la alumno/a.</li>
+                    <li>b) Las actividades institucionales, pedagógicas y formativas organizadas conforme al Proyecto Educativo Institucional.</li>
+                  </ul>
+                  <p className="mt-1 text-slate-600">
+                    En caso de repitencia, la reinscripción quedará supeditada a la existencia de vacantes disponibles en el curso correspondiente.
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 7° – Uso institucional de imágenes</p>
                   <p className="mt-1 text-slate-600">
-                    LOS RESPONSABLES PARENTALES autorizan a LA FUNDACIÓN a utilizar imágenes y registros audiovisuales del/de la alumno/a obtenidos en actividades escolares, pedagógicas, recreativas, culturales e institucionales, con fines exclusivamente pedagógicos, divulgativos e institucionales, en publicaciones oficiales, plataformas educativas, sitio web y redes sociales de LA FUNDACIÓN, sin fines de lucro comercial y en el marco de la normativa de protección de datos personales y de la niñez y adolescencia. Dicha autorización podrá ser revocada o limitada en cualquier momento mediante notificación expresa y fehaciente por escrito.
+                    La autorización para captar, utilizar o difundir imágenes, fotografías y registros audiovisuales en los que aparezca el/la alumno/a se instrumentará mediante un consentimiento específico, separado y revocable. Dicho consentimiento distinguirá, como mínimo, el uso pedagógico interno, la difusión en el sitio web institucional, las redes sociales oficiales y el material gráfico o audiovisual público. LOS RESPONSABLES PARENTALES podrán revocar la autorización otorgada en cualquier momento mediante comunicación escrita dirigida a la Administración de LA FUNDACIÓN, la que no afectará publicaciones impresas ya distribuidas ni registros históricos institucionales. La negativa o revocación de esta autorización no afectará la matriculación ni la prestación del servicio educativo.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 8° – Firma y validez contractual</p>
                   <p className="mt-1 text-slate-600">
-                    El presente contrato podrá ser suscripto en soporte papel mediante firma ológrafa o a través de medios electrónicos mediante firma electrónica, reconociendo ambas partes su plena validez, eficacia jurídica y fuerza obligatoria.
+                    El presente contrato podrá suscribirse en soporte papel o mediante mecanismos electrónicos que permitan identificar a los firmantes, registrar la fecha de aceptación y conservar la integridad del documento. LA FUNDACIÓN pondrá a disposición de LOS RESPONSABLES PARENTALES una copia del contrato suscripto o aceptado.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    La validez de la matriculación y continuidad del vínculo educativo quedará sujeta al cumplimiento de las condiciones académicas, administrativas, documentales y arancelarias previstas en el presente contrato y en la normativa institucional vigente para cada ciclo lectivo.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Las actualizaciones de valores arancelarios, reglamentaciones internas, cronogramas administrativos y demás condiciones aplicables a cada ciclo lectivo serán informadas con antelación razonable mediante los canales institucionales habituales. Cuando se modifiquen condiciones esenciales del vínculo, su incorporación al contrato requerirá la aceptación expresa de LOS RESPONSABLES PARENTALES en el procedimiento anual de matriculación o reinscripción.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    En caso de incumplimiento de los requisitos establecidos para cada ciclo lectivo dentro de los plazos informados, LA FUNDACIÓN podrá disponer de la vacante previa notificación por los medios institucionales habituales.
                   </p>
                 </div>
               </div>
@@ -1260,67 +1282,103 @@ export function EnrollmentForm() {
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 9° – Aranceles y modalidades de pago</p>
                   <p className="mt-1 text-slate-600">
-                    El costo del servicio educativo correspondiente a cada ciclo lectivo se compone de un arancel anual que se divide, a los efectos de su pago, en ONCE (11) cuotas mensuales y consecutivas, correspondientes a los meses de FEBRERO a DICIEMBRE inclusive de cada año. Las cuotas mensuales vencerán del día 1 al 10 de cada mes. En caso de que el día 10 fuera inhábil o feriado, el vencimiento operará el primer día hábil posterior.
+                    El costo anual del servicio educativo será abonado en once (11) cuotas mensuales y consecutivas de Febrero a Diciembre, con vencimiento entre los días 1 y 10 de cada mes, independientemente de la cantidad de días efectivamente dictados durante el período correspondiente. En caso de tratarse una incorporación una vez iniciado el ciclo lectivo, corresponderá abonar las cuotas mensualizadas de los meses restantes.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    LA FUNDACIÓN habilita los siguientes medios de pago:
+                  </p>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5 text-slate-600 pl-2">
+                    <li>Transferencias bancarias inmediatas.</li>
+                    <li>Débito automático.</li>
+                    <li>Otros medios de pago que pudieran incorporarse en el futuro los que serán debidamente informados, a su debido tiempo.</li>
+                  </ul>
+                  <p className="mt-1 text-slate-600">
+                    A efectos de solicitar la matriculación para el ciclo lectivo siguiente, resultará aplicable el régimen de libre deuda y acuerdos de pago previsto en la Cláusula 12.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    LA FUNDACIÓN no será responsable por alteraciones o imposibilidad de prestación derivadas de supuestos de caso fortuito, fuerza mayor, disposiciones de autoridad competente o circunstancias ajenas razonablemente a su control, conforme a la normativa vigente.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Las partes acuerdan aplicar el principio de esfuerzo compartido frente a procesos inflacionarios, modificaciones regulatorias o variaciones sustanciales de costos que alteren significativamente la ecuación económica del presente contrato.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 10° – Beneficios de terceros y medios de pago</p>
                   <p className="mt-1 text-slate-600">
-                    Los descuentos, promociones, reintegros o beneficios derivados de convenios celebrados con entidades bancarias o financieras serán de exclusiva responsabilidad de dichas entidades, no asumiendo LA FUNDACIÓN responsabilidad alguna por su otorgamiento, modificación o suspensión.
+                    Las promociones, descuentos, reintegros o planes de cuotas ofrecidos por entidades bancarias, emisoras de tarjetas o plataformas de pago se regirán por las condiciones, límites y vigencia establecidos por cada entidad. Los reclamos por beneficios o reintegros no aplicados por causas imputables a la entidad deberán tramitarse ante ésta. LA FUNDACIÓN responderá exclusivamente por la información, cargos y condiciones que ella establezca o comunique directamente.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 11° – Descuentos y beneficios arancelarios</p>
                   <p className="mt-1 text-slate-600">
-                    LA FUNDACIÓN otorga beneficios arancelarios a familias con más de un/a hijo/a matriculado/a en sus establecimientos:
+                    LA FUNDACIÓN podrá otorgar los siguientes beneficios arancelarios, los cuales deberán ser solicitados al inicio de cada ciclo lectivo y no revisten carácter automático ni permanente:
                   </p>
                   <ul className="list-disc list-inside mt-1 space-y-0.5 text-slate-600 pl-2">
-                    <li>Familias con dos (2) hijos/as: 15% de descuento sobre el valor de la cuota mensual del arancel de menor valor.</li>
-                    <li>Familias con tres (3) o más hijos/as: 25% de descuento sobre el valor de las cuotas mensuales de los aranceles de menor valor.</li>
+                    <li>Quince por ciento (15%) de descuento para familias con dos hijos/as matriculados/as, aplicado sobre la cuota de menor valor.</li>
+                    <li>Veinticinco por ciento (25%) de descuento para familias con tres o más hijos/as matriculados/as, aplicado sobre la cuota de menor valor.</li>
+                    <li>Veinte por ciento (20%) de descuento para hijos/as de empleados de LA FUNDACIÓN.</li>
                   </ul>
                   <p className="mt-1 text-slate-600">
-                    Estos descuentos no son acumulables con otros beneficios arancelarios y caducarán automáticamente en caso de mora en el pago de cualquiera de las cuotas mensuales.
+                    Será condición esencial para la conservación de dichos beneficios mantener regularidad en el pago íntegro y oportuno de las obligaciones arancelarias.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Los beneficios podrán ser suspendidos en caso de mora recurrente, entendiéndose por tal la existencia de dos (2) cuotas consecutivas o tres (3) alternadas impagas o abonadas fuera de término durante el mismo ciclo lectivo. La rehabilitación de los beneficios quedará sujeta a evaluación administrativa y podrá efectuarse a partir del siguiente ciclo lectivo.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 12° – Libre deuda y condición de matrícula</p>
                   <p className="mt-1 text-slate-600">
-                    Es condición indispensable para formalizar la matriculación inicial, la reinscripción en cada ciclo lectivo posterior y la reserva definitiva de vacante no registrar deuda exigible por ningún concepto con LA FUNDACIÓN al momento de efectivizarse el trámite correspondiente.
+                    Será condición indispensable para completar la matriculación y obtener la reserva definitiva de la vacante no registrar deuda exigible con LA FUNDACIÓN. Las familias que registren deuda deberán cancelarla o formalizar un acuerdo de pago expresamente aceptado por LA FUNDACIÓN. La mera presentación de la solicitud de matriculación no implicará la reserva definitiva de la vacante mientras no se verifique el cumplimiento de esta condición.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Las familias consideradas morosas reincidentes no tendrán derecho automático a acceder a un nuevo acuerdo de pago. Su situación será evaluada por el Consejo de Administración, considerando los antecedentes de pago, los acuerdos previamente incumplidos y las circunstancias particulares debidamente acreditadas. Se considerará que existe mora reincidente cuando LOS RESPONSABLES PARENTALES: a) hayan incumplido dos acuerdos de pago formalizados durante los dos últimos ciclos lectivos; o b) registren tres cuotas consecutivas o cuatro alternadas impagas o abonadas con más de treinta (30) días de atraso y no regularicen su situación luego de una notificación formal de LA FUNDACIÓN. La decisión que se adopte será comunicada a LOS RESPONSABLES PARENTALES.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Para alumnos/as regulares, la Administración verificará internamente la inexistencia de deuda exigible o la existencia de un acuerdo de pago vigente y cumplido. Para nuevos ingresantes se solicitará únicamente la documentación que corresponda conforme al procedimiento de admisión informado por LA FUNDACIÓN.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 13° – Reembolsos</p>
                   <p className="mt-1 text-slate-600">
-                    Los importes abonados en concepto de matrícula y cuotas mensuales no serán reintegrables, excepto cuando el/la aspirante no hubiera obtenido vacante por causas no imputables a LOS RESPONSABLES PARENTALES, o mediara cancelación formal de la vacante solicitada con una antelación mínima de diez (10) días corridos previos al inicio del ciclo lectivo correspondiente.
+                    Los importes abonados en concepto de reserva de vacante y/o matrícula podrán reintegrarse de forma parcial o proporcional según el momento de la baja y los gastos administrativos efectivamente incurridos, justificados y verificados administrativamente, conforme a las políticas institucionales vigentes y la normativa aplicable, siempre y cuando no haya iniciado el ciclo lectivo, en cuyo caso no será reintegrable, por cuanto LA FUNDACIÓN mantuvo la reserva de lugar, y se procedió a su utilización.
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 14° – Valor de matrícula y formas de pago</p>
                   <p className="mt-1 text-slate-600">
-                    El valor de la matrícula para cada ciclo lectivo se fijará conforme a las siguientes pautas:
+                    El valor de la reserva de vacante/matrícula equivaldrá a:
                   </p>
                   <ul className="list-disc list-inside mt-1 space-y-0.5 text-slate-600 pl-2">
-                    <li>Alumnos/as regulares: 1,4 veces el valor de la cuota mensual vigente al mes de agosto del año en curso.</li>
-                    <li>Nuevos/as ingresantes: 1,8 veces el valor de la cuota mensual vigente al mes de agosto del año en curso.</li>
+                    <li>Uno coma cuatro (1,4) veces el valor de la cuota vigente al mes de agosto para alumnos/as regulares.</li>
+                    <li>Uno coma ocho (1,8) veces el valor de la cuota vigente al mes de agosto para nuevos ingresantes.</li>
                   </ul>
-                </div>
-
-                <div>
-                  <p className="font-bold text-slate-900">Cláusula 15° – Requisitos adicionales para nuevos/as ingresantes</p>
                   <p className="mt-1 text-slate-600">
-                    Para los/as alumnos/as que ingresen por primera vez a LA FUNDACIÓN, además de los requisitos generales, será condición necesaria para la matriculación definitiva la acreditación de la documentación académica previa y la aprobación de los procesos de admisión institucional.
+                    La matrícula podrá abonarse mediante transferencia bancaria, tarjeta de crédito, planes de pago u otras modalidades habilitadas e informadas por LA FUNDACIÓN. Las promociones, descuentos, planes de cuotas y costos financieros aplicables serán informados anualmente y deberán ser aceptados al formalizar la matriculación.
                   </p>
                 </div>
 
                 <div>
-                  <p className="font-bold text-slate-900">Cláusula 16° – Modificación de aranceles</p>
+                  <p className="font-bold text-slate-900">Cláusula 15° – Plazos administrativos</p>
                   <p className="mt-1 text-slate-600">
-                    Los valores de las cuotas podrán ser actualizados durante los meses de Marzo, Junio y Octubre de cada ciclo lectivo, juntamente con la tasa correspondiente a intereses punitorios, y de forma extraordinaria ante variaciones sustanciales en costos salariales o normativas.
+                    Las fechas de matriculación interna y externa, así como los plazos para completar la documentación y acreditar el cumplimiento de los requisitos correspondientes, serán establecidos anualmente por LA FUNDACIÓN y comunicados mediante los canales institucionales habituales.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="font-bold text-slate-900">Cláusula 16° – Actualización de valores</p>
+                  <p className="mt-1 text-slate-600">
+                    Los valores de las cuotas podrán ser actualizados durante los meses de Marzo, Junio y Octubre de cada ciclo lectivo, juntamente con la tasa correspondiente a intereses punitorios.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Asimismo, podrán efectuarse modificaciones extraordinarias cuando se produzcan variaciones sustanciales en costos salariales, cargas sociales, servicios, impuestos, regulaciones estatales u otros factores que impacten significativamente en la estructura económica del servicio educativo.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Toda modificación arancelaria será informada a LOS RESPONSABLES PARENTALES mediante los canales institucionales habituales con antelación razonable.
                   </p>
                 </div>
 
@@ -1329,12 +1387,33 @@ export function EnrollmentForm() {
                   <p className="mt-1 text-slate-600">
                     LOS RESPONSABLES PARENTALES podrán solicitar becas o ayudas económicas conforme al Reglamento General de Becas vigente en la Administración de LA FUNDACIÓN.
                   </p>
+                  <p className="mt-1 text-slate-600">
+                    La presentación de la solicitud no genera derecho automático a su otorgamiento, renovación ni continuidad, quedando sujeta a evaluación institucional conforme a los criterios establecidos en la reglamentación correspondiente.
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 18° – Mora y gestión de cobranza</p>
                   <p className="mt-1 text-slate-600">
-                    El pago efectuado con posterioridad a la fecha de vencimiento devengará intereses punitorios. En caso de mora reiterada o persistente, previa intimación fehaciente, LA FUNDACIÓN podrá iniciar las acciones legales tendientes al cobro de las sumas adeudadas y/o decidir no renovar la matrícula para futuros ciclos lectivos.
+                    El pago efectuado con posterioridad a la fecha de vencimiento devengará, desde dicha fecha y hasta su efectivo pago, la tasa de intereses punitorios que determine LA FUNDACIÓN, que no podrá ser superior a la tasa activa del Banco del Chubut con hasta una sobretasa del 10% (DIEZ) de la misma, y los cuales serán informados al inicio de cada ciclo lectivo y/o al momento de comunicarse modificaciones arancelarias.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    La falta de pago de uno o más aranceles facultará a LA FUNDACIÓN a reclamar las sumas adeudadas, con más los intereses correspondientes y los gastos razonables de cobranza judicial o extrajudicial que resulten procedentes conforme a la normativa vigente.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    En caso de mora reiterada o persistente, y previa intimación fehaciente al domicilio constituido por LOS RESPONSABLES PARENTALES, LA FUNDACIÓN podrá iniciar las acciones legales tendientes al cobro de las sumas adeudadas.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Asimismo, la mora persistente podrá constituir causal suficiente para que LA FUNDACIÓN decida no renovar la matrícula o resolver el presente contrato para futuros ciclos lectivos, de conformidad con la normativa educativa aplicable y previa notificación fehaciente.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    En caso de no renovación para un ciclo lectivo futuro, LA FUNDACIÓN notificará la decisión con antelación suficiente y brindará la documentación necesaria para facilitar la continuidad educativa y el pase institucional del/de la alumno/a, de conformidad con la normativa aplicable.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    LOS RESPONSABLES PARENTALES reconocen el carácter arancelario y exigible de las obligaciones económicas asumidas. Las liquidaciones y certificaciones emitidas por la Administración podrán ser observadas mediante impugnación fundada o acreditación de error material, sin perjuicio de las acciones y procedimientos de cobro que legalmente correspondan.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Las partes acuerdan que dichas constancias podrán ser utilizadas como instrumento suficiente para promover las acciones judiciales de cobro que correspondan, incluyendo, en su caso, la vía ejecutiva prevista por la normativa procesal aplicable.
                   </p>
                 </div>
 
@@ -1342,6 +1421,15 @@ export function EnrollmentForm() {
                   <p className="font-bold text-slate-900">Cláusula 19° – Responsabilidad de pago</p>
                   <p className="mt-1 text-slate-600">
                     LOS RESPONSABLES PARENTALES asumen en forma solidaria la obligación de pago de la totalidad de los aranceles, cuotas, matrículas, intereses y demás conceptos derivados del presente contrato, independientemente de su situación personal, familiar, laboral o económica.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Dicha obligación subsiste durante toda la vigencia del vínculo educativo y hasta la cancelación total de las sumas adeudadas.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    LA FUNDACIÓN no asume responsabilidad ni intervención alguna en las situaciones particulares de índole familiar, económica o personal de LOS RESPONSABLES PARENTALES, las cuales no afectan la validez, exigibilidad ni cumplimiento de las obligaciones asumidas en el presente contrato.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Sin perjuicio de ello, LA FUNDACIÓN podrá, a su exclusivo criterio institucional y conforme a sus políticas vigentes, evaluar situaciones particulares y eventualmente otorgar facilidades de pago o beneficios, sin que ello implique renuncia, modificación o novación de las obligaciones contractuales.
                   </p>
                 </div>
               </div>
@@ -1362,19 +1450,22 @@ export function EnrollmentForm() {
                   <p className="mt-1 text-slate-600">
                     Las actividades recreativas, deportivas, convivencias, torneos y salidas educativas forman parte integrante del Proyecto Educativo Institucional.
                   </p>
+                  <p className="mt-1 text-slate-600">
+                    La participación en dichas actividades implica aceptación de las decisiones organizativas y pedagógicas adoptadas por LA FUNDACIÓN.
+                  </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 22° – Equipos técnicos interdisciplinarios</p>
                   <p className="mt-1 text-slate-600">
-                    LA FUNDACIÓN podrá dar intervención a sus equipos institucionales cuando resulte necesario para acompañar la trayectoria escolar o atender necesidades educativas del/la alumno/a, resguardando la privacidad y confidencialidad.
+                    LA FUNDACIÓN podrá dar intervención a sus equipos institucionales cuando resulte necesario para acompañar la trayectoria escolar o atender necesidades educativas del/la alumno(a). La intervención de profesionales externos y el tratamiento o comunicación de información sensible se realizarán con conocimiento de LOS RESPONSABLES PARENTALES y, cuando corresponda, mediante consentimiento específico, resguardando la privacidad, confidencialidad y autonomía progresiva del/de (la) alumno(a).
                   </p>
                 </div>
 
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 23° – Uso responsable de redes sociales</p>
                   <p className="mt-1 text-slate-600">
-                    LOS RESPONSABLES PARENTALES asumen la responsabilidad de promover el uso adecuado y responsable de redes sociales y plataformas digitales por parte de sus hijos/as o tutelados/as.
+                    LOS RESPONSABLES PARENTALES asumen la responsabilidad de promover el uso adecuado y responsable de redes sociales y plataformas digitales por parte de sus hijos/as o tutelados/as, comprometiéndose a colaborar con LA FUNDACIÓN en la prevención de situaciones que afecten la convivencia y bienestar de la comunidad educativa.
                   </p>
                 </div>
               </div>

@@ -69,7 +69,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import JSZip from "jszip";
-import { generateContractPdf, downloadFilledContract, determineLevel } from "@/lib/contractGenerator";
+import { generateContractPdf, downloadFilledContract, determineLevel, getContractFilename } from "@/lib/contractGenerator";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -422,9 +422,23 @@ export function AdminDashboard({
           signedAt: item.createdAt
         });
         const pdfBlob = doc.output("blob");
-        const cleanName = (item.studentName || "Aspirante").replace(/[^a-zA-Z0-9]/g, "_");
+        const pdfFileName = getContractFilename({
+          studentName: item.studentName || "",
+          studentDni: item.studentDni || "",
+          parent1Dni: item.parent1Dni || "",
+          billingCuit: item.billingCuit || item.parent1Dni || "",
+          parent1Name: item.parent1Name || item.tutorName || "",
+          parent1Relationship: item.parent1Relationship || "Padre/Madre/Tutor",
+          parent1Phone: item.parent1Phone || item.tutorPhone || "",
+          parent1Email: item.parent1Email || item.tutorEmail || "",
+          parent1Address: item.parent1Address || "",
+          parent1City: item.parent1City || "Esquel",
+          parent1PostalCode: item.parent1PostalCode || "9200",
+          school: item.school || "Escuela N.º 1030",
+          studentGrade: item.studentGrade || ""
+        });
         const schoolFolder = (item.school || "Escuela_1030").includes("1739") ? "Escuela_1739" : "Escuela_1030";
-        zip.folder(schoolFolder)?.file(`Contrato_2027_${cleanName}_${item.studentDni || item.id}.pdf`, pdfBlob);
+        zip.folder(schoolFolder)?.file(pdfFileName, pdfBlob);
       }
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(zipBlob);

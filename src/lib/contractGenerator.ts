@@ -5,7 +5,7 @@ export interface SiblingData {
   id?: string;
   name: string;
   level?: string;
-  school: string; // "Escuela N.º 1030" | "Escuela N.º 1739"
+  school: string;
   grade: string;
 }
 
@@ -18,7 +18,7 @@ export interface EnrollmentContractData {
   studentName: string;
   studentDni: string;
   studentLevel?: string; // "Nivel Inicial" | "Nivel Primario" | "Nivel Secundario"
-  level?: string;        // Alias for compatibility
+  level?: string;        // Alias de compatibilidad
   school: string;        // "Escuela N.º 1030" | "Escuela N.º 1739"
   studentGrade: string;  // "Sala de 3", "1° Grado", "3° Año", etc.
   hasSiblings?: boolean;
@@ -88,7 +88,16 @@ function getHonorific(relationship?: string): string {
 }
 
 /**
- * Genera el documento PDF del Contrato Marco oficial optimizado para 4 páginas exactas
+ * Nombre de archivo exigido por Administración: {DNI_PADRE_FACTURA}_{DNI_ALUMNO}.pdf
+ */
+export function getContractFilename(data: EnrollmentContractData): string {
+  const billingDni = (data.billingCuit || data.parent1Dni || "0").replace(/[^0-9]/g, "") || "0";
+  const studentDni = (data.studentDni || "0").replace(/[^0-9]/g, "") || "0";
+  return `${billingDni}_${studentDni}.pdf`;
+}
+
+/**
+ * Genera el documento PDF del Contrato Marco oficial definitivo de la Fundación Educativa Esquel
  */
 export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   const doc = new jsPDF({
@@ -99,7 +108,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   const isBlank = !data;
   const now = data?.signedAt ? new Date(data.signedAt) : new Date();
-  const day = isBlank ? "_____" : String(now.getDate());
+  const day = isBlank ? "___________" : String(now.getDate());
   const month = isBlank ? "___________________" : MONTH_NAMES[now.getMonth()];
   const year = isBlank ? "_________" : String(now.getFullYear());
 
@@ -130,7 +139,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   
   const level = isBlank
     ? "_________________________________"
-    : (data.studentLevel || determineLevel(data.studentGrade, data.school));
+    : (data.studentLevel || data.level || determineLevel(data.studentGrade, data.school));
 
   const school = isBlank 
     ? "Escuela N.º 1030 / Escuela N.º 1739" 
@@ -145,10 +154,10 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   let currentPage = 1;
 
   const drawHeader = (pNum: number) => {
-    // Header institucional
+    // Encabezado institucional FEE
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(24, 60, 52); // Brand green
+    doc.setFontSize(8.5);
+    doc.setTextColor(24, 60, 52); // Verde institucional
     doc.text("FUNDACIÓN EDUCATIVA ESQUEL", marginX, 12);
 
     doc.setFont("helvetica", "normal");
@@ -209,7 +218,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
     const bodyLines = doc.splitTextToSize(clauseBody, contentWidth);
     const bodyHeight = bodyLines.length * 3.75;
 
-    // Si no entra el título y al menos 2 líneas del cuerpo, hacemos salto
+    // Si no entra el título y al menos 2 líneas del cuerpo, hacemos salto de página
     checkPageBreak(titleHeight + Math.min(bodyHeight, 10));
 
     doc.setFont("helvetica", "bold");
@@ -241,7 +250,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   doc.text("CONTRATO MARCO DE PRESTACIÓN DE SERVICIOS EDUCATIVOS", pageWidth / 2, y, { align: "center" });
   y += 5.5;
 
-  // Comparecencia
+  // Comparecencia oficial
   let comparecencia = "";
   if (isSingle) {
     comparecencia = `En la ciudad de Esquel, a los ${day} días del mes de ${month} del año ${year}, entre la Fundación Educativa Esquel, con domicilio legal en Chacabuco Nº 1029 de la ciudad de Esquel, Provincia del Chubut, en adelante denominada “LA FUNDACIÓN”, y por la otra parte ${p1Title} ${p1Name} D.N.I. Nº ${p1Dni} (en carácter de único/a responsable parental habilitado/a), quien constituye domicilio en ${address} de la ciudad de ${city}, en adelante denominado/a “EL/LA RESPONSABLE PARENTAL”, se celebra el presente contrato sujeto a las siguientes cláusulas y condiciones particulares.`;
@@ -250,7 +259,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   }
   printParagraph(comparecencia, { spaceAfter: 3.0 });
 
-  // Disposiciones Preliminares
+  // DISPOSICIONES PRELIMINARES
   printSectionHeader("DISPOSICIONES PRELIMINARES");
 
   printClause(
@@ -282,7 +291,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   printClause(
     "Cláusula 4° – Reserva de vacante",
-    `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo ${cycleYear} y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de ${level} (${school}). A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reservará una vacante para el/la alumno/a individualizado/a en la documentación de matriculación, exclusivamente para el ciclo lectivo correspondiente. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`
+    `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo ${cycleYear} y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de Nivel ${level} (${school}). La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`
   );
 
   printClause(
@@ -294,18 +303,25 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   printClause(
     "Cláusula 6° – Reinscripción y prestación del servicio educativo",
-    "Cumplidas las condiciones académicas, administrativas y arancelarias previstas en el presente contrato, y sujeto a disponibilidad institucional, LA FUNDACIÓN podrá reinscribir al/la alumno/a para el ciclo lectivo siguiente."
+    "Cumplidas las condiciones académicas, administrativas y arancelarias previstas en el presente contrato, y sujeto a disponibilidad institucional, LA FUNDACIÓN podrá reinscribir al/la alumno/a para el ciclo lectivo siguiente.\n" +
+    "Toda decisión de no renovación o negativa de reinscripción deberá fundarse en causas objetivas, razonables y compatibles con la normativa educativa vigente, debiendo ser notificada fehacientemente a LOS RESPONSABLES PARENTALES.\n" +
+    "La prestación del servicio educativo comprende:\n" +
+    "a)  La enseñanza oficial correspondiente al nivel y año en el que se encuentre matriculado/a el/la alumno/a.\n" +
+    "b)  Las actividades institucionales, pedagógicas y formativas organizadas conforme al Proyecto Educativo Institucional.\n" +
+    "En caso de repitencia, la reinscripción quedará supeditada a la existencia de vacantes disponibles en el curso correspondiente."
   );
 
   printClause(
     "Cláusula 7° – Uso institucional de imágenes",
-    "LOS RESPONSABLES PARENTALES autorizan a LA FUNDACIÓN a utilizar imágenes y registros audiovisuales del/de la alumno/a obtenidos en actividades escolares, pedagógicas, recreativas, culturales e institucionales, con fines exclusivamente pedagógicos, divulgativos e institucionales, en publicaciones oficiales, plataformas educativas, sitio web y redes sociales de LA FUNDACIÓN, sin fines de lucro comercial y en el marco de la normativa de protección de datos personales y de la niñez y adolescencia.\n" +
-    "Dicha autorización podrá ser revocada o limitada en cualquier momento mediante notificación expresa y fehaciente por escrito dirigida a la Administración de LA FUNDACIÓN."
+    "La autorización para captar, utilizar o difundir imágenes, fotografías y registros audiovisuales en los que aparezca el/la alumno/a se instrumentará mediante un consentimiento específico, separado y revocable. Dicho consentimiento distinguirá, como mínimo, el uso pedagógico interno, la difusión en el sitio web institucional, las redes sociales oficiales y el material gráfico o audiovisual público. LOS RESPONSABLES PARENTALES podrán revocar la autorización otorgada en cualquier momento mediante comunicación escrita dirigida a la Administración de LA FUNDACIÓN, la que no afectará publicaciones impresas ya distribuidas ni registros históricos institucionales. La negativa o revocación de esta autorización no afectará la matriculación ni la prestación del servicio educativo."
   );
 
   printClause(
     "Cláusula 8° – Firma y validez contractual",
-    "El presente contrato podrá ser suscripto en soporte papel mediante firma ológrafa o a través de medios electrónicos mediante firma electrónica, reconociendo ambas partes su plena validez, eficacia jurídica y fuerza obligatoria."
+    "El presente contrato podrá suscribirse en soporte papel o mediante mecanismos electrónicos que permitan identificar a los firmantes, registrar la fecha de aceptación y conservar la integridad del documento. LA FUNDACIÓN pondrá a disposición de LOS RESPONSABLES PARENTALES una copia del contrato suscripto o aceptado.\n" +
+    "La validez de la matriculación y continuidad del vínculo educativo quedará sujeta al cumplimiento de las condiciones académicas, administrativas, documentales y arancelarias previstas en el presente contrato y en la normativa institucional vigente para cada ciclo lectivo.\n" +
+    "Las actualizaciones de valores arancelarios, reglamentaciones internas, cronogramas administrativos y demás condiciones aplicables a cada ciclo lectivo serán informadas con antelación razonable mediante los canales institucionales habituales. Cuando se modifiquen condiciones esenciales del vínculo, su incorporación al contrato requerirá la aceptación expresa de LOS RESPONSABLES PARENTALES en el procedimiento anual de matriculación o reinscripción.\n" +
+    "En caso de incumplimiento de los requisitos establecidos para cada ciclo lectivo dentro de los plazos informados, LA FUNDACIÓN podrá disponer de la vacante previa notificación por los medios institucionales habituales."
   );
 
   // CAPÍTULO II
@@ -313,50 +329,58 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   printClause(
     "Cláusula 9° – Aranceles y modalidades de pago",
-    "El costo del servicio educativo correspondiente a cada ciclo lectivo se compone de un arancel anual que se divide, a los efectos de su pago, en ONCE (11) cuotas mensuales y consecutivas, correspondientes a los meses de FEBRERO a DICIEMBRE inclusive de cada año.\n" +
-    "Las cuotas mensuales vencerán del día 1 al 10 de cada mes. En caso de que el día 10 fuera inhábil o feriado, el vencimiento operará el primer día hábil posterior.\n" +
-    "Las cuotas no devengan intereses dentro del período que corre hasta su fecha de vencimiento.\n" +
-    "Los pagos deberán realizarse por los medios electrónicos o bancarios que LA FUNDACIÓN habilite oportunamente."
+    "El costo anual del servicio educativo será abonado en once (11) cuotas mensuales y consecutivas de Febrero a Diciembre, con vencimiento entre los días 1 y 10 de cada mes, independientemente de la cantidad de días efectivamente dictados durante el período correspondiente. En caso de tratarse una incorporación una vez iniciado el ciclo lectivo, corresponderá abonar las cuotas mensualizadas de los meses restantes.\n" +
+    "LA FUNDACIÓN habilita los siguientes medios de pago:\n" +
+    "•  Transferencias bancarias inmediatas.\n" +
+    "•  Débito automático.\n" +
+    "•  Otros medios de pago que pudieran incorporarse en el futuro los que serán debidamente informados, a su debido tiempo.\n" +
+    "A efectos de solicitar la matriculación para el ciclo lectivo siguiente, resultará aplicable el régimen de libre deuda y acuerdos de pago previsto en la Cláusula 12.\n" +
+    "LA FUNDACIÓN no será responsable por alteraciones o imposibilidad de prestación derivadas de supuestos de caso fortuito, fuerza mayor, disposiciones de autoridad competente o circunstancias ajenas razonablemente a su control, conforme a la normativa vigente.\n" +
+    "Las partes acuerdan aplicar el principio de esfuerzo compartido frente a procesos inflacionarios, modificaciones regulatorias o variaciones sustanciales de costos que alteren significativamente la ecuación económica del presente contrato."
   );
 
   printClause(
-    "Cláusula 10° – Beneficios de terceros y medios de pago",
-    "Los descuentos, promociones, reintegros o beneficios derivados de convenios celebrados con entidades bancarias o financieras serán de exclusiva responsabilidad de dichas entidades, no asumiendo LA FUNDACIÓN responsabilidad alguna por su otorgamiento, modificación o suspensión."
+    "Cláusula 10° – Beneficios de terceros y medios de pago:",
+    "Las promociones, descuentos, reintegros o planes de cuotas ofrecidos por entidades bancarias, emisoras de tarjetas o plataformas de pago se regirán por las condiciones, límites y vigencia establecidos por cada entidad. Los reclamos por beneficios o reintegros no aplicados por causas imputables a la entidad deberán tramitarse ante ésta. LA FUNDACIÓN responderá exclusivamente por la información, cargos y condiciones que ella establezca o comunique directamente."
   );
 
   printClause(
     "Cláusula 11° – Descuentos y beneficios arancelarios",
-    "LA FUNDACIÓN otorga beneficios arancelarios a familias con más de un/a hijo/a matriculado/a en sus establecimientos:\n" +
-    "•  Familias con dos (2) hijos/as: 15% de descuento sobre el valor de la cuota mensual del arancel de menor valor.\n" +
-    "•  Familias con tres (3) o más hijos/as: 25% de descuento sobre el valor de las cuotas mensuales de los aranceles de menor valor.\n" +
-    "Estos descuentos no son acumulables con otros beneficios arancelarios y caducarán automáticamente en caso de mora en el pago de cualquiera de las cuotas mensuales, reanudándose a partir del mes siguiente al de la cancelación total de las sumas adeudadas."
+    "LA FUNDACIÓN podrá otorgar los siguientes beneficios arancelarios, los cuales deberán ser solicitados al inicio de cada ciclo lectivo y no revisten carácter automático ni permanente:\n" +
+    "•  Quince por ciento (15%) de descuento para familias con dos hijos/as matriculados/as, aplicado sobre la cuota de menor valor.\n" +
+    "•  Veinticinco por ciento (25%) de descuento para familias con tres o más hijos/as matriculados/as, aplicado sobre la cuota de menor valor.\n" +
+    "•  Veinte por ciento (20%) de descuento para hijos/as de empleados de LA FUNDACIÓN.\n" +
+    "Será condición esencial para la conservación de dichos beneficios mantener regularidad en el pago íntegro y oportuno de las obligaciones arancelarias.\n" +
+    "Los beneficios podrán ser suspendidos en caso de mora recurrente, entendiéndose por tal la existencia de dos (2) cuotas consecutivas o tres (3) alternadas impagas o abonadas fuera de término durante el mismo ciclo lectivo. La rehabilitación de los beneficios quedará sujeta a evaluación administrativa y podrá efectuarse a partir del siguiente ciclo lectivo."
   );
 
   printClause(
     "Cláusula 12° – Libre deuda y condición de matrícula",
-    "Es condición indispensable para formalizar la matriculación inicial, la reinscripción en cada ciclo lectivo posterior y la reserva definitiva de vacante no registrar deuda exigible por ningún concepto con LA FUNDACIÓN al momento de efectivizarse el trámite correspondiente."
+    "Será condición indispensable para completar la matriculación y obtener la reserva definitiva de la vacante no registrar deuda exigible con LA FUNDACIÓN. Las familias que registren deuda deberán cancelarla o formalizar un acuerdo de pago expresamente aceptado por LA FUNDACIÓN. La mera presentación de la solicitud de matriculación no implicará la reserva definitiva de la vacante mientras no se verifique el cumplimiento de esta condición.\n" +
+    "Las familias consideradas morosas reincidentes no tendrán derecho automático a acceder a un nuevo acuerdo de pago. Su situación será evaluada por el Consejo de Administración, considerando los antecedentes de pago, los acuerdos previamente incumplidos y las circunstancias particulares debidamente acreditadas. Se considerará que existe mora reincidente cuando LOS RESPONSABLES PARENTALES: a) hayan incumplido dos acuerdos de pago formalizados durante los dos últimos ciclos lectivos; o b) registren tres cuotas consecutivas o cuatro alternadas impagas o abonadas con más de treinta (30) días de atraso y no regularicen su situación luego de una notificación formal de LA FUNDACIÓN. La decisión que se adopte será comunicada a LOS RESPONSABLES PARENTALES.\n" +
+    "Para alumnos/as regulares, la Administración verificará internamente la inexistencia de deuda exigible o la existencia de un acuerdo de pago vigente y cumplido. Para nuevos ingresantes se solicitará únicamente la documentación que corresponda conforme al procedimiento de admisión informado por LA FUNDACIÓN."
   );
 
   printClause(
     "Cláusula 13° – Reembolsos",
-    "Los importes abonados en concepto de matrícula y cuotas mensuales no serán reintegrables, excepto cuando el/la aspirante no hubiera obtenido vacante por causas no imputables a LOS RESPONSABLES PARENTALES, o mediara cancelación formal de la vacante solicitada con una antelación mínima de diez (10) días corridos previos al inicio del ciclo lectivo correspondiente."
+    "Los importes abonados en concepto de reserva de vacante y/o matrícula podrán reintegrarse de forma parcial o proporcional según el momento de la baja y los gastos administrativos efectivamente incurridos, justificados y verificados administrativamente, conforme a las políticas institucionales vigentes y la normativa aplicable, siempre y cuando no haya iniciado el ciclo lectivo, en cuyo caso no será reintegrable, por cuanto LA FUNDACIÓN mantuvo la reserva de lugar, y se procedió a su utilización."
   );
 
   printClause(
     "Cláusula 14° – Valor de matrícula y formas de pago",
-    "El valor de la matrícula para cada ciclo lectivo se fijará conforme a las siguientes pautas:\n" +
-    "•  Alumnos/as regulares: El valor de la matrícula para el ciclo lectivo siguiente será equivalente a una coma cuatro (1,4) veces el valor de la cuota mensual vigente al mes de agosto del año en curso.\n" +
-    "•  Nuevos/as ingresantes: El valor de la matrícula será equivalente a una coma ocho (1,8) veces el valor de la cuota mensual vigente al mes de agosto del año en curso.\n" +
-    "El importe de la matrícula podrá abonarse en un pago único o en hasta cuatro (4) cuotas mensuales iguales y consecutivas, en las condiciones y fechas que LA FUNDACIÓN determine anualmente."
+    "El valor de la reserva de vacante/matrícula equivaldrá a:\n" +
+    "•  Uno coma cuatro (1,4) veces el valor de la cuota vigente al mes de agosto para alumnos/as regulares.\n" +
+    "•  Uno coma ocho (1,8) veces el valor de la cuota vigente al mes de agosto para nuevos ingresantes.\n" +
+    "La matrícula podrá abonarse mediante transferencia bancaria, tarjeta de crédito, planes de pago u otras modalidades habilitadas e informadas por LA FUNDACIÓN. Las promociones, descuentos, planes de cuotas y costos financieros aplicables serán informados anualmente y deberán ser aceptados al formalizar la matriculación."
   );
 
   printClause(
-    "Cláusula 15° – Requisitos adicionales para nuevos/as ingresantes",
-    "Para los/as alumnos/as que ingresen por primera vez a LA FUNDACIÓN, además de los requisitos generales, será condición necesaria para la matriculación definitiva la acreditación de la documentación académica previa y la aprobación de los procesos de admisión que la institución determine conforme a su Proyecto Educativo Institucional."
+    "Cláusula 15° – Plazos administrativos",
+    "Las fechas de matriculación interna y externa, así como los plazos para completar la documentación y acreditar el cumplimiento de los requisitos correspondientes, serán establecidos anualmente por LA FUNDACIÓN y comunicados mediante los canales institucionales habituales."
   );
 
   printClause(
-    "Cláusula 16° – Modificación de aranceles",
+    "Cláusula 16° – Actualización de valores",
     "Los valores de las cuotas podrán ser actualizados durante los meses de Marzo, Junio y Octubre de cada ciclo lectivo, juntamente con la tasa correspondiente a intereses punitorios.\n" +
     "Asimismo, podrán efectuarse modificaciones extraordinarias cuando se produzcan variaciones sustanciales en costos salariales, cargas sociales, servicios, impuestos, regulaciones estatales u otros factores que impacten significativamente en la estructura económica del servicio educativo.\n" +
     "Toda modificación arancelaria será informada a LOS RESPONSABLES PARENTALES mediante los canales institucionales habituales con antelación razonable."
@@ -403,7 +427,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   printClause(
     "Cláusula 22° – Equipos técnicos interdisciplinarios",
-    "LA FUNDACIÓN podrá dar intervención a sus equipos institucionales cuando resulte necesario para acompañar la trayectoria escolar o atender necesidades educativas del/la alumno/a. La intervención de profesionales externos y el tratamiento o comunicación de información sensible se realizarán con conocimiento de LOS RESPONSABLES PARENTALES y, cuando corresponda, mediante consentimiento específico, resguardando la privacidad, confidencialidad y autonomía progresiva del/de la alumno/a."
+    "LA FUNDACIÓN podrá dar intervención a sus equipos institucionales cuando resulte necesario para acompañar la trayectoria escolar o atender necesidades educativas del/la alumno(a). La intervención de profesionales externos y el tratamiento o comunicación de información sensible se realizarán con conocimiento de LOS RESPONSABLES PARENTALES y, cuando corresponda, mediante consentimiento específico, resguardando la privacidad, confidencialidad y autonomía progresiva del/de (la) alumno(a)."
   );
 
   printClause(
@@ -416,9 +440,9 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   printParagraph(cierreText, { spaceAfter: 4 });
 
   // ==========================================
-  // BLOQUE DE FIRMAS PERFECTAMENTE ALINEADO
+  // BLOQUE DE FIRMAS Y REGISTRO DE ALUMNOS
   // ==========================================
-  checkPageBreak(58);
+  checkPageBreak(65);
 
   const col1X = marginX + 3;
   const col2X = marginX + 62;
@@ -459,7 +483,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const resp1Label = isBlank
-    ? "Firma Padre / Madre / Tutor"
+    ? "Firma del padre/tutor"
     : `Firma ${data.parent1Relationship || "Responsable 1"}`;
   doc.text(resp1Label, col1X + colW1 / 2, lineY + 3.5, { align: "center" });
   doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
@@ -502,7 +526,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const resp2Label = isBlank
-    ? "Firma Padre / Madre / Tutora"
+    ? "Firma de la madre/tutora"
     : (isSingle ? "---" : `Firma ${data.parent2Relationship || "Responsable 2"}`);
   doc.text(resp2Label, col1X + colW1 / 2, lineY + 3.5, { align: "center" });
   doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
@@ -539,24 +563,34 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
   doc.text("Aclaración", col3X + colW3 / 2, lineY + 3.5, { align: "center" });
 
-  // Recuadro de Metadatos Digitales (Solo si está firmado)
+  // Recuadro de Metadatos Digitales y Registro de Alumnos Reinscriptos
   if (!isBlank) {
-    lineY += 9;
-    checkPageBreak(16);
+    lineY += 8.5;
+    const boxHeight = data.hasSiblings && data.siblingDetails ? 20 : 16;
+    checkPageBreak(boxHeight + 2);
+    
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(marginX, lineY, contentWidth, 14, 1.5, 1.5, "FD");
+    doc.roundedRect(marginX, lineY, contentWidth, boxHeight, 1.5, 1.5, "FD");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
     doc.setTextColor(15, 23, 42);
-    doc.text("CONSTANCIA DE REGISTRO ELECTRÓNICO INSTITUCIONAL — CICLO LECTIVO 2027", marginX + 3.5, lineY + 4);
+    doc.text("REGISTRO ELECTRÓNICO INSTITUCIONAL — CONSTANCIA DE REINSCRIPCIÓN 2027", marginX + 3.5, lineY + 4);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Trámite: ${data.trackingNumber || data.id || "FEE-2027-ONLINE"}  |  Fecha/Hora: ${now.toLocaleDateString("es-AR")} ${now.toLocaleTimeString("es-AR")}  |  Facturación: ${data.billingName || p1Name} (${data.billingCuit || p1Dni})`, marginX + 3.5, lineY + 8);
-    doc.text("Suscripción digital mediante firma electrónica táctil y aceptación de los 23 artículos del Contrato Marco.", marginX + 3.5, lineY + 11.5);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`• ESTUDIANTE: ${studentName} (DNI ${studentDni}) — ${level} (${grade}) - ${school}`, marginX + 3.5, lineY + 7.5);
+    
+    let subY = lineY + 11;
+    if (data.hasSiblings && data.siblingDetails) {
+      doc.text(`• HERMANOS/AS: ${data.siblingDetails}`, marginX + 3.5, subY);
+      subY += 3.5;
+    }
+
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Trámite: ${data.trackingNumber || data.id || "FEE-2027-ONLINE"}  |  Fecha/Hora: ${now.toLocaleDateString("es-AR")} ${now.toLocaleTimeString("es-AR")}  |  Facturación: ${data.billingName || p1Name} (DNI/CUIT ${data.billingCuit || p1Dni})`, marginX + 3.5, subY);
   }
 
   return doc;
@@ -571,11 +605,10 @@ export function downloadBlankContract(): void {
 }
 
 /**
- * Descarga el contrato completo completado y firmado
+ * Descarga el contrato completo completado y firmado con nomenclatura: {DNI_PADRE}_{DNI_ALUMNO}.pdf
  */
 export function downloadFilledContract(data: EnrollmentContractData): void {
   const doc = generateContractPdf(data);
-  const cleanName = data.studentName.replace(/[^a-zA-Z0-9]/g, "_");
-  const filename = `Contrato_Reinscripcion_2027_${cleanName}_${data.studentDni || "FEE"}.pdf`;
+  const filename = getContractFilename(data);
   doc.save(filename);
 }
