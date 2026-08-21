@@ -224,6 +224,36 @@ export function formatDurationSeconds(seconds: number): string {
   return `${minutes} min`;
 }
 
+export function HighlightText({ text, highlight }: { text?: string | number | null; highlight?: string }) {
+  if (text === undefined || text === null) return null;
+  const str = String(text);
+  if (!highlight || !highlight.trim()) {
+    return <>{str}</>;
+  }
+
+  const query = highlight.trim();
+  // Divide el término por espacios para resaltar cada palabra buscada
+  const terms = query.split(/\s+/).filter(Boolean).map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (terms.length === 0) return <>{str}</>;
+
+  const regex = new RegExp(`(${terms.join("|")})`, "gi");
+  const parts = str.split(regex);
+
+  return (
+    <>
+      {parts.map((part, index) =>
+        regex.test(part) ? (
+          <mark key={index} className="bg-amber-300 text-amber-950 font-extrabold px-1 py-0.2 rounded-sm shadow-2xs">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
 export function AdminDashboard({ 
   posts, 
   enrollments, 
@@ -396,20 +426,31 @@ export function AdminDashboard({
 
   const filteredExtractedStudents = useMemo(() => {
     return allExtractedStudents.filter((s: ExtractedStudent) => {
-      // 1. Search Query
+      // 1. Search Query (Búsqueda por palabras clave múltiples en todos los campos)
       if (enrollmentSearchQuery.trim()) {
-        const q = enrollmentSearchQuery.toLowerCase();
-        const matchName = (s.studentName || "").toLowerCase().includes(q);
-        const matchDni = (s.studentDni || "").toLowerCase().includes(q);
-        const matchTutor = (s.parent1Name || "").toLowerCase().includes(q);
-        const matchEmail = (s.parent1Email || "").toLowerCase().includes(q);
-        const matchPhone = (s.parent1Phone || "").toLowerCase().includes(q);
-        const matchGrade = (s.studentGrade || "").toLowerCase().includes(q);
-        const matchSchool = (s.school || "").toLowerCase().includes(q);
-        const matchTracking = (s.trackingNumber || "").toLowerCase().includes(q);
-        if (!matchName && !matchDni && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchSchool && !matchTracking) {
-          return false;
-        }
+        const terms = enrollmentSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const corpus = [
+          s.studentName,
+          s.studentDni,
+          s.parent1Name,
+          s.parent1Dni,
+          s.parent1Phone,
+          s.parent1Email,
+          s.parent2Name,
+          s.parent2Dni,
+          s.studentGrade,
+          s.studentLevel,
+          s.school,
+          s.trackingNumber,
+          s.familyPrimaryStudent,
+          s.familyPrimaryDni,
+          s.billingName,
+          s.billingCuit,
+          s.studentType
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        const matchAllTerms = terms.every(t => corpus.includes(t));
+        if (!matchAllTerms) return false;
       }
 
       // 2. School Filter
@@ -462,20 +503,33 @@ export function AdminDashboard({
 
   const filteredEnrollments = useMemo(() => {
     return reinscripcionesList.filter((e: any) => {
-      // 1. Search Query
+      // 1. Search Query (Búsqueda por palabras clave múltiples en todos los campos)
       if (enrollmentSearchQuery.trim()) {
-        const q = enrollmentSearchQuery.toLowerCase();
-        const matchName = (e.studentName || "").toLowerCase().includes(q);
-        const matchDni = (e.studentDni || "").toLowerCase().includes(q);
-        const matchTutor = (e.parent1Name || e.tutorName || "").toLowerCase().includes(q);
-        const matchEmail = (e.parent1Email || e.tutorEmail || "").toLowerCase().includes(q);
-        const matchPhone = (e.parent1Phone || e.tutorPhone || "").toLowerCase().includes(q);
-        const matchGrade = (e.studentGrade || "").toLowerCase().includes(q);
-        const matchSchool = (e.school || "").toLowerCase().includes(q);
-        const matchComments = (e.comments || "").toLowerCase().includes(q);
-        if (!matchName && !matchDni && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchSchool && !matchComments) {
-          return false;
-        }
+        const terms = enrollmentSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const corpus = [
+          e.studentName,
+          e.studentDni,
+          e.parent1Name,
+          e.parent1Dni,
+          e.parent1Phone,
+          e.parent1Email,
+          e.parent2Name,
+          e.parent2Dni,
+          e.studentGrade,
+          e.studentLevel,
+          e.school,
+          e.trackingNumber,
+          e.siblingDetails,
+          e.billingName,
+          e.billingCuit,
+          e.tutorName,
+          e.tutorEmail,
+          e.tutorPhone,
+          e.comments
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        const matchAllTerms = terms.every(t => corpus.includes(t));
+        if (!matchAllTerms) return false;
       }
 
       // 2. School Filter
@@ -1288,24 +1342,37 @@ export function AdminDashboard({
                   {/* Filter & Search Bar */}
                   <div className="bg-white border rounded-2xl p-4 sm:p-5 shadow-xs mb-6 space-y-4">
                     <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-                      {/* Search Bar */}
+                      {/* Search Bar con Lupita y Resaltado */}
                       <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-brand-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                          <Search className="w-4 h-4 text-emerald-600 font-bold" />
+                        </div>
                         <input
                           type="text"
                           value={enrollmentSearchQuery}
                           onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
-                          placeholder="Buscar por alumno, hermano/a, DNI, responsable, teléfono, email, curso..."
-                          className="w-full pl-10 pr-9 py-2 border rounded-xl text-xs sm:text-sm font-medium bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
+                          placeholder="Buscar por alumno, hermano/a, DNI, responsable, teléfono, email, curso, trámite..."
+                          className={cn(
+                            "w-full pl-10 pr-28 py-2.5 border rounded-xl text-xs sm:text-sm font-medium transition-all outline-none",
+                            enrollmentSearchQuery 
+                              ? "bg-amber-50/60 border-amber-300 ring-2 ring-amber-200/50 text-slate-900 shadow-xs" 
+                              : "bg-brand-gray/5 border-slate-200 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                          )}
                         />
-                        {enrollmentSearchQuery && (
-                          <button
-                            onClick={() => setEnrollmentSearchQuery("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-foreground/40 hover:text-brand-blue cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
+                        {enrollmentSearchQuery ? (
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md">
+                              {studentEntityViewMode === "students" ? filteredExtractedStudents.length : filteredEnrollments.length} {studentEntityViewMode === "students" ? "alumnos" : "trámites"}
+                            </span>
+                            <button
+                              onClick={() => setEnrollmentSearchQuery("")}
+                              className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-200 transition-colors cursor-pointer"
+                              title="Limpiar búsqueda"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Period Presets */}
@@ -1455,14 +1522,14 @@ export function AdminDashboard({
                               )}
                             >
                               <div>
-                                {/* Header Card */}
+                                 {/* Header Card */}
                                 <div className="flex justify-between items-start gap-2 mb-3">
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <span className={cn(
                                       "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
                                       isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                     )}>
-                                      {s.school}
+                                      <HighlightText text={s.school} highlight={enrollmentSearchQuery} />
                                     </span>
                                     {isSibling ? (
                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
@@ -1475,23 +1542,25 @@ export function AdminDashboard({
                                     )}
                                   </div>
                                   <span className="text-[10px] text-slate-400 font-semibold font-mono">
-                                    {s.trackingNumber}
+                                    <HighlightText text={s.trackingNumber} highlight={enrollmentSearchQuery} />
                                   </span>
                                 </div>
 
                                 {/* Student Info */}
                                 <div className="mb-3">
                                   <h4 className="font-extrabold text-slate-900 text-base leading-snug">
-                                    {s.studentName}
+                                    <HighlightText text={s.studentName} highlight={enrollmentSearchQuery} />
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-0.5 font-medium">
-                                    <span>DNI: {s.studentDni}</span>
+                                    <span>DNI: <HighlightText text={s.studentDni} highlight={enrollmentSearchQuery} /></span>
                                     <span>•</span>
-                                    <span className="font-bold text-emerald-700">{s.studentLevel} — {s.studentGrade}</span>
+                                    <span className="font-bold text-emerald-700">
+                                      <HighlightText text={`${s.studentLevel} — ${s.studentGrade}`} highlight={enrollmentSearchQuery} />
+                                    </span>
                                   </div>
                                   {isSibling && (
                                     <p className="text-[10px] text-amber-800 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
-                                      Vinculado a legajo de: <strong>{s.familyPrimaryStudent}</strong>
+                                      Vinculado a legajo de: <strong><HighlightText text={s.familyPrimaryStudent} highlight={enrollmentSearchQuery} /></strong>
                                     </p>
                                   )}
                                 </div>
@@ -1499,13 +1568,13 @@ export function AdminDashboard({
                                 {/* Responsible & Contact */}
                                 <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
                                   <p className="truncate">
-                                    <span className="font-bold text-slate-900">Resp. 1:</span> {s.parent1Name} ({s.parent1Relationship})
+                                    <span className="font-bold text-slate-900">Resp. 1:</span> <HighlightText text={s.parent1Name} highlight={enrollmentSearchQuery} /> ({s.parent1Relationship})
                                   </p>
                                   <p className="flex items-center gap-1.5 truncate text-slate-600">
-                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {s.parent1Email}
+                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> <HighlightText text={s.parent1Email} highlight={enrollmentSearchQuery} />
                                   </p>
                                   <p className="flex items-center gap-1.5 text-slate-600">
-                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {s.parent1Phone}
+                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> <HighlightText text={s.parent1Phone} highlight={enrollmentSearchQuery} />
                                   </p>
                                 </div>
 
@@ -1602,7 +1671,9 @@ export function AdminDashboard({
                                 <tr key={s.uniqueId} className={cn("border-b last:border-0 hover:bg-emerald-50/30 transition-colors", isSibling ? "bg-amber-50/20" : "")}>
                                   <td className="p-4 text-slate-500 whitespace-nowrap">
                                     <span className="font-semibold text-slate-800 block">{new Date(s.createdAt).toLocaleDateString()}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono">{s.trackingNumber}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      <HighlightText text={s.trackingNumber} highlight={enrollmentSearchQuery} />
+                                    </span>
                                   </td>
                                   <td className="p-4">
                                     {isSibling ? (
@@ -1616,24 +1687,38 @@ export function AdminDashboard({
                                     )}
                                   </td>
                                   <td className="p-4">
-                                    <span className="font-bold text-slate-900 block">{s.studentLevel}</span>
+                                    <span className="font-bold text-slate-900 block">
+                                      <HighlightText text={s.studentLevel} highlight={enrollmentSearchQuery} />
+                                    </span>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
-                                        {s.studentGrade}
+                                        <HighlightText text={s.studentGrade} highlight={enrollmentSearchQuery} />
                                       </span>
-                                      <span className="text-[10px] text-slate-400">({s.school})</span>
+                                      <span className="text-[10px] text-slate-400">
+                                        (<HighlightText text={s.school} highlight={enrollmentSearchQuery} />)
+                                      </span>
                                     </div>
                                   </td>
                                   <td className="p-4 font-bold text-brand-blue">
-                                    <div>{s.studentName}</div>
-                                    <div className="text-[10px] text-slate-400 font-normal">DNI: {s.studentDni}</div>
+                                    <div>
+                                      <HighlightText text={s.studentName} highlight={enrollmentSearchQuery} />
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-normal">
+                                      DNI: <HighlightText text={s.studentDni} highlight={enrollmentSearchQuery} />
+                                    </div>
                                     {isSibling && (
-                                      <div className="text-[10px] text-amber-700 font-normal">Titular: {s.familyPrimaryStudent}</div>
+                                      <div className="text-[10px] text-amber-700 font-normal">
+                                        Titular: <HighlightText text={s.familyPrimaryStudent} highlight={enrollmentSearchQuery} />
+                                      </div>
                                     )}
                                   </td>
                                   <td className="p-4">
-                                    <div className="font-semibold text-slate-800">{s.parent1Name}</div>
-                                    <div className="text-[11px] text-slate-500">{s.parent1Phone} • {s.parent1Email}</div>
+                                    <div className="font-semibold text-slate-800">
+                                      <HighlightText text={s.parent1Name} highlight={enrollmentSearchQuery} />
+                                    </div>
+                                    <div className="text-[11px] text-slate-500">
+                                      <HighlightText text={s.parent1Phone} highlight={enrollmentSearchQuery} /> • <HighlightText text={s.parent1Email} highlight={enrollmentSearchQuery} />
+                                    </div>
                                   </td>
                                   <td className="p-4">
                                     <span className={cn(
@@ -1731,7 +1816,7 @@ export function AdminDashboard({
                                       "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
                                       isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
                                     )}>
-                                      {e.school || "Escuela N.º 1030"}
+                                      <HighlightText text={e.school || "Escuela N.º 1030"} highlight={enrollmentSearchQuery} />
                                     </span>
                                   </label>
                                   <span className="text-[10px] text-brand-foreground/50 font-semibold">
@@ -1742,16 +1827,18 @@ export function AdminDashboard({
                                 {/* Student Info */}
                                 <div className="mb-3">
                                   <h4 className="font-extrabold text-brand-blue text-base leading-snug">
-                                    {e.studentName}
+                                    <HighlightText text={e.studentName} highlight={enrollmentSearchQuery} />
                                   </h4>
                                   <div className="flex flex-wrap items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
-                                    <span>DNI: {e.studentDni || "---"}</span>
+                                    <span>DNI: <HighlightText text={e.studentDni || "---"} highlight={enrollmentSearchQuery} /></span>
                                     <span>•</span>
-                                    <span className="font-bold text-emerald-700">{e.studentLevel || determineLevel(e.studentGrade, e.school)} — {e.studentGrade}</span>
+                                    <span className="font-bold text-emerald-700">
+                                      <HighlightText text={`${e.studentLevel || determineLevel(e.studentGrade, e.school)} — ${e.studentGrade}`} highlight={enrollmentSearchQuery} />
+                                    </span>
                                   </div>
                                   {e.hasSiblings && (
                                     <p className="text-[10px] text-amber-700 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
-                                      Hno/a: {e.siblingDetails || "Sí"}
+                                      Hno/a: <HighlightText text={e.siblingDetails || "Sí"} highlight={enrollmentSearchQuery} />
                                     </p>
                                   )}
                                 </div>
@@ -1759,13 +1846,13 @@ export function AdminDashboard({
                                 {/* Responsible & Contact */}
                                 <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
                                   <p className="truncate">
-                                    <span className="font-bold text-slate-900">Resp. 1:</span> {e.parent1Name || e.tutorName || "---"} ({e.parent1Relationship || "Tutor"})
+                                    <span className="font-bold text-slate-900">Resp. 1:</span> <HighlightText text={e.parent1Name || e.tutorName || "---"} highlight={enrollmentSearchQuery} /> ({e.parent1Relationship || "Tutor"})
                                   </p>
                                   <p className="flex items-center gap-1.5 truncate text-slate-600">
-                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.parent1Email || e.tutorEmail}
+                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> <HighlightText text={e.parent1Email || e.tutorEmail} highlight={enrollmentSearchQuery} />
                                   </p>
                                   <p className="flex items-center gap-1.5 text-slate-600">
-                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.parent1Phone || e.tutorPhone}
+                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> <HighlightText text={e.parent1Phone || e.tutorPhone} highlight={enrollmentSearchQuery} />
                                   </p>
                                 </div>
 
@@ -1877,24 +1964,38 @@ export function AdminDashboard({
                                   </td>
                                   <td className="p-4 text-slate-500 whitespace-nowrap">
                                     <span className="font-semibold text-slate-800 block">{new Date(e.createdAt).toLocaleDateString()}</span>
-                                    <span className="text-[10px] text-slate-400 font-mono">{e.trackingNumber || `FEE-${e.id.substring(0, 5)}`}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      <HighlightText text={e.trackingNumber || `FEE-${e.id.substring(0, 5)}`} highlight={enrollmentSearchQuery} />
+                                    </span>
                                   </td>
                                   <td className="p-4">
-                                    <span className="font-bold text-slate-900 block">{e.studentLevel || determineLevel(e.studentGrade, e.school)}</span>
+                                    <span className="font-bold text-slate-900 block">
+                                      <HighlightText text={e.studentLevel || determineLevel(e.studentGrade, e.school)} highlight={enrollmentSearchQuery} />
+                                    </span>
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
-                                        {e.studentGrade}
+                                        <HighlightText text={e.studentGrade} highlight={enrollmentSearchQuery} />
                                       </span>
-                                      <span className="text-[10px] text-slate-400">({e.school || "Escuela N.º 1030"})</span>
+                                      <span className="text-[10px] text-slate-400">
+                                        (<HighlightText text={e.school || "Escuela N.º 1030"} highlight={enrollmentSearchQuery} />)
+                                      </span>
                                     </div>
                                   </td>
                                   <td className="p-4 font-bold text-brand-blue">
-                                    <div>{e.studentName}</div>
-                                    <div className="text-[10px] text-slate-400 font-normal">DNI: {e.studentDni || "---"}</div>
+                                    <div>
+                                      <HighlightText text={e.studentName} highlight={enrollmentSearchQuery} />
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-normal">
+                                      DNI: <HighlightText text={e.studentDni || "---"} highlight={enrollmentSearchQuery} />
+                                    </div>
                                   </td>
                                   <td className="p-4">
-                                    <div className="font-semibold text-slate-800">{e.parent1Name || e.tutorName}</div>
-                                    <div className="text-[11px] text-slate-500">{e.parent1Phone || e.tutorPhone} • {e.parent1Email || e.tutorEmail}</div>
+                                    <div className="font-semibold text-slate-800">
+                                      <HighlightText text={e.parent1Name || e.tutorName} highlight={enrollmentSearchQuery} />
+                                    </div>
+                                    <div className="text-[11px] text-slate-500">
+                                      <HighlightText text={e.parent1Phone || e.tutorPhone} highlight={enrollmentSearchQuery} /> • <HighlightText text={e.parent1Email || e.tutorEmail} highlight={enrollmentSearchQuery} />
+                                    </div>
                                   </td>
                                   <td className="p-4">
                                     <span className={cn(
