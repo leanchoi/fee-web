@@ -69,7 +69,8 @@ import {
   ExternalLink
 } from "lucide-react";
 import JSZip from "jszip";
-import { generateContractPdf, downloadFilledContract, determineLevel, getContractFilename } from "@/lib/contractGenerator";
+import { generateContractPdf, downloadFilledContract, determineLevel, determineSchool, getContractFilename } from "@/lib/contractGenerator";
+import { extractAllStudents, extractStudentsFromEnrollment, ExtractedStudent } from "@/lib/studentExtractor";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -256,9 +257,81 @@ export function AdminDashboard({
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [enrollmentViewMode, setEnrollmentViewMode] = useState<"cards" | "table">("cards");
+  const [studentEntityViewMode, setStudentEntityViewMode] = useState<"students" | "forms">("students");
   const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
   const [isZipping, setIsZipping] = useState(false);
   const [inspectingEnrollment, setInspectingEnrollment] = useState<any | null>(null);
+
+  // Desglose de todos los alumnos individuales (Titulares + Hermanos)
+  const allExtractedStudents = useMemo(() => {
+    return extractAllStudents(reinscripcionesList);
+  }, [reinscripcionesList]);
+
+  const filteredExtractedStudents = useMemo(() => {
+    return allExtractedStudents.filter((s: ExtractedStudent) => {
+      // 1. Search Query
+      if (enrollmentSearchQuery.trim()) {
+        const q = enrollmentSearchQuery.toLowerCase();
+        const matchName = (s.studentName || "").toLowerCase().includes(q);
+        const matchDni = (s.studentDni || "").toLowerCase().includes(q);
+        const matchTutor = (s.parent1Name || "").toLowerCase().includes(q);
+        const matchEmail = (s.parent1Email || "").toLowerCase().includes(q);
+        const matchPhone = (s.parent1Phone || "").toLowerCase().includes(q);
+        const matchGrade = (s.studentGrade || "").toLowerCase().includes(q);
+        const matchSchool = (s.school || "").toLowerCase().includes(q);
+        const matchTracking = (s.trackingNumber || "").toLowerCase().includes(q);
+        if (!matchName && !matchDni && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchSchool && !matchTracking) {
+          return false;
+        }
+      }
+
+      // 2. School Filter
+      if (enrollmentSchoolFilter !== "all") {
+        const sch = s.school.toLowerCase();
+        if (enrollmentSchoolFilter === "Escuela N.º 1030" && !sch.includes("1030")) return false;
+        if (enrollmentSchoolFilter === "Escuela N.º 1739" && !sch.includes("1739")) return false;
+      }
+
+      // 3. Level Filter
+      if (enrollmentLevelFilter !== "all") {
+        const lvl = s.studentLevel.toLowerCase();
+        if (!lvl.includes(enrollmentLevelFilter)) return false;
+      }
+
+      // 4. Date Preset Filter
+      const itemDate = new Date(s.createdAt);
+      const now = new Date();
+      if (enrollmentDatePreset === "today") {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        if (itemDate < startOfToday || itemDate > endOfToday) return false;
+      } else if (enrollmentDatePreset === "yesterday") {
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+        const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+        if (itemDate < startOfYesterday || itemDate > endOfYesterday) return false;
+      } else if (enrollmentDatePreset === "7days") {
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        if (itemDate < sevenDaysAgo) return false;
+      } else if (enrollmentDatePreset === "30days") {
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        if (itemDate < thirtyDaysAgo) return false;
+      } else if (enrollmentDatePreset === "thisYear") {
+        const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        if (itemDate < startOfYear) return false;
+      } else if (enrollmentDatePreset === "custom") {
+        if (customStartDate) {
+          const sDate = new Date(customStartDate + "T00:00:00");
+          if (itemDate < sDate) return false;
+        }
+        if (customEndDate) {
+          const eDate = new Date(customEndDate + "T23:59:59");
+          if (itemDate > eDate) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [allExtractedStudents, enrollmentSearchQuery, enrollmentSchoolFilter, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
 
   const filteredEnrollments = useMemo(() => {
     return reinscripcionesList.filter((e: any) => {
@@ -457,35 +530,33 @@ export function AdminDashboard({
   };
 
   const handleExportCsv = () => {
-    if (filteredEnrollments.length === 0) return;
+    const exportData = filteredExtractedStudents;
+    if (exportData.length === 0) return;
     const headers = [
-      "ID",
+      "ID Trámite",
       "N.° Trámite",
-      "Fecha",
-      "Escuela",
-      "Nivel",
+      "Tipo de Alumno",
+      "Fecha Solicitud",
+      "Nivel Educativo",
       "Sala/Grado/Año",
-      "Aspirante",
-      "DNI Aspirante",
-      "Hermanos",
-      "Detalle Hermanos",
+      "Escuela",
+      "Nombre y Apellido Alumno",
+      "DNI Alumno",
+      "Hermanos en Familia",
+      "Alumno Titular del Trámite",
       "Responsable 1",
       "DNI Resp 1",
       "Vínculo Resp 1",
       "Teléfono Resp 1",
       "Email Resp 1",
-      "Domicilio Resp 1",
-      "Ciudad Resp 1",
-      "CP Resp 1",
+      "Domicilio",
+      "Ciudad",
+      "Código Postal",
       "Único Responsable",
       "Responsable 2",
       "DNI Resp 2",
-      "Vínculo Resp 2",
-      "Teléfono Resp 2",
-      "Email Resp 2",
-      "Domicilio Resp 2",
       "Facturación Titular",
-      "Facturación CUIT",
+      "Facturación CUIT/DNI",
       "Facturación Condición",
       "Facturación Email",
       "Facturación Domicilio",
@@ -494,44 +565,38 @@ export function AdminDashboard({
       "Firma 2 Registrada"
     ];
 
-    const rows = filteredEnrollments.map((e: any) => {
-      const calculatedLevel = e.studentLevel || determineLevel(e.studentGrade, e.school);
-      return [
-        e.id,
-        e.trackingNumber || `FEE-2027-${e.id.substring(0, 5)}`,
-        new Date(e.createdAt).toLocaleDateString() + " " + new Date(e.createdAt).toLocaleTimeString(),
-        e.school || "Escuela N.º 1030",
-        calculatedLevel,
-        e.studentGrade || "-",
-        e.studentName || "-",
-        e.studentDni || "-",
-        e.hasSiblings ? "SÍ" : "NO",
-        e.siblingDetails || "-",
-        e.parent1Name || e.tutorName || "-",
-        e.parent1Dni || "-",
-        e.parent1Relationship || "Madre/Padre/Tutor",
-        e.parent1Phone || e.tutorPhone || "-",
-        e.parent1Email || e.tutorEmail || "-",
-        e.parent1Address || "-",
-        e.parent1City || "Esquel",
-        e.parent1PostalCode || "9200",
-        e.isSingleParent ? "SÍ" : "NO",
-        e.parent2Name || "-",
-        e.parent2Dni || "-",
-        e.parent2Relationship || "-",
-        e.parent2Phone || "-",
-        e.parent2Email || "-",
-        e.parent2Address || "-",
-        e.billingName || e.parent1Name || e.tutorName || "-",
-        e.billingCuit || e.parent1Dni || "-",
-        e.billingTaxCondition || "Consumidor Final",
-        e.billingEmail || e.parent1Email || e.tutorEmail || "-",
-        e.billingAddress || e.parent1Address || "-",
-        e.status || "PENDING",
-        e.signature1Data ? "SÍ" : "NO",
-        e.signature2Data ? "SÍ" : (e.isSingleParent ? "N/A" : "NO")
-      ];
-    });
+    const rows = exportData.map((s: ExtractedStudent) => [
+      s.enrollmentId,
+      s.trackingNumber,
+      s.studentType,
+      new Date(s.createdAt).toLocaleDateString() + " " + new Date(s.createdAt).toLocaleTimeString(),
+      s.studentLevel,
+      s.studentGrade,
+      s.school,
+      s.studentName,
+      s.studentDni,
+      s.hasSiblings ? `SÍ (${s.totalSiblingsInFamily} alumnos en total)` : "NO",
+      s.familyPrimaryStudent,
+      s.parent1Name,
+      s.parent1Dni,
+      s.parent1Relationship,
+      s.parent1Phone,
+      s.parent1Email,
+      s.parent1Address,
+      s.parent1City,
+      s.parent1PostalCode,
+      s.isSingleParent ? "SÍ" : "NO",
+      s.parent2Name || "-",
+      s.parent2Dni || "-",
+      s.billingName,
+      s.billingCuit,
+      s.billingTaxCondition,
+      s.billingEmail,
+      s.billingAddress,
+      s.status,
+      s.signature1Data ? "SÍ" : "NO",
+      s.signature2Data ? "SÍ" : (s.isSingleParent ? "N/A" : "NO")
+    ]);
 
     const csvContent = "\uFEFF" + [
       headers.map(h => `"${h}"`).join(";"),
@@ -983,10 +1048,11 @@ export function AdminDashboard({
 
             {/* Quick Metrics KPI Banner */}
             {(() => {
-              const totalAll = reinscripcionesList.length;
-              const inicialCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Inicial").length;
-              const primarioCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Primario").length;
-              const secundarioCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Secundario").length;
+              const totalStudentsCount = allExtractedStudents.length;
+              const totalFormsCount = reinscripcionesList.length;
+              const inicialCount = allExtractedStudents.filter((s: ExtractedStudent) => s.studentLevel === "Nivel Inicial").length;
+              const primarioCount = allExtractedStudents.filter((s: ExtractedStudent) => s.studentLevel === "Nivel Primario").length;
+              const secundarioCount = allExtractedStudents.filter((s: ExtractedStudent) => s.studentLevel === "Nivel Secundario").length;
 
               return (
                 <>
@@ -1001,11 +1067,14 @@ export function AdminDashboard({
                         enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "bg-slate-900 text-white shadow-md scale-[1.01] border-slate-900" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white/80" : "text-slate-600")}>
-                        Total General
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-0.5", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white/80" : "text-slate-600")}>
+                        Total Estudiantes
                       </span>
                       <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white" : "text-slate-900")}>
-                        {totalAll}
+                        {totalStudentsCount}
+                      </span>
+                      <span className={cn("text-[10px] block mt-0.5 font-medium", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white/70" : "text-slate-500")}>
+                        {totalFormsCount} trámites familiares
                       </span>
                     </button>
 
@@ -1019,11 +1088,14 @@ export function AdminDashboard({
                         enrollmentLevelFilter === "inicial" ? "bg-teal-700 text-white shadow-md scale-[1.01] border-teal-700" : "bg-teal-50/70 border-teal-200 hover:bg-teal-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "inicial" ? "text-white/80" : "text-teal-800")}>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-0.5", enrollmentLevelFilter === "inicial" ? "text-white/80" : "text-teal-800")}>
                         Nivel Inicial (Jardín)
                       </span>
                       <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "inicial" ? "text-white" : "text-teal-800")}>
                         {inicialCount}
+                      </span>
+                      <span className={cn("text-[10px] block mt-0.5 font-medium", enrollmentLevelFilter === "inicial" ? "text-white/70" : "text-teal-700")}>
+                        Alumnos matriculados
                       </span>
                     </button>
 
@@ -1037,11 +1109,14 @@ export function AdminDashboard({
                         enrollmentLevelFilter === "primario" ? "bg-emerald-700 text-white shadow-md scale-[1.01] border-emerald-700" : "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "primario" ? "text-white/80" : "text-emerald-800")}>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-0.5", enrollmentLevelFilter === "primario" ? "text-white/80" : "text-emerald-800")}>
                         Nivel Primario (Esc. 1030)
                       </span>
                       <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "primario" ? "text-white" : "text-emerald-800")}>
                         {primarioCount}
+                      </span>
+                      <span className={cn("text-[10px] block mt-0.5 font-medium", enrollmentLevelFilter === "primario" ? "text-white/70" : "text-emerald-700")}>
+                        Alumnos matriculados
                       </span>
                     </button>
 
@@ -1055,11 +1130,14 @@ export function AdminDashboard({
                         enrollmentLevelFilter === "secundario" ? "bg-blue-800 text-white shadow-md scale-[1.01] border-blue-800" : "bg-blue-50/70 border-blue-200 hover:bg-blue-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "secundario" ? "text-white/80" : "text-blue-900")}>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-0.5", enrollmentLevelFilter === "secundario" ? "text-white/80" : "text-blue-900")}>
                         Nivel Secundario (Esc. 1739)
                       </span>
                       <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "secundario" ? "text-white" : "text-blue-900")}>
                         {secundarioCount}
+                      </span>
+                      <span className={cn("text-[10px] block mt-0.5 font-medium", enrollmentLevelFilter === "secundario" ? "text-white/70" : "text-blue-700")}>
+                        Alumnos matriculados
                       </span>
                     </button>
                   </div>
@@ -1074,7 +1152,7 @@ export function AdminDashboard({
                           type="text"
                           value={enrollmentSearchQuery}
                           onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
-                          placeholder="Buscar por aspirante, DNI, responsable, teléfono, email, curso..."
+                          placeholder="Buscar por alumno, hermano/a, DNI, responsable, teléfono, email, curso..."
                           className="w-full pl-10 pr-9 py-2 border rounded-xl text-xs sm:text-sm font-medium bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
                         />
                         {enrollmentSearchQuery && (
@@ -1098,18 +1176,18 @@ export function AdminDashboard({
                           { key: "yesterday", label: "Ayer" },
                           { key: "7days", label: "7 Días" },
                           { key: "30days", label: "Último Mes" },
-                          { key: "thisYear", label: "Este Año" },
-                          { key: "custom", label: "Personalizado 📅" },
+                          { key: "thisYear", label: "2027" },
+                          { key: "custom", label: "Personalizado" },
                         ].map((preset) => (
                           <button
                             key={preset.key}
                             type="button"
                             onClick={() => setEnrollmentDatePreset(preset.key as any)}
                             className={cn(
-                              "text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer",
+                              "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer",
                               enrollmentDatePreset === preset.key
-                                ? "bg-brand-blue text-white shadow-xs"
-                                : "bg-brand-gray/10 hover:bg-brand-gray/20 text-brand-foreground/70"
+                                ? "bg-slate-900 text-white shadow-2xs"
+                                : "bg-brand-gray/10 text-brand-foreground/70 hover:bg-brand-gray/20"
                             )}
                           >
                             {preset.label}
@@ -1118,45 +1196,63 @@ export function AdminDashboard({
                       </div>
                     </div>
 
-                    {/* Custom Date Range Selector (if selected) */}
+                    {/* Custom Date Range Picker */}
                     {enrollmentDatePreset === "custom" && (
-                      <div className="pt-3 border-t flex flex-wrap items-center gap-3 text-xs font-bold text-brand-blue bg-brand-blue/5 p-3 rounded-xl">
-                        <span>Filtrar fechas:</span>
+                      <div className="flex flex-wrap items-center gap-3 p-3 bg-brand-gray/5 rounded-xl border text-xs animate-in fade-in duration-200">
+                        <span className="font-bold text-brand-blue">Rango de fechas:</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-normal text-brand-foreground/70">Desde:</span>
+                          <label className="text-brand-foreground/60">Desde:</label>
                           <input
                             type="date"
                             value={customStartDate}
                             onChange={(e) => setCustomStartDate(e.target.value)}
-                            className="px-2.5 py-1 border rounded-lg bg-white text-xs"
+                            className="px-2.5 py-1 border rounded-lg bg-white outline-none focus:ring-1 focus:ring-brand-blue"
                           />
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-normal text-brand-foreground/70">Hasta:</span>
+                          <label className="text-brand-foreground/60">Hasta:</label>
                           <input
                             type="date"
                             value={customEndDate}
                             onChange={(e) => setCustomEndDate(e.target.value)}
-                            className="px-2.5 py-1 border rounded-lg bg-white text-xs"
+                            className="px-2.5 py-1 border rounded-lg bg-white outline-none focus:ring-1 focus:ring-brand-blue"
                           />
                         </div>
-                        {(customStartDate || customEndDate) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCustomStartDate("");
-                              setCustomEndDate("");
-                            }}
-                            className="text-[11px] text-red-500 hover:underline ml-auto cursor-pointer"
-                          >
-                            Limpiar fechas
-                          </button>
-                        )}
                       </div>
                     )}
 
-                    {/* Active Filters & Multi-Select Status */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs">
+                    {/* Active Filters, Mode Switcher & Multi-Select Status */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t text-xs">
+                      {/* Switcher: Alumnos Individuales vs Trámites Familiares */}
+                      <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => setStudentEntityViewMode("students")}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                            studentEntityViewMode === "students" 
+                              ? "bg-white text-slate-900 shadow-2xs font-extrabold" 
+                              : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          <Users className="w-3.5 h-3.5 text-emerald-600" />
+                          Alumnos Individuales ({filteredExtractedStudents.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStudentEntityViewMode("forms")}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                            studentEntityViewMode === "forms" 
+                              ? "bg-white text-slate-900 shadow-2xs font-extrabold" 
+                              : "text-slate-600 hover:text-slate-900"
+                          )}
+                        >
+                          <FileText className="w-3.5 h-3.5 text-blue-600" />
+                          Trámites / Contratos ({filteredEnrollments.length})
+                        </button>
+                      </div>
+
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
@@ -1175,7 +1271,7 @@ export function AdminDashboard({
                         </button>
                         <span className="text-brand-foreground/60">|</span>
                         <span className="text-brand-foreground/70 font-semibold">
-                          Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {reinscripcionesList.length} reinscripciones
+                          Total en vista: <strong className="text-brand-blue">{filteredExtractedStudents.length}</strong> alumnos ({filteredEnrollments.length} formularios)
                         </span>
                       </div>
 
@@ -1199,230 +1295,466 @@ export function AdminDashboard({
                   </div>
 
                   {/* Render Cards or Table */}
-                  {enrollmentViewMode === "cards" ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                      {filteredEnrollments.map((e: any) => {
-                        const isSelected = selectedEnrollmentIds.includes(e.id);
-                        const isEsc1739 = (e.school || "").includes("1739");
+                  {studentEntityViewMode === "students" ? (
+                    // VISTA 1: ALUMNOS INDIVIDUALES (TITULARES + HERMANOS DESGLOSADOS)
+                    enrollmentViewMode === "cards" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                        {filteredExtractedStudents.map((s: ExtractedStudent) => {
+                          const isEsc1739 = s.school.includes("1739");
+                          const isSibling = s.studentType !== "Titular";
 
-                        return (
-                          <div 
-                            key={e.id} 
-                            className={cn(
-                              "bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative",
-                              isSelected ? "ring-2 ring-emerald-500 border-emerald-300 bg-emerald-50/20" : ""
-                            )}
-                          >
-                            <div>
-                              {/* Header Card */}
-                              <div className="flex justify-between items-start gap-3 mb-3">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleSelectEnrollment(e.id)}
-                                    className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                                  />
-                                  <span className={cn(
-                                    "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
-                                    isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                  )}>
-                                    {e.school || "Escuela N.º 1030"}
+                          return (
+                            <div 
+                              key={s.uniqueId} 
+                              className={cn(
+                                "bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative",
+                                isSibling ? "border-amber-200 bg-amber-50/10" : ""
+                              )}
+                            >
+                              <div>
+                                {/* Header Card */}
+                                <div className="flex justify-between items-start gap-2 mb-3">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className={cn(
+                                      "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
+                                      isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    )}>
+                                      {s.school}
+                                    </span>
+                                    {isSibling ? (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                        Hermano/a
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                                        Titular
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-semibold font-mono">
+                                    {s.trackingNumber}
                                   </span>
-                                </label>
-                                <span className="text-[10px] text-brand-foreground/50 font-semibold">
-                                  {new Date(e.createdAt).toLocaleDateString()}
-                                </span>
-                              </div>
-
-                              {/* Student Info */}
-                              <div className="mb-3">
-                                <h4 className="font-extrabold text-brand-blue text-base leading-snug">
-                                  {e.studentName}
-                                </h4>
-                                <div className="flex flex-wrap items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
-                                  <span>DNI: {e.studentDni || "---"}</span>
-                                  <span>•</span>
-                                  <span className="font-bold text-emerald-700">{e.studentLevel || determineLevel(e.studentGrade, e.school)} — {e.studentGrade}</span>
                                 </div>
-                                {e.hasSiblings && (
-                                  <p className="text-[10px] text-amber-700 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
-                                    Hno/a: {e.siblingDetails || "Sí"}
+
+                                {/* Student Info */}
+                                <div className="mb-3">
+                                  <h4 className="font-extrabold text-slate-900 text-base leading-snug">
+                                    {s.studentName}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-0.5 font-medium">
+                                    <span>DNI: {s.studentDni}</span>
+                                    <span>•</span>
+                                    <span className="font-bold text-emerald-700">{s.studentLevel} — {s.studentGrade}</span>
+                                  </div>
+                                  {isSibling && (
+                                    <p className="text-[10px] text-amber-800 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
+                                      Vinculado a legajo de: <strong>{s.familyPrimaryStudent}</strong>
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Responsible & Contact */}
+                                <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
+                                  <p className="truncate">
+                                    <span className="font-bold text-slate-900">Resp. 1:</span> {s.parent1Name} ({s.parent1Relationship})
                                   </p>
-                                )}
+                                  <p className="flex items-center gap-1.5 truncate text-slate-600">
+                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {s.parent1Email}
+                                  </p>
+                                  <p className="flex items-center gap-1.5 text-slate-600">
+                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {s.parent1Phone}
+                                  </p>
+                                </div>
+
+                                {/* Signatures indicator */}
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-200/60 mb-3">
+                                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                  <span>Firma Digital 1: {s.signature1Data ? "✓ Registrada" : "Pendiente"}</span>
+                                  {s.isSingleParent ? (
+                                    <span className="text-amber-700 ml-auto">(Único Resp.)</span>
+                                  ) : (
+                                    <span className="ml-auto">F2: {s.signature2Data ? "✓" : "---"}</span>
+                                  )}
+                                </div>
                               </div>
 
-                              {/* Responsible & Contact */}
-                              <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
-                                <p className="truncate">
-                                  <span className="font-bold text-slate-900">Resp. 1:</span> {e.parent1Name || e.tutorName || "---"} ({e.parent1Relationship || "Tutor"})
-                                </p>
-                                <p className="flex items-center gap-1.5 truncate text-slate-600">
-                                  <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.parent1Email || e.tutorEmail}
-                                </p>
-                                <p className="flex items-center gap-1.5 text-slate-600">
-                                  <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.parent1Phone || e.tutorPhone}
-                                </p>
-                              </div>
-
-                              {/* Signatures indicator */}
-                              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-200/60 mb-3">
-                                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                                <span>Firma Digital 1: {e.signature1Data ? "✓ Registrada" : "Pendiente"}</span>
-                                {e.isSingleParent ? (
-                                  <span className="text-amber-700 ml-auto">(Único Resp.)</span>
-                                ) : (
-                                  <span className="ml-auto">F2: {e.signature2Data ? "✓" : "---"}</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Card Footer Actions */}
-                            <div className="border-t pt-3 space-y-2">
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadSinglePdf(e)}
-                                className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                              >
-                                <Download className="w-3.5 h-3.5" /> Descargar Contrato (PDF)
-                              </button>
-
-                              <div className="flex items-center gap-2">
+                              {/* Card Footer Actions */}
+                              <div className="border-t pt-3 space-y-2">
                                 <button
                                   type="button"
-                                  onClick={() => setInspectingEnrollment(e)}
-                                  className="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
+                                  onClick={() => handleDownloadSinglePdf(s.rawEnrollment)}
+                                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                                 >
-                                  Ver Ficha
+                                  <Download className="w-3.5 h-3.5" /> Descargar Contrato Familiar (PDF)
                                 </button>
-                                <a 
-                                  href={`mailto:${e.parent1Email || e.tutorEmail}`} 
-                                  className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
-                                  title="Enviar correo"
-                                >
-                                  <Mail className="w-4 h-4" />
-                                </a>
-                                <button 
-                                  onClick={() => handleDeleteEnrollment(e.id)} 
-                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
-                                  title="Eliminar inscripción"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
 
-                      {filteredEnrollments.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
-                          No se encontraron reinscripciones con los filtros seleccionados.
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-2xl border mb-8 shadow-xs bg-white">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 text-slate-700 text-xs border-b">
-                            <th className="p-4 w-10">
-                              <input
-                                type="checkbox"
-                                checked={selectedEnrollmentIds.length === filteredEnrollments.length && filteredEnrollments.length > 0}
-                                onChange={handleSelectAllEnrollments}
-                                className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                              />
-                            </th>
-                            <th className="p-4 font-bold">Fecha / N.°</th>
-                            <th className="p-4 font-bold">Escuela & Curso</th>
-                            <th className="p-4 font-bold">Aspirante</th>
-                            <th className="p-4 font-bold">Responsable Principal</th>
-                            <th className="p-4 font-bold">Firmas</th>
-                            <th className="p-4 font-bold text-right">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-xs">
-                          {filteredEnrollments.map((e: any) => {
-                            const isSelected = selectedEnrollmentIds.includes(e.id);
-                            return (
-                              <tr key={e.id} className={cn("border-b last:border-0 hover:bg-emerald-50/30 transition-colors", isSelected ? "bg-emerald-50/40" : "")}>
-                                <td className="p-4">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleToggleSelectEnrollment(e.id)}
-                                    className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                                  />
-                                </td>
-                                <td className="p-4 text-slate-500 whitespace-nowrap">
-                                  <span className="font-semibold text-slate-800 block">{new Date(e.createdAt).toLocaleDateString()}</span>
-                                  <span className="text-[10px] text-slate-400 font-mono">{e.trackingNumber || `FEE-${e.id.substring(0, 5)}`}</span>
-                                </td>
-                                <td className="p-4">
-                                  <span className="font-bold text-slate-900 block">{e.studentLevel || determineLevel(e.studentGrade, e.school)}</span>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
-                                      {e.studentGrade}
-                                    </span>
-                                    <span className="text-[10px] text-slate-400">({e.school || "Escuela N.º 1030"})</span>
-                                  </div>
-                                </td>
-                                <td className="p-4 font-bold text-brand-blue">
-                                  <div>{e.studentName}</div>
-                                  <div className="text-[10px] text-slate-400 font-normal">DNI: {e.studentDni || "---"}</div>
-                                </td>
-                                <td className="p-4">
-                                  <div className="font-semibold text-slate-800">{e.parent1Name || e.tutorName}</div>
-                                  <div className="text-[11px] text-slate-500">{e.parent1Phone || e.tutorPhone} • {e.parent1Email || e.tutorEmail}</div>
-                                </td>
-                                <td className="p-4">
-                                  <span className={cn(
-                                    "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
-                                    e.signature1Data ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
-                                  )}>
-                                    <ShieldCheck className="w-3 h-3" />
-                                    {e.signature1Data ? "Firmado" : "Pendiente"}
-                                  </span>
-                                </td>
-                                <td className="p-4 text-right whitespace-nowrap space-x-1">
+                                <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => handleDownloadSinglePdf(e)}
-                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer inline-flex"
-                                    title="Descargar Contrato Firmado (PDF)"
+                                    onClick={() => setInspectingEnrollment(s.rawEnrollment)}
+                                    className="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
                                   >
-                                    <Download className="w-3.5 h-3.5" />
+                                    Ver Ficha Familiar
                                   </button>
+                                  <a 
+                                    href={`mailto:${s.parent1Email}`} 
+                                    className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
+                                    title="Enviar correo"
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </a>
+                                  <button 
+                                    onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
+                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
+                                    title="Eliminar inscripción"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {filteredExtractedStudents.length === 0 && (
+                          <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
+                            No se encontraron alumnos con los filtros seleccionados.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border mb-8 shadow-xs bg-white">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-700 text-xs border-b">
+                              <th className="p-4 font-bold">Fecha / N.°</th>
+                              <th className="p-4 font-bold">Tipo</th>
+                              <th className="p-4 font-bold">Nivel & Curso</th>
+                              <th className="p-4 font-bold">Alumno / Hermano</th>
+                              <th className="p-4 font-bold">Responsable Principal</th>
+                              <th className="p-4 font-bold">Firmas</th>
+                              <th className="p-4 font-bold text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {filteredExtractedStudents.map((s: ExtractedStudent) => {
+                              const isSibling = s.studentType !== "Titular";
+                              return (
+                                <tr key={s.uniqueId} className={cn("border-b last:border-0 hover:bg-emerald-50/30 transition-colors", isSibling ? "bg-amber-50/20" : "")}>
+                                  <td className="p-4 text-slate-500 whitespace-nowrap">
+                                    <span className="font-semibold text-slate-800 block">{new Date(s.createdAt).toLocaleDateString()}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">{s.trackingNumber}</span>
+                                  </td>
+                                  <td className="p-4">
+                                    {isSibling ? (
+                                      <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md font-bold text-[10px] inline-block border border-amber-300">
+                                        Hermano/a
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-semibold text-[10px] inline-block border border-slate-200">
+                                        Titular
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-4">
+                                    <span className="font-bold text-slate-900 block">{s.studentLevel}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
+                                        {s.studentGrade}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">({s.school})</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-4 font-bold text-brand-blue">
+                                    <div>{s.studentName}</div>
+                                    <div className="text-[10px] text-slate-400 font-normal">DNI: {s.studentDni}</div>
+                                    {isSibling && (
+                                      <div className="text-[10px] text-amber-700 font-normal">Titular: {s.familyPrimaryStudent}</div>
+                                    )}
+                                  </td>
+                                  <td className="p-4">
+                                    <div className="font-semibold text-slate-800">{s.parent1Name}</div>
+                                    <div className="text-[11px] text-slate-500">{s.parent1Phone} • {s.parent1Email}</div>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                                      s.signature1Data ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                                    )}>
+                                      <ShieldCheck className="w-3 h-3" />
+                                      {s.signature1Data ? "Firmado" : "Pendiente"}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadSinglePdf(s.rawEnrollment)}
+                                        className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer"
+                                        title="Descargar Contrato Familiar PDF"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setInspectingEnrollment(s.rawEnrollment)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                                        title="Ver Ficha Familiar"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
+                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                        title="Eliminar registro"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {filteredExtractedStudents.length === 0 && (
+                              <tr>
+                                <td colSpan={7} className="p-8 text-center text-slate-400">
+                                  No se encontraron alumnos con los filtros seleccionados.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  ) : (
+                    // VISTA 2: TRÁMITES / FORMULARIOS FAMILIARES (1 POR FORMULARIO)
+                    enrollmentViewMode === "cards" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                        {filteredEnrollments.map((e: any) => {
+                          const isSelected = selectedEnrollmentIds.includes(e.id);
+                          const isEsc1739 = (e.school || "").includes("1739");
+
+                          return (
+                            <div 
+                              key={e.id} 
+                              className={cn(
+                                "bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative",
+                                isSelected ? "ring-2 ring-emerald-500 border-emerald-300 bg-emerald-50/20" : ""
+                              )}
+                            >
+                              <div>
+                                {/* Header Card */}
+                                <div className="flex justify-between items-start gap-3 mb-3">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggleSelectEnrollment(e.id)}
+                                      className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                    <span className={cn(
+                                      "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
+                                      isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    )}>
+                                      {e.school || "Escuela N.º 1030"}
+                                    </span>
+                                  </label>
+                                  <span className="text-[10px] text-brand-foreground/50 font-semibold">
+                                    {new Date(e.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+
+                                {/* Student Info */}
+                                <div className="mb-3">
+                                  <h4 className="font-extrabold text-brand-blue text-base leading-snug">
+                                    {e.studentName}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
+                                    <span>DNI: {e.studentDni || "---"}</span>
+                                    <span>•</span>
+                                    <span className="font-bold text-emerald-700">{e.studentLevel || determineLevel(e.studentGrade, e.school)} — {e.studentGrade}</span>
+                                  </div>
+                                  {e.hasSiblings && (
+                                    <p className="text-[10px] text-amber-700 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
+                                      Hno/a: {e.siblingDetails || "Sí"}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Responsible & Contact */}
+                                <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
+                                  <p className="truncate">
+                                    <span className="font-bold text-slate-900">Resp. 1:</span> {e.parent1Name || e.tutorName || "---"} ({e.parent1Relationship || "Tutor"})
+                                  </p>
+                                  <p className="flex items-center gap-1.5 truncate text-slate-600">
+                                    <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.parent1Email || e.tutorEmail}
+                                  </p>
+                                  <p className="flex items-center gap-1.5 text-slate-600">
+                                    <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.parent1Phone || e.tutorPhone}
+                                  </p>
+                                </div>
+
+                                {/* Signatures indicator */}
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-200/60 mb-3">
+                                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                  <span>Firma Digital 1: {e.signature1Data ? "✓ Registrada" : "Pendiente"}</span>
+                                  {e.isSingleParent ? (
+                                    <span className="text-amber-700 ml-auto">(Único Resp.)</span>
+                                  ) : (
+                                    <span className="ml-auto">F2: {e.signature2Data ? "✓" : "---"}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Card Footer Actions */}
+                              <div className="border-t pt-3 space-y-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadSinglePdf(e)}
+                                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> Descargar Contrato (PDF)
+                                </button>
+
+                                <div className="flex items-center gap-2">
                                   <button
                                     type="button"
                                     onClick={() => setInspectingEnrollment(e)}
-                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer inline-flex"
-                                    title="Ver Ficha y Firmas"
+                                    className="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
                                   >
-                                    <Eye className="w-3.5 h-3.5" />
+                                    Ver Ficha
                                   </button>
+                                  <a 
+                                    href={`mailto:${e.parent1Email || e.tutorEmail}`} 
+                                    className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
+                                    title="Enviar correo"
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </a>
                                   <button 
                                     onClick={() => handleDeleteEnrollment(e.id)} 
-                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex" 
+                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
                                     title="Eliminar inscripción"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {filteredEnrollments.length === 0 && (
+                          <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
+                            No se encontraron reinscripciones con los filtros seleccionados.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border mb-8 shadow-xs bg-white">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-700 text-xs border-b">
+                              <th className="p-4 w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedEnrollmentIds.length === filteredEnrollments.length && filteredEnrollments.length > 0}
+                                  onChange={handleSelectAllEnrollments}
+                                  className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                />
+                              </th>
+                              <th className="p-4 font-bold">Fecha / N.°</th>
+                              <th className="p-4 font-bold">Escuela & Curso</th>
+                              <th className="p-4 font-bold">Aspirante</th>
+                              <th className="p-4 font-bold">Responsable Principal</th>
+                              <th className="p-4 font-bold">Firmas</th>
+                              <th className="p-4 font-bold text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {filteredEnrollments.map((e: any) => {
+                              const isSelected = selectedEnrollmentIds.includes(e.id);
+                              return (
+                                <tr key={e.id} className={cn("border-b last:border-0 hover:bg-emerald-50/30 transition-colors", isSelected ? "bg-emerald-50/40" : "")}>
+                                  <td className="p-4">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleToggleSelectEnrollment(e.id)}
+                                      className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="p-4 text-slate-500 whitespace-nowrap">
+                                    <span className="font-semibold text-slate-800 block">{new Date(e.createdAt).toLocaleDateString()}</span>
+                                    <span className="text-[10px] text-slate-400 font-mono">{e.trackingNumber || `FEE-${e.id.substring(0, 5)}`}</span>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className="font-bold text-slate-900 block">{e.studentLevel || determineLevel(e.studentGrade, e.school)}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
+                                        {e.studentGrade}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">({e.school || "Escuela N.º 1030"})</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-4 font-bold text-brand-blue">
+                                    <div>{e.studentName}</div>
+                                    <div className="text-[10px] text-slate-400 font-normal">DNI: {e.studentDni || "---"}</div>
+                                  </td>
+                                  <td className="p-4">
+                                    <div className="font-semibold text-slate-800">{e.parent1Name || e.tutorName}</div>
+                                    <div className="text-[11px] text-slate-500">{e.parent1Phone || e.tutorPhone} • {e.parent1Email || e.tutorEmail}</div>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                                      e.signature1Data ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                                    )}>
+                                      <ShieldCheck className="w-3 h-3" />
+                                      {e.signature1Data ? "Firmado" : "Pendiente"}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadSinglePdf(e)}
+                                        className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer"
+                                        title="Descargar Contrato PDF"
+                                      >
+                                        <Download className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setInspectingEnrollment(e)}
+                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                                        title="Ver Ficha"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteEnrollment(e.id)} 
+                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                        title="Eliminar inscripción"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {filteredEnrollments.length === 0 && (
+                              <tr>
+                                <td colSpan={7} className="p-8 text-center text-slate-400">
+                                  No se encontraron reinscripciones con los filtros seleccionados.
                                 </td>
                               </tr>
-                            );
-                          })}
-                          {filteredEnrollments.length === 0 && (
-                            <tr>
-                              <td colSpan={7} className="p-8 text-center text-brand-gray">
-                                No se encontraron solicitudes con los filtros aplicados.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
                   )}
                 </>
               );
