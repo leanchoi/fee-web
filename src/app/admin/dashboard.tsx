@@ -359,12 +359,12 @@ export function AdminDashboard({
     if (!isSuperAdmin) return;
     setIsLoadingAudit(true);
     try {
-      const token = localStorage.getItem("fee_admin_token");
-      const res = await fetch("/api/admin.php?action=get_audit_data", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      const token = typeof window !== "undefined" ? localStorage.getItem("fee_admin_token") : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch("/api/admin.php?action=get_audit_data", { headers });
       const data = await res.json();
       if (data.success) {
         setAuditLogs(data.auditLogs || []);
@@ -376,6 +376,12 @@ export function AdminDashboard({
       setIsLoadingAudit(false);
     }
   };
+
+  useEffect(() => {
+    if (isSuperAdmin && (activeTab === "audit" || userActivityList.length === 0)) {
+      fetchAuditData();
+    }
+  }, [isSuperAdmin, activeTab]);
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
