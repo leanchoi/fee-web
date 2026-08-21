@@ -19,35 +19,40 @@ import {
   Trash2
 } from "lucide-react";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
-import { downloadBlankContract, downloadFilledContract, EnrollmentContractData, SiblingData } from "@/lib/contractGenerator";
+import { 
+  downloadBlankContract, 
+  downloadFilledContract, 
+  EnrollmentContractData, 
+  SiblingData,
+  determineLevel,
+  determineSchool
+} from "@/lib/contractGenerator";
 import { submitEnrollment } from "@/actions/enrollment";
 
-const GRADE_OPTIONS_1030 = [
-  "Sala de 3",
-  "Sala de 4",
-  "Sala de 5",
-  "1° Grado",
-  "2° Grado",
-  "3° Grado",
-  "4° Grado",
-  "5° Grado",
-  "6° Grado"
-];
-
-const GRADE_OPTIONS_1739 = [
-  "1° Año",
-  "2° Año",
-  "3° Año",
-  "4° Año",
-  "5° Año",
-  "6° Año"
-];
+const LEVEL_CONFIG = {
+  "Nivel Inicial": {
+    school: "Escuela N.º 1030",
+    grades: ["Sala de 3", "Sala de 4", "Sala de 5"],
+    description: "Jardín Maternal y de Infantes (Escuela N.º 1030)"
+  },
+  "Nivel Primario": {
+    school: "Escuela N.º 1030",
+    grades: ["1° Grado", "2° Grado", "3° Grado", "4° Grado", "5° Grado", "6° Grado"],
+    description: "Educación Primaria (Escuela N.º 1030)"
+  },
+  "Nivel Secundario": {
+    school: "Escuela N.º 1739",
+    grades: ["1° Año", "2° Año", "3° Año", "4° Año", "5° Año", "6° Año"],
+    description: "Educación Secundaria (Escuela N.º 1739)"
+  }
+};
 
 export function EnrollmentForm() {
   // Estado del formulario
   const [formData, setFormData] = useState<EnrollmentContractData>({
     studentName: "",
     studentDni: "",
+    studentLevel: "Nivel Inicial",
     school: "Escuela N.º 1030",
     studentGrade: "Sala de 3",
     hasSiblings: false,
@@ -84,7 +89,7 @@ export function EnrollmentForm() {
 
   // Lista tabulada de hermanos (hasta 4)
   const [siblingsList, setSiblingsList] = useState<SiblingData[]>([
-    { id: "sib-1", name: "", school: "Escuela N.º 1030", grade: "Sala de 3" }
+    { id: "sib-1", name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
   ]);
 
   // Declaraciones legales
@@ -99,27 +104,28 @@ export function EnrollmentForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ trackingNumber: string } | null>(null);
 
-  // Opciones dinámicas de salas/grados según la escuela del estudiante principal
-  const gradeOptions = formData.school === "Escuela N.º 1030" 
-    ? GRADE_OPTIONS_1030 
-    : GRADE_OPTIONS_1739;
+  // Cursos disponibles para el nivel seleccionado
+  const currentLevel = (formData.studentLevel as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
+  const gradeOptions = LEVEL_CONFIG[currentLevel]?.grades || LEVEL_CONFIG["Nivel Inicial"].grades;
 
-  const handleSchoolChange = (newSchool: string) => {
-    const defaultGrade = newSchool === "Escuela N.º 1030" ? "Sala de 3" : "1° Año";
+  const handleLevelChange = (newLevel: string) => {
+    const lvlKey = (newLevel as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
+    const cfg = LEVEL_CONFIG[lvlKey];
     setFormData(prev => ({
       ...prev,
-      school: newSchool,
-      studentGrade: defaultGrade
+      studentLevel: newLevel,
+      school: cfg.school,
+      studentGrade: cfg.grades[0]
     }));
   };
 
-  // Manejo de hermanos
+  // Manejo de hermanos por nivel
   const handleAddSibling = () => {
     if (siblingsList.length >= 4) return;
     const newId = `sib-${Date.now()}`;
     setSiblingsList(prev => [
       ...prev,
-      { id: newId, name: "", school: "Escuela N.º 1030", grade: "Sala de 3" }
+      { id: newId, name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
     ]);
   };
 
@@ -127,15 +133,25 @@ export function EnrollmentForm() {
     setSiblingsList(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSiblingChange = (index: number, field: keyof SiblingData, value: string) => {
+  const handleSiblingLevelChange = (index: number, newLevel: string) => {
+    const lvlKey = (newLevel as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
+    const cfg = LEVEL_CONFIG[lvlKey];
     setSiblingsList(prev => {
       const updated = [...prev];
-      if (field === "school") {
-        const defaultGrade = value === "Escuela N.º 1030" ? "Sala de 3" : "1° Año";
-        updated[index] = { ...updated[index], school: value, grade: defaultGrade };
-      } else {
-        updated[index] = { ...updated[index], [field]: value };
-      }
+      updated[index] = {
+        ...updated[index],
+        level: newLevel,
+        school: cfg.school,
+        grade: cfg.grades[0]
+      };
+      return updated;
+    });
+  };
+
+  const handleSiblingFieldChange = (index: number, field: "name" | "grade", value: string) => {
+    setSiblingsList(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
   };
@@ -155,7 +171,7 @@ export function EnrollmentForm() {
 
     // 1. Estudiante
     if (!formData.studentName.trim() || !formData.studentDni.trim() || !formData.studentGrade) {
-      setErrorMessage("Por favor complete los datos obligatorios del estudiante (Nombre, DNI y Curso 2027).");
+      setErrorMessage("Por favor complete los datos obligatorios del estudiante (Nombre, DNI, Nivel y Curso 2027).");
       return false;
     }
 
@@ -226,7 +242,7 @@ export function EnrollmentForm() {
       if (formData.hasSiblings) {
         const formattedSiblings = siblingsList
           .filter(s => s.name.trim().length > 0)
-          .map(s => `${s.name.trim()} (${s.school} - ${s.grade})`)
+          .map(s => `${s.name.trim()} (${s.level || determineLevel(s.grade, s.school)} - ${s.grade})`)
           .join(" | ");
         setFormData(prev => ({
           ...prev,
@@ -249,7 +265,11 @@ export function EnrollmentForm() {
     setErrorMessage(null);
 
     try {
-      const result = await submitEnrollment(formData);
+      const result = await submitEnrollment({
+        ...formData,
+        studentLevel: formData.studentLevel || determineLevel(formData.studentGrade, formData.school),
+        school: formData.school || determineSchool(formData.studentLevel || "Nivel Primario")
+      });
 
       if (result.success) {
         const tracking = result.trackingNumber || `FEE-2027-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -295,7 +315,7 @@ export function EnrollmentForm() {
         </h2>
 
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Hemos recibido la solicitud de reinscripción para el/la estudiante <strong>{formData.studentName}</strong> (DNI {formData.studentDni}) en <strong>{formData.school} — {formData.studentGrade}</strong>.
+          Hemos recibido la solicitud de reinscripción para el/la estudiante <strong>{formData.studentName}</strong> (DNI {formData.studentDni}) en <strong>{formData.studentLevel} — {formData.studentGrade} ({formData.school})</strong>.
         </p>
 
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-8 text-left space-y-2">
@@ -304,6 +324,10 @@ export function EnrollmentForm() {
             <span className="font-mono font-bold text-slate-900 bg-slate-200/80 px-2.5 py-1 rounded-md text-sm">
               {successData.trackingNumber}
             </span>
+          </div>
+          <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
+            <span className="text-slate-500 font-semibold">Nivel & Curso:</span>
+            <span className="font-medium text-slate-700">{formData.studentLevel} — {formData.studentGrade}</span>
           </div>
           <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
             <span className="text-slate-500 font-semibold">Fecha y Hora:</span>
@@ -336,6 +360,7 @@ export function EnrollmentForm() {
               setFormData({
                 studentName: "",
                 studentDni: "",
+                studentLevel: "Nivel Inicial",
                 school: "Escuela N.º 1030",
                 studentGrade: "Sala de 3",
                 hasSiblings: false,
@@ -365,7 +390,7 @@ export function EnrollmentForm() {
                 signature1Data: null,
                 signature2Data: null,
               });
-              setSiblingsList([{ id: "sib-1", name: "", school: "Escuela N.º 1030", grade: "Sala de 3" }]);
+              setSiblingsList([{ id: "sib-1", name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }]);
               setContractAccepted(false);
               setDataAccepted(false);
               setTermsAccepted(false);
@@ -447,15 +472,16 @@ export function EnrollmentForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Escuela en la que solicita la reinscripción para 2027 <span className="text-red-500">*</span>
+                Nivel Educativo para el ciclo 2027 <span className="text-red-500">*</span>
               </label>
               <select
-                value={formData.school}
-                onChange={e => handleSchoolChange(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-medium transition-all bg-white"
+                value={formData.studentLevel || "Nivel Inicial"}
+                onChange={e => handleLevelChange(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-semibold text-emerald-950 transition-all bg-white"
               >
-                <option value="Escuela N.º 1030">Escuela N.º 1030 (Jardín y Primaria)</option>
-                <option value="Escuela N.º 1739">Escuela N.º 1739 (Secundaria)</option>
+                <option value="Nivel Inicial">Nivel Inicial — Jardín (Escuela N.º 1030)</option>
+                <option value="Nivel Primario">Nivel Primario (Escuela N.º 1030)</option>
+                <option value="Nivel Secundario">Nivel Secundario (Escuela N.º 1739)</option>
               </select>
             </div>
 
@@ -490,7 +516,7 @@ export function EnrollmentForm() {
                     onChange={() => {
                       setFormData(prev => ({ ...prev, hasSiblings: true }));
                       if (siblingsList.length === 0) {
-                        setSiblingsList([{ id: "sib-1", name: "", school: "Escuela N.º 1030", grade: "Sala de 3" }]);
+                        setSiblingsList([{ id: "sib-1", name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }]);
                       }
                     }}
                     className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
@@ -523,9 +549,8 @@ export function EnrollmentForm() {
 
                 <div className="space-y-3">
                   {siblingsList.map((sib, index) => {
-                    const siblingGrades = sib.school === "Escuela N.º 1030" 
-                      ? GRADE_OPTIONS_1030 
-                      : GRADE_OPTIONS_1739;
+                    const sibLevel = (sib.level as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
+                    const sibGrades = LEVEL_CONFIG[sibLevel]?.grades || LEVEL_CONFIG["Nivel Inicial"].grades;
 
                     return (
                       <div key={sib.id || index} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
@@ -546,7 +571,7 @@ export function EnrollmentForm() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                          <div className="sm:col-span-6">
+                          <div className="sm:col-span-5">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                               Nombre y Apellido <span className="text-red-500">*</span>
                             </label>
@@ -554,36 +579,37 @@ export function EnrollmentForm() {
                               type="text"
                               required
                               value={sib.name}
-                              onChange={e => handleSiblingChange(index, "name", e.target.value)}
+                              onChange={e => handleSiblingFieldChange(index, "name", e.target.value)}
                               placeholder="Nombre completo"
                               className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
                             />
                           </div>
 
-                          <div className="sm:col-span-3">
+                          <div className="sm:col-span-4">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                              Escuela 2027 <span className="text-red-500">*</span>
+                              Nivel 2027 <span className="text-red-500">*</span>
                             </label>
                             <select
-                              value={sib.school}
-                              onChange={e => handleSiblingChange(index, "school", e.target.value)}
+                              value={sib.level || "Nivel Inicial"}
+                              onChange={e => handleSiblingLevelChange(index, e.target.value)}
                               className="w-full px-2.5 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-medium"
                             >
-                              <option value="Escuela N.º 1030">Esc. 1030</option>
-                              <option value="Escuela N.º 1739">Esc. 1739</option>
+                              <option value="Nivel Inicial">Inicial (Esc. 1030)</option>
+                              <option value="Nivel Primario">Primario (Esc. 1030)</option>
+                              <option value="Nivel Secundario">Secundario (Esc. 1739)</option>
                             </select>
                           </div>
 
                           <div className="sm:col-span-3">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                              Sala/Grado/Año <span className="text-red-500">*</span>
+                              Sala / Grado / Año <span className="text-red-500">*</span>
                             </label>
                             <select
                               value={sib.grade}
-                              onChange={e => handleSiblingChange(index, "grade", e.target.value)}
+                              onChange={e => handleSiblingFieldChange(index, "grade", e.target.value)}
                               className="w-full px-2.5 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-medium"
                             >
-                              {siblingGrades.map(g => (
+                              {sibGrades.map(g => (
                                 <option key={g} value={g}>{g}</option>
                               ))}
                             </select>
@@ -1415,8 +1441,8 @@ export function EnrollmentForm() {
                 <div className="grid grid-cols-2 gap-2">
                   <div><strong>Nombre:</strong> {formData.studentName}</div>
                   <div><strong>DNI:</strong> {formData.studentDni}</div>
-                  <div><strong>Escuela:</strong> {formData.school}</div>
-                  <div><strong>Curso 2027:</strong> {formData.studentGrade}</div>
+                  <div><strong>Nivel:</strong> {formData.studentLevel}</div>
+                  <div><strong>Curso 2027:</strong> {formData.studentGrade} ({formData.school})</div>
                   {formData.hasSiblings && (
                     <div className="col-span-2 text-slate-600"><strong>Hermanos/as:</strong> {formData.siblingDetails || "Registrados en el formulario"}</div>
                   )}

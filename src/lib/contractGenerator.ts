@@ -1,8 +1,10 @@
 import { jsPDF } from "jspdf";
+import { INSTITUTIONAL_SIGNATURE_PNG } from "./institutionalSignature";
 
 export interface SiblingData {
   id?: string;
   name: string;
+  level?: string;
   school: string; // "Escuela N.º 1030" | "Escuela N.º 1739"
   grade: string;
 }
@@ -15,9 +17,10 @@ export interface EnrollmentContractData {
   // Estudiante
   studentName: string;
   studentDni: string;
-  school: string; // "Escuela N.º 1030" | "Escuela N.º 1739"
-  level?: string;
-  studentGrade: string; // "Sala de 3", "1° grado", "3° año", etc.
+  studentLevel?: string; // "Nivel Inicial" | "Nivel Primario" | "Nivel Secundario"
+  level?: string;        // Alias for compatibility
+  school: string;        // "Escuela N.º 1030" | "Escuela N.º 1739"
+  studentGrade: string;  // "Sala de 3", "1° Grado", "3° Año", etc.
   hasSiblings?: boolean;
   siblingDetails?: string;
   siblingsList?: SiblingData[];
@@ -61,13 +64,19 @@ const MONTH_NAMES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
 ];
 
-function determineLevel(school: string, grade: string): string {
-  const g = grade.toLowerCase();
+export function determineLevel(grade: string, school?: string): string {
+  const g = (grade || "").toLowerCase();
   if (g.includes("sala")) return "Nivel Inicial";
   if (g.includes("grado")) return "Nivel Primario";
   if (g.includes("año")) return "Nivel Secundario";
-  if (school.includes("1030")) return "Nivel Inicial / Primario";
-  return "Nivel Secundario";
+  if (school && school.includes("1739")) return "Nivel Secundario";
+  return "Nivel Primario";
+}
+
+export function determineSchool(level: string): string {
+  const lvl = (level || "").toLowerCase();
+  if (lvl.includes("secundario") || lvl.includes("1739")) return "Escuela N.º 1739";
+  return "Escuela N.º 1030";
 }
 
 function getHonorific(relationship?: string): string {
@@ -79,7 +88,7 @@ function getHonorific(relationship?: string): string {
 }
 
 /**
- * Genera el documento PDF del Contrato Marco oficial
+ * Genera el documento PDF del Contrato Marco oficial optimizado para 4 páginas exactas
  */
 export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   const doc = new jsPDF({
@@ -118,59 +127,63 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
   const studentDni = isBlank ? "__________________" : data.studentDni;
   const cycleYear = "2027";
   const grade = isBlank ? "_______________________" : data.studentGrade;
-  const school = isBlank ? "Escuela N.º 1030 / Escuela N.º 1739" : data.school;
+  
   const level = isBlank
     ? "_________________________________"
-    : (data.level || determineLevel(data.school, data.studentGrade));
+    : (data.studentLevel || determineLevel(data.studentGrade, data.school));
+
+  const school = isBlank 
+    ? "Escuela N.º 1030 / Escuela N.º 1739" 
+    : (data.school || determineSchool(level));
 
   const pageWidth = 210;
   const pageHeight = 297;
-  const marginX = 20;
-  const contentWidth = pageWidth - marginX * 2; // 170mm
-  const bottomLimit = pageHeight - 20;
+  const marginX = 18;
+  const contentWidth = pageWidth - marginX * 2; // 174mm
+  const bottomLimit = pageHeight - 16; // 281mm
 
   let currentPage = 1;
 
   const drawHeader = (pNum: number) => {
     // Header institucional
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(24, 60, 52); // Brand green
-    doc.text("FUNDACIÓN EDUCATIVA ESQUEL", marginX, 13);
+    doc.text("FUNDACIÓN EDUCATIVA ESQUEL", marginX, 12);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.2);
     doc.setTextColor(100, 116, 139);
-    doc.text("Escuela N.º 1030 | Escuela N.º 1739 — Chacabuco Nº 1029, Esquel, Chubut", marginX, 17);
+    doc.text("Escuela N.º 1030 | Escuela N.º 1739 — Chacabuco Nº 1029, Esquel, Chubut", marginX, 15.5);
 
     doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.3);
-    doc.line(marginX, 19, pageWidth - marginX, 19);
+    doc.setLineWidth(0.25);
+    doc.line(marginX, 17.5, pageWidth - marginX, 17.5);
 
     // Número de página al pie
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
-    doc.text(`{  ${pNum}  }`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    doc.text(`{  ${pNum}  }`, pageWidth / 2, pageHeight - 9, { align: "center" });
   };
 
   drawHeader(currentPage);
-  let y = 26;
+  let y = 23.5;
 
   const checkPageBreak = (neededHeight: number): void => {
     if (y + neededHeight > bottomLimit) {
       doc.addPage();
       currentPage++;
       drawHeader(currentPage);
-      y = 26;
+      y = 23.5;
     }
   };
 
   const printParagraph = (text: string, options?: { bold?: boolean; size?: number; lineHeight?: number; spaceAfter?: number }): void => {
     const bold = options?.bold || false;
-    const size = options?.size || 9.2;
-    const lineHeight = options?.lineHeight || 4.2;
-    const spaceAfter = options?.spaceAfter ?? 2.5;
+    const size = options?.size || 8.6;
+    const lineHeight = options?.lineHeight || 3.75;
+    const spaceAfter = options?.spaceAfter ?? 2.0;
 
     doc.setFont("helvetica", bold ? "bold" : "normal");
     doc.setFontSize(size);
@@ -187,55 +200,55 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   const printClause = (clauseTitle: string, clauseBody: string): void => {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.2);
+    doc.setFontSize(8.7);
     const titleLines = doc.splitTextToSize(clauseTitle, contentWidth);
-    const titleHeight = titleLines.length * 4.2;
+    const titleHeight = titleLines.length * 3.75;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.2);
+    doc.setFontSize(8.6);
     const bodyLines = doc.splitTextToSize(clauseBody, contentWidth);
-    const bodyHeight = bodyLines.length * 4.2;
+    const bodyHeight = bodyLines.length * 3.75;
 
-    // Si no entra el título y al menos 2 líneas del cuerpo, hacemos salto de página
-    checkPageBreak(titleHeight + Math.min(bodyHeight, 14));
+    // Si no entra el título y al menos 2 líneas del cuerpo, hacemos salto
+    checkPageBreak(titleHeight + Math.min(bodyHeight, 10));
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.2);
+    doc.setFontSize(8.7);
     doc.setTextColor(15, 23, 42);
     doc.text(titleLines, marginX, y);
-    y += titleHeight + 1;
+    y += titleHeight + 0.8;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.2);
+    doc.setFontSize(8.6);
     doc.setTextColor(30, 41, 59);
     doc.text(bodyLines, marginX, y);
-    y += bodyHeight + 3.5;
+    y += bodyHeight + 2.2;
   };
 
   const printSectionHeader = (title: string): void => {
-    checkPageBreak(12);
+    checkPageBreak(9);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9.2);
     doc.setTextColor(15, 23, 42);
     doc.text(title, marginX, y);
-    y += 5.5;
+    y += 4.5;
   };
 
   // Título Principal
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11.5);
+  doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
   doc.text("CONTRATO MARCO DE PRESTACIÓN DE SERVICIOS EDUCATIVOS", pageWidth / 2, y, { align: "center" });
-  y += 7;
+  y += 5.5;
 
-  // Comparecencia con tratamiento adecuado
+  // Comparecencia
   let comparecencia = "";
   if (isSingle) {
     comparecencia = `En la ciudad de Esquel, a los ${day} días del mes de ${month} del año ${year}, entre la Fundación Educativa Esquel, con domicilio legal en Chacabuco Nº 1029 de la ciudad de Esquel, Provincia del Chubut, en adelante denominada “LA FUNDACIÓN”, y por la otra parte ${p1Title} ${p1Name} D.N.I. Nº ${p1Dni} (en carácter de único/a responsable parental habilitado/a), quien constituye domicilio en ${address} de la ciudad de ${city}, en adelante denominado/a “EL/LA RESPONSABLE PARENTAL”, se celebra el presente contrato sujeto a las siguientes cláusulas y condiciones particulares.`;
   } else {
     comparecencia = `En la ciudad de Esquel, a los ${day} días del mes de ${month} del año ${year}, entre la Fundación Educativa Esquel, con domicilio legal en Chacabuco Nº 1029 de la ciudad de Esquel, Provincia del Chubut, en adelante denominada “LA FUNDACIÓN”, y por la otra parte ${p1Title} ${p1Name} D.N.I. Nº ${p1Dni} y ${p2Title} ${p2Name} D.N.I. Nº ${p2Dni}, quienes constituyen domicilio en ${address} de la ciudad de ${city}, en adelante denominados “LOS RESPONSABLES PARENTALES”, se celebra el presente contrato sujeto a las siguientes cláusulas y condiciones particulares.`;
   }
-  printParagraph(comparecencia, { spaceAfter: 4 });
+  printParagraph(comparecencia, { spaceAfter: 3.0 });
 
   // Disposiciones Preliminares
   printSectionHeader("DISPOSICIONES PRELIMINARES");
@@ -269,7 +282,7 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   printClause(
     "Cláusula 4° – Reserva de vacante",
-    `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo ${cycleYear} y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de Nivel ${level} (${school}). A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reservará una vacante para el/la alumno/a individualizado/a en la documentación de matriculación, exclusivamente para el ciclo lectivo correspondiente. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`
+    `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo ${cycleYear} y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de ${level} (${school}). A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reservará una vacante para el/la alumno/a individualizado/a en la documentación de matriculación, exclusivamente para el ciclo lectivo correspondiente. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`
   );
 
   printClause(
@@ -400,38 +413,38 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   // CIERRE Y JURISDICCIÓN
   const cierreText = "Las partes constituyen domicilio especial en los indicados en el encabezado del presente contrato, donde serán válidas todas las notificaciones judiciales y extrajudiciales, asimismo, acuerdan someter cualquier controversia derivada del presente contrato a los Tribunales Ordinarios de la ciudad de Esquel, renunciando a cualquier otro fuero o jurisdicción.";
-  printParagraph(cierreText, { spaceAfter: 6 });
+  printParagraph(cierreText, { spaceAfter: 4 });
 
   // ==========================================
   // BLOQUE DE FIRMAS PERFECTAMENTE ALINEADO
   // ==========================================
-  checkPageBreak(85);
+  checkPageBreak(58);
 
-  const col1X = marginX + 5;
-  const col2X = marginX + 65;
+  const col1X = marginX + 3;
+  const col2X = marginX + 62;
   const col3X = marginX + 115;
-  const colW1 = 50;
-  const colW2 = 42;
-  const colW3 = 50;
+  const colW1 = 52;
+  const colW2 = 45;
+  const colW3 = 54;
 
   // --- FILA 1: RESPONSABLE 1 ---
-  let lineY = y + 18;
+  let lineY = y + 14;
 
   // Arriba de la línea:
   if (!isBlank && data.signature1Data) {
     try {
-      doc.addImage(data.signature1Data, "PNG", col1X + 2, lineY - 17, 45, 16);
+      doc.addImage(data.signature1Data, "PNG", col1X + 4, lineY - 14, 44, 13.5);
     } catch {
       // Fallback
     }
   }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.2);
   doc.setTextColor(30, 41, 59);
   if (!isBlank) {
-    doc.text(p1Dni, col2X + colW2 / 2, lineY - 2.5, { align: "center" });
-    doc.text(p1Name, col3X + colW3 / 2, lineY - 2.5, { align: "center" });
+    doc.text(p1Dni, col2X + colW2 / 2, lineY - 2, { align: "center" });
+    doc.text(p1Name, col3X + colW3 / 2, lineY - 2, { align: "center" });
   }
 
   // Las líneas:
@@ -443,38 +456,38 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   // Abajo de la línea:
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const resp1Label = isBlank
     ? "Firma Padre / Madre / Tutor"
     : `Firma ${data.parent1Relationship || "Responsable 1"}`;
-  doc.text(resp1Label, col1X + colW1 / 2, lineY + 4, { align: "center" });
-  doc.text("DNI", col2X + colW2 / 2, lineY + 4, { align: "center" });
-  doc.text("Aclaración", col3X + colW3 / 2, lineY + 4, { align: "center" });
+  doc.text(resp1Label, col1X + colW1 / 2, lineY + 3.5, { align: "center" });
+  doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
+  doc.text("Aclaración", col3X + colW3 / 2, lineY + 3.5, { align: "center" });
 
   // --- FILA 2: RESPONSABLE 2 ---
-  lineY += 22;
+  lineY += 17;
 
   // Arriba de la línea:
   if (!isBlank && !isSingle && data.signature2Data) {
     try {
-      doc.addImage(data.signature2Data, "PNG", col1X + 2, lineY - 17, 45, 16);
+      doc.addImage(data.signature2Data, "PNG", col1X + 4, lineY - 14, 44, 13.5);
     } catch {
       // Fallback
     }
   } else if (isSingle) {
     doc.setFont("helvetica", "italic");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.2);
     doc.setTextColor(100, 116, 139);
-    doc.text("[Declaración Responsable Único/a]", col1X + colW1 / 2, lineY - 2.5, { align: "center" });
+    doc.text("[Declaración Responsable Único/a]", col1X + colW1 / 2, lineY - 2, { align: "center" });
   }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.2);
   doc.setTextColor(30, 41, 59);
   if (!isBlank && !isSingle) {
-    doc.text(p2Dni, col2X + colW2 / 2, lineY - 2.5, { align: "center" });
-    doc.text(p2Name, col3X + colW3 / 2, lineY - 2.5, { align: "center" });
+    doc.text(p2Dni, col2X + colW2 / 2, lineY - 2, { align: "center" });
+    doc.text(p2Name, col3X + colW3 / 2, lineY - 2, { align: "center" });
   }
 
   // Las líneas:
@@ -486,29 +499,30 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   // Abajo de la línea:
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   const resp2Label = isBlank
     ? "Firma Padre / Madre / Tutora"
     : (isSingle ? "---" : `Firma ${data.parent2Relationship || "Responsable 2"}`);
-  doc.text(resp2Label, col1X + colW1 / 2, lineY + 4, { align: "center" });
-  doc.text("DNI", col2X + colW2 / 2, lineY + 4, { align: "center" });
-  doc.text("Aclaración", col3X + colW3 / 2, lineY + 4, { align: "center" });
+  doc.text(resp2Label, col1X + colW1 / 2, lineY + 3.5, { align: "center" });
+  doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
+  doc.text("Aclaración", col3X + colW3 / 2, lineY + 3.5, { align: "center" });
 
-  // --- FILA 3: FUNDACIÓN EDUCATIVA ESQUEL ---
-  lineY += 22;
+  // --- FILA 3: FUNDACIÓN EDUCATIVA ESQUEL (REPRESENTANTE LEGAL CON FIRMA Y SELLO OFICIAL) ---
+  lineY += 17;
 
-  // Arriba de la línea:
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.setTextColor(24, 60, 52);
-  doc.text("FUNDACIÓN EDUCATIVA ESQUEL", col1X + colW1 / 2, lineY - 2.5, { align: "center" });
+  // Arriba de la línea: Firma y sello oficial institucional
+  try {
+    doc.addImage(INSTITUTIONAL_SIGNATURE_PNG, "PNG", col1X + 16, lineY - 17, 20, 20);
+  } catch {
+    // Fallback
+  }
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.2);
   doc.setTextColor(30, 41, 59);
-  doc.text("29.878.978", col2X + colW2 / 2, lineY - 2.5, { align: "center" });
-  doc.text("María Cecilia Turró", col3X + colW3 / 2, lineY - 2.5, { align: "center" });
+  doc.text("29.878.978", col2X + colW2 / 2, lineY - 2, { align: "center" });
+  doc.text("María Cecilia Turró", col3X + colW3 / 2, lineY - 2, { align: "center" });
 
   // Las líneas:
   doc.setDrawColor(100, 116, 139);
@@ -519,30 +533,30 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
 
   // Abajo de la línea:
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text("Representación Legal", col1X + colW1 / 2, lineY + 4, { align: "center" });
-  doc.text("DNI", col2X + colW2 / 2, lineY + 4, { align: "center" });
-  doc.text("Aclaración", col3X + colW3 / 2, lineY + 4, { align: "center" });
+  doc.text("Representación Legal", col1X + colW1 / 2, lineY + 3.5, { align: "center" });
+  doc.text("DNI", col2X + colW2 / 2, lineY + 3.5, { align: "center" });
+  doc.text("Aclaración", col3X + colW3 / 2, lineY + 3.5, { align: "center" });
 
   // Recuadro de Metadatos Digitales (Solo si está firmado)
   if (!isBlank) {
-    lineY += 12;
-    checkPageBreak(22);
+    lineY += 9;
+    checkPageBreak(16);
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(marginX, lineY, contentWidth, 18, 2, 2, "FD");
+    doc.roundedRect(marginX, lineY, contentWidth, 14, 1.5, 1.5, "FD");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(15, 23, 42);
-    doc.text("CONSTANCIA DE REGISTRO ELECTRÓNICO INSTITUCIONAL — CICLO LECTIVO 2027", marginX + 4, lineY + 5);
+    doc.text("CONSTANCIA DE REGISTRO ELECTRÓNICO INSTITUCIONAL — CICLO LECTIVO 2027", marginX + 3.5, lineY + 4);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Trámite: ${data.trackingNumber || data.id || "FEE-2027-ONLINE"}  |  Fecha/Hora: ${now.toLocaleDateString("es-AR")} ${now.toLocaleTimeString("es-AR")}  |  Facturación: ${data.billingName || p1Name} (${data.billingCuit || p1Dni})`, marginX + 4, lineY + 10);
-    doc.text("Suscripción digital mediante firma electrónica táctil y aceptación de los 23 artículos del Contrato Marco.", marginX + 4, lineY + 14.5);
+    doc.text(`Trámite: ${data.trackingNumber || data.id || "FEE-2027-ONLINE"}  |  Fecha/Hora: ${now.toLocaleDateString("es-AR")} ${now.toLocaleTimeString("es-AR")}  |  Facturación: ${data.billingName || p1Name} (${data.billingCuit || p1Dni})`, marginX + 3.5, lineY + 8);
+    doc.text("Suscripción digital mediante firma electrónica táctil y aceptación de los 23 artículos del Contrato Marco.", marginX + 3.5, lineY + 11.5);
   }
 
   return doc;

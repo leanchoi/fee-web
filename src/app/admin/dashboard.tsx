@@ -69,7 +69,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import JSZip from "jszip";
-import { downloadFilledContract, generateContractPdf } from "@/lib/contractGenerator";
+import { generateContractPdf, downloadFilledContract, determineLevel } from "@/lib/contractGenerator";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -345,7 +345,8 @@ export function AdminDashboard({
       studentName: e.studentName || "",
       studentDni: e.studentDni || "",
       school: e.school || "Escuela N.º 1030",
-      level: e.studentLevel || "Nivel Primario",
+      studentLevel: e.studentLevel || determineLevel(e.studentGrade, e.school),
+      level: e.studentLevel || determineLevel(e.studentGrade, e.school),
       studentGrade: e.studentGrade || "",
       hasSiblings: Boolean(e.hasSiblings),
       siblingDetails: e.siblingDetails || "",
@@ -388,7 +389,8 @@ export function AdminDashboard({
           studentName: item.studentName || "",
           studentDni: item.studentDni || "",
           school: item.school || "Escuela N.º 1030",
-          level: item.studentLevel || "Nivel Primario",
+          studentLevel: item.studentLevel || determineLevel(item.studentGrade, item.school),
+          level: item.studentLevel || determineLevel(item.studentGrade, item.school),
           studentGrade: item.studentGrade || "",
           hasSiblings: Boolean(item.hasSiblings),
           siblingDetails: item.siblingDetails || "",
@@ -478,41 +480,44 @@ export function AdminDashboard({
       "Firma 2 Registrada"
     ];
 
-    const rows = filteredEnrollments.map((e: any) => [
-      e.id,
-      e.trackingNumber || `FEE-2027-${e.id.substring(0, 5)}`,
-      new Date(e.createdAt).toLocaleDateString() + " " + new Date(e.createdAt).toLocaleTimeString(),
-      e.school || "Escuela N.º 1030",
-      e.studentLevel || "-",
-      e.studentGrade || "-",
-      e.studentName || "-",
-      e.studentDni || "-",
-      e.hasSiblings ? "SÍ" : "NO",
-      e.siblingDetails || "-",
-      e.parent1Name || e.tutorName || "-",
-      e.parent1Dni || "-",
-      e.parent1Relationship || "Madre/Padre/Tutor",
-      e.parent1Phone || e.tutorPhone || "-",
-      e.parent1Email || e.tutorEmail || "-",
-      e.parent1Address || "-",
-      e.parent1City || "Esquel",
-      e.parent1PostalCode || "9200",
-      e.isSingleParent ? "SÍ" : "NO",
-      e.parent2Name || "-",
-      e.parent2Dni || "-",
-      e.parent2Relationship || "-",
-      e.parent2Phone || "-",
-      e.parent2Email || "-",
-      e.parent2Address || "-",
-      e.billingName || e.parent1Name || e.tutorName || "-",
-      e.billingCuit || e.parent1Dni || "-",
-      e.billingTaxCondition || "Consumidor Final",
-      e.billingEmail || e.parent1Email || e.tutorEmail || "-",
-      e.billingAddress || e.parent1Address || "-",
-      e.status || "PENDING",
-      e.signature1Data ? "SÍ" : "NO",
-      e.signature2Data ? "SÍ" : (e.isSingleParent ? "N/A" : "NO")
-    ]);
+    const rows = filteredEnrollments.map((e: any) => {
+      const calculatedLevel = e.studentLevel || determineLevel(e.studentGrade, e.school);
+      return [
+        e.id,
+        e.trackingNumber || `FEE-2027-${e.id.substring(0, 5)}`,
+        new Date(e.createdAt).toLocaleDateString() + " " + new Date(e.createdAt).toLocaleTimeString(),
+        e.school || "Escuela N.º 1030",
+        calculatedLevel,
+        e.studentGrade || "-",
+        e.studentName || "-",
+        e.studentDni || "-",
+        e.hasSiblings ? "SÍ" : "NO",
+        e.siblingDetails || "-",
+        e.parent1Name || e.tutorName || "-",
+        e.parent1Dni || "-",
+        e.parent1Relationship || "Madre/Padre/Tutor",
+        e.parent1Phone || e.tutorPhone || "-",
+        e.parent1Email || e.tutorEmail || "-",
+        e.parent1Address || "-",
+        e.parent1City || "Esquel",
+        e.parent1PostalCode || "9200",
+        e.isSingleParent ? "SÍ" : "NO",
+        e.parent2Name || "-",
+        e.parent2Dni || "-",
+        e.parent2Relationship || "-",
+        e.parent2Phone || "-",
+        e.parent2Email || "-",
+        e.parent2Address || "-",
+        e.billingName || e.parent1Name || e.tutorName || "-",
+        e.billingCuit || e.parent1Dni || "-",
+        e.billingTaxCondition || "Consumidor Final",
+        e.billingEmail || e.parent1Email || e.tutorEmail || "-",
+        e.billingAddress || e.parent1Address || "-",
+        e.status || "PENDING",
+        e.signature1Data ? "SÍ" : "NO",
+        e.signature2Data ? "SÍ" : (e.isSingleParent ? "N/A" : "NO")
+      ];
+    });
 
     const csvContent = "\uFEFF" + [
       headers.map(h => `"${h}"`).join(";"),
@@ -965,57 +970,82 @@ export function AdminDashboard({
             {/* Quick Metrics KPI Banner */}
             {(() => {
               const totalAll = reinscripcionesList.length;
-              const esc1030Count = reinscripcionesList.filter((e: any) => (e.school || "").includes("1030") || !(e.school || "").includes("1739")).length;
-              const esc1739Count = reinscripcionesList.filter((e: any) => (e.school || "").includes("1739")).length;
+              const inicialCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Inicial").length;
+              const primarioCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Primario").length;
+              const secundarioCount = reinscripcionesList.filter((e: any) => (e.studentLevel || determineLevel(e.studentGrade, e.school)) === "Nivel Secundario").length;
 
               return (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                     <button
                       onClick={() => {
                         setEnrollmentSchoolFilter("all");
                         setEnrollmentLevelFilter("all");
                       }}
                       className={cn(
-                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentSchoolFilter === "all" ? "bg-brand-blue text-white shadow-md scale-[1.01] border-brand-blue" : "bg-brand-blue/5 border-brand-blue/10 hover:bg-brand-blue/10"
+                        "p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "bg-slate-900 text-white shadow-md scale-[1.01] border-slate-900" : "bg-slate-50 border-slate-200 hover:bg-slate-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "all" ? "text-white/80" : "text-brand-blue")}>
-                        Total General Reinscripciones
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white/80" : "text-slate-600")}>
+                        Total General
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "all" ? "text-white" : "text-brand-blue")}>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "all" && enrollmentSchoolFilter === "all" ? "text-white" : "text-slate-900")}>
                         {totalAll}
                       </span>
                     </button>
 
                     <button
-                      onClick={() => setEnrollmentSchoolFilter("Escuela N.º 1030")}
+                      onClick={() => {
+                        setEnrollmentSchoolFilter("all");
+                        setEnrollmentLevelFilter("inicial");
+                      }}
                       className={cn(
-                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentSchoolFilter === "Escuela N.º 1030" ? "bg-emerald-700 text-white shadow-md scale-[1.01] border-emerald-700" : "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100"
+                        "p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "inicial" ? "bg-teal-700 text-white shadow-md scale-[1.01] border-teal-700" : "bg-teal-50/70 border-teal-200 hover:bg-teal-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "Escuela N.º 1030" ? "text-white/80" : "text-emerald-800")}>
-                        Escuela N.º 1030 (Jardín / Primaria)
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "inicial" ? "text-white/80" : "text-teal-800")}>
+                        Nivel Inicial (Jardín)
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "Escuela N.º 1030" ? "text-white" : "text-emerald-800")}>
-                        {esc1030Count}
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "inicial" ? "text-white" : "text-teal-800")}>
+                        {inicialCount}
                       </span>
                     </button>
 
                     <button
-                      onClick={() => setEnrollmentSchoolFilter("Escuela N.º 1739")}
+                      onClick={() => {
+                        setEnrollmentSchoolFilter("all");
+                        setEnrollmentLevelFilter("primario");
+                      }}
                       className={cn(
-                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentSchoolFilter === "Escuela N.º 1739" ? "bg-blue-800 text-white shadow-md scale-[1.01] border-blue-800" : "bg-blue-50/70 border-blue-200 hover:bg-blue-100"
+                        "p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "primario" ? "bg-emerald-700 text-white shadow-md scale-[1.01] border-emerald-700" : "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "Escuela N.º 1739" ? "text-white/80" : "text-blue-900")}>
-                        Escuela N.º 1739 (Secundaria)
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "primario" ? "text-white/80" : "text-emerald-800")}>
+                        Nivel Primario (Esc. 1030)
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "Escuela N.º 1739" ? "text-white" : "text-blue-900")}>
-                        {esc1739Count}
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "primario" ? "text-white" : "text-emerald-800")}>
+                        {primarioCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setEnrollmentSchoolFilter("all");
+                        setEnrollmentLevelFilter("secundario");
+                      }}
+                      className={cn(
+                        "p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer",
+                        enrollmentLevelFilter === "secundario" ? "bg-blue-800 text-white shadow-md scale-[1.01] border-blue-800" : "bg-blue-50/70 border-blue-200 hover:bg-blue-100"
+                      )}
+                    >
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "secundario" ? "text-white/80" : "text-blue-900")}>
+                        Nivel Secundario (Esc. 1739)
+                      </span>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "secundario" ? "text-white" : "text-blue-900")}>
+                        {secundarioCount}
                       </span>
                     </button>
                   </div>
@@ -1196,10 +1226,10 @@ export function AdminDashboard({
                                 <h4 className="font-extrabold text-brand-blue text-base leading-snug">
                                   {e.studentName}
                                 </h4>
-                                <div className="flex items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
                                   <span>DNI: {e.studentDni || "---"}</span>
                                   <span>•</span>
-                                  <span className="font-bold text-emerald-700">{e.studentGrade}</span>
+                                  <span className="font-bold text-emerald-700">{e.studentLevel || determineLevel(e.studentGrade, e.school)} — {e.studentGrade}</span>
                                 </div>
                                 {e.hasSiblings && (
                                   <p className="text-[10px] text-amber-700 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
@@ -1316,10 +1346,13 @@ export function AdminDashboard({
                                   <span className="text-[10px] text-slate-400 font-mono">{e.trackingNumber || `FEE-${e.id.substring(0, 5)}`}</span>
                                 </td>
                                 <td className="p-4">
-                                  <span className="font-bold text-slate-900 block">{e.school || "Escuela N.º 1030"}</span>
-                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block mt-0.5">
-                                    {e.studentGrade}
-                                  </span>
+                                  <span className="font-bold text-slate-900 block">{e.studentLevel || determineLevel(e.studentGrade, e.school)}</span>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block">
+                                      {e.studentGrade}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">({e.school || "Escuela N.º 1030"})</span>
+                                  </div>
                                 </td>
                                 <td className="p-4 font-bold text-brand-blue">
                                   <div>{e.studentName}</div>
