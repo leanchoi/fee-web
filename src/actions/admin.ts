@@ -1,3 +1,14 @@
+function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...customHeaders };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("fee_admin_token");
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+}
+
 export async function loginAdmin(password: string, email?: string) {
   try {
     const res = await fetch("/api/login.php", {
@@ -5,7 +16,11 @@ export async function loginAdmin(password: string, email?: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email || "admin", password }),
     });
-    return await res.json();
+    const data = await res.json();
+    if (data && data.success && data.token && typeof window !== "undefined") {
+      localStorage.setItem("fee_admin_token", data.token);
+    }
+    return data;
   } catch (error: any) {
     return { success: false, error: error.message || "Error al iniciar sesión" };
   }
@@ -13,11 +28,17 @@ export async function loginAdmin(password: string, email?: string) {
 
 export async function logoutAdmin() {
   try {
-    await fetch("/api/admin.php?action=logout", { method: "POST" });
+    await fetch("/api/admin.php?action=logout", { 
+      method: "POST",
+      headers: getAuthHeaders()
+    });
   } catch (e) {}
   try {
     await fetch("/api/logout.php", { method: "POST" });
   } catch (e) {}
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("fee_admin_token");
+  }
   if (typeof document !== "undefined") {
     document.cookie = "admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0;";
   }
@@ -25,7 +46,9 @@ export async function logoutAdmin() {
 
 export async function getDashboardData() {
   try {
-    const res = await fetch("/api/admin.php?action=get_data");
+    const res = await fetch("/api/admin.php?action=get_data", {
+      headers: getAuthHeaders()
+    });
     return await res.json();
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -36,7 +59,7 @@ export async function updateEnrollmentStatus(id: string, status: string) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "update_enrollment_status", id, status }),
     });
     return await res.json();
@@ -49,7 +72,7 @@ export async function deleteEnrollment(id: string) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "delete_enrollment", id }),
     });
     return await res.json();
@@ -62,7 +85,7 @@ export async function deleteContactMessage(id: string) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "delete_contact", id }),
     });
     return await res.json();
@@ -75,7 +98,7 @@ export async function createPost(data: any) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "save_post", ...data }),
     });
     return await res.json();
@@ -88,7 +111,7 @@ export async function updatePost(id: string, data: any) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "save_post", id, ...data }),
     });
     return await res.json();
@@ -101,7 +124,7 @@ export async function deletePost(id: string) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "delete_post", id }),
     });
     return await res.json();
@@ -118,7 +141,7 @@ export async function createUserAction(data: any): Promise<{ success: boolean; e
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "create_user", ...data }),
     });
     return await res.json();
@@ -131,7 +154,7 @@ export async function deleteUser(id: string): Promise<{ success: boolean; error?
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "delete_user", id }),
     });
     return await res.json();
@@ -144,7 +167,7 @@ export async function changePasswordAction(newPassword: string): Promise<{ succe
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "change_password", newPassword }),
     });
     return await res.json();
@@ -157,7 +180,7 @@ export async function resetUserPasswordAction(userId: string, password: string):
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "reset_user_password", userId, password }),
     });
     return await res.json();
@@ -170,6 +193,7 @@ export async function uploadMediaAction(formData: FormData): Promise<{ success: 
   try {
     const res = await fetch("/api/upload.php", {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
     return await res.json();
@@ -191,7 +215,7 @@ export async function saveGalleryItemAction(data: { id?: string; image: string; 
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "save_gallery_item", ...data }),
     });
     return await res.json();
@@ -204,7 +228,7 @@ export async function deleteGalleryItemAction(id: string) {
   try {
     const res = await fetch("/api/admin.php", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ action: "delete_gallery_item", id }),
     });
     return await res.json();
