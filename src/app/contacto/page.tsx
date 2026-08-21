@@ -101,8 +101,10 @@ export default function ContactoPage() {
                     <Phone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-brand-blue">Teléfono de Contacto</h3>
-                    <p className="text-sm text-brand-foreground/75">(02945) 456053</p>
+                    <h3 className="font-bold text-brand-blue">Teléfono & WhatsApp</h3>
+                    <a href="https://wa.me/5492945416363" target="_blank" rel="noopener noreferrer" className="text-sm text-brand-green hover:underline">
+                      +54 9 2945 41-6363
+                    </a>
                   </div>
                 </div>
 
@@ -138,6 +140,10 @@ export default function ContactoPage() {
                   <li className="flex gap-2 items-start">
                     <MapPin className="w-4 h-4 text-brand-blue shrink-0 mt-1" />
                     <span>Chacabuco 1029, Esquel</span>
+                  </li>
+                  <li className="flex gap-2 items-center">
+                    <Phone className="w-4 h-4 text-brand-blue shrink-0" />
+                    <span>(02945) 456053</span>
                   </li>
                   <li className="flex gap-2 items-center">
                     <Mail className="w-4 h-4 text-brand-blue shrink-0" />

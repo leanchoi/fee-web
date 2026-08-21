@@ -134,9 +134,17 @@ export function Footer() {
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-lightblue"></span>
                   <span>Administración</span>
                 </div>
-                <div className="pl-3 text-[11px] text-white/70 flex items-center gap-1.5">
-                  <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
-                  <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
+                <div className="pl-3 space-y-0.5 text-[11px] text-white/70">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <a href="https://wa.me/5492945416363" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                      +54 9 2945 41-6363 (WhatsApp)
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
+                  </div>
                 </div>
               </li>
 
