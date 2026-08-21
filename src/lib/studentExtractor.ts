@@ -50,13 +50,23 @@ export interface ExtractedStudent {
  * Parsea un texto de hermanos guardado como string si no viene en lista estructurada
  * Ej: "Juan Perez (Nivel Inicial - Sala de 4) | Sofia Perez (Nivel Primario - 2° Grado)"
  */
-function parseSiblingDetailsString(detailsStr: string): Array<{ name: string; level: string; grade: string; school: string }> {
+function parseSiblingDetailsString(detailsStr: string): Array<{ name: string; dni?: string; level: string; grade: string; school: string }> {
   if (!detailsStr || !detailsStr.trim()) return [];
   const parts = detailsStr.split(/[|;\n]+/).map(p => p.trim()).filter(Boolean);
   
   return parts.map(part => {
+    let rawPart = part;
+    let dni = "";
+
+    // Extraer DNI si viene con formato (DNI 12345678)
+    const dniMatch = rawPart.match(/\(DNI\s*([\d\.\-]+)\)/i);
+    if (dniMatch) {
+      dni = dniMatch[1].replace(/[^0-9]/g, "");
+      rawPart = rawPart.replace(/\(DNI\s*[\d\.\-]+\)/i, "").trim();
+    }
+
     // Si viene en formato "Nombre (Nivel - Grado)" o similar
-    const match = part.match(/^(.*?)\s*\((.*?)\)$/);
+    const match = rawPart.match(/^(.*?)\s*\((.*?)\)$/);
     if (match) {
       const name = match[1].trim();
       const inside = match[2].trim();
@@ -68,12 +78,12 @@ function parseSiblingDetailsString(detailsStr: string): Array<{ name: string; le
         const sub = inside.split("-")[1]?.trim();
         if (sub) grade = sub;
       }
-      return { name, level, grade, school };
+      return { name, dni, level, grade, school };
     }
 
-    const level = determineLevel(part);
+    const level = determineLevel(rawPart);
     const school = determineSchool(level);
-    return { name: part, level, grade: "-", school };
+    return { name: rawPart, dni, level, grade: "-", school };
   });
 }
 

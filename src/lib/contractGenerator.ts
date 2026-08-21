@@ -4,6 +4,7 @@ import { INSTITUTIONAL_SIGNATURE_PNG } from "./institutionalSignature";
 export interface SiblingData {
   id?: string;
   name: string;
+  dni?: string;
   level?: string;
   school: string;
   grade: string;

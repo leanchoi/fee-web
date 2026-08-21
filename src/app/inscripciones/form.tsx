@@ -89,7 +89,7 @@ export function EnrollmentForm() {
 
   // Lista tabulada de hermanos (hasta 4)
   const [siblingsList, setSiblingsList] = useState<SiblingData[]>([
-    { id: "sib-1", name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
+    { id: "sib-1", name: "", dni: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
   ]);
 
   // Declaraciones legales
@@ -125,7 +125,7 @@ export function EnrollmentForm() {
     const newId = `sib-${Date.now()}`;
     setSiblingsList(prev => [
       ...prev,
-      { id: newId, name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
+      { id: newId, name: "", dni: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }
     ]);
   };
 
@@ -148,7 +148,7 @@ export function EnrollmentForm() {
     });
   };
 
-  const handleSiblingFieldChange = (index: number, field: "name" | "grade", value: string) => {
+  const handleSiblingFieldChange = (index: number, field: "name" | "dni" | "grade", value: string) => {
     setSiblingsList(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
@@ -179,8 +179,20 @@ export function EnrollmentForm() {
     if (formData.hasSiblings) {
       const validSiblings = siblingsList.filter(s => s.name.trim().length > 0);
       if (validSiblings.length === 0) {
-        setErrorMessage("Indicó que tiene hermanos/as en la institución. Por favor ingrese al menos el nombre y curso de uno de ellos o seleccione 'No'.");
+        setErrorMessage("Indicó que tiene hermanos/as en la institución. Por favor complete los datos (Nombre, DNI y Curso) de al menos un hermano/a o seleccione 'No'.");
         return false;
+      }
+
+      for (let i = 0; i < siblingsList.length; i++) {
+        const sib = siblingsList[i];
+        if (!sib.name.trim()) {
+          setErrorMessage(`Por favor ingrese el Nombre y Apellido del Hermano/a #${i + 1}.`);
+          return false;
+        }
+        if (!sib.dni || !sib.dni.trim()) {
+          setErrorMessage(`Por favor ingrese el DNI del Hermano/a #${i + 1} (${sib.name}).`);
+          return false;
+        }
       }
     }
 
@@ -242,7 +254,7 @@ export function EnrollmentForm() {
       if (formData.hasSiblings) {
         const formattedSiblings = siblingsList
           .filter(s => s.name.trim().length > 0)
-          .map(s => `${s.name.trim()} (${s.level || determineLevel(s.grade, s.school)} - ${s.grade})`)
+          .map(s => `${s.name.trim()}${s.dni?.trim() ? ` (DNI ${s.dni.trim()})` : ""} (${s.level || determineLevel(s.grade, s.school)} - ${s.grade})`)
           .join(" | ");
         setFormData(prev => ({
           ...prev,
@@ -571,7 +583,7 @@ export function EnrollmentForm() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                          <div className="sm:col-span-5">
+                          <div className="sm:col-span-4">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                               Nombre y Apellido <span className="text-red-500">*</span>
                             </label>
@@ -585,7 +597,21 @@ export function EnrollmentForm() {
                             />
                           </div>
 
-                          <div className="sm:col-span-4">
+                          <div className="sm:col-span-3">
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              DNI Hermano/a <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={sib.dni || ""}
+                              onChange={e => handleSiblingFieldChange(index, "dni", e.target.value)}
+                              placeholder="Sin puntos (ej. 48123456)"
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                               Nivel 2027 <span className="text-red-500">*</span>
                             </label>
@@ -600,7 +626,7 @@ export function EnrollmentForm() {
                             </select>
                           </div>
 
-                          <div className="sm:col-span-3">
+                          <div className="sm:col-span-2">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                               Sala / Grado / Año <span className="text-red-500">*</span>
                             </label>
