@@ -60,8 +60,16 @@ import {
   RefreshCw,
   KeyRound,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Download,
+  CheckSquare,
+  Square,
+  FileSpreadsheet,
+  FolderArchive,
+  ExternalLink
 } from "lucide-react";
+import JSZip from "jszip";
+import { downloadFilledContract, generateContractPdf } from "@/lib/contractGenerator";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -225,38 +233,51 @@ export function AdminDashboard({
   const [enrollmentList, setEnrollmentList] = useState<Enrollment[]>(enrollments || []);
   const [contactList, setContactList] = useState<ContactMessage[]>(contactMessages || []);
 
-  // Enrollments Filtering & Analytics State
+  // Enrollments Filtering, Selection & ZIP Export State
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("");
+  const [enrollmentSchoolFilter, setEnrollmentSchoolFilter] = useState<"all" | "Escuela N.º 1030" | "Escuela N.º 1739">("all");
   const [enrollmentLevelFilter, setEnrollmentLevelFilter] = useState<"all" | "inicial" | "primario" | "secundario">("all");
   const [enrollmentDatePreset, setEnrollmentDatePreset] = useState<"all" | "today" | "yesterday" | "7days" | "30days" | "thisYear" | "custom">("all");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [enrollmentViewMode, setEnrollmentViewMode] = useState<"cards" | "table">("cards");
+  const [selectedEnrollmentIds, setSelectedEnrollmentIds] = useState<string[]>([]);
+  const [isZipping, setIsZipping] = useState(false);
+  const [inspectingEnrollment, setInspectingEnrollment] = useState<any | null>(null);
 
   const filteredEnrollments = useMemo(() => {
-    return enrollmentList.filter(e => {
+    return enrollmentList.filter((e: any) => {
       // 1. Search Query
       if (enrollmentSearchQuery.trim()) {
         const q = enrollmentSearchQuery.toLowerCase();
         const matchName = (e.studentName || "").toLowerCase().includes(q);
-        const matchTutor = (e.tutorName || "").toLowerCase().includes(q);
-        const matchEmail = (e.tutorEmail || "").toLowerCase().includes(q);
-        const matchPhone = (e.tutorPhone || "").toLowerCase().includes(q);
+        const matchDni = (e.studentDni || "").toLowerCase().includes(q);
+        const matchTutor = (e.parent1Name || e.tutorName || "").toLowerCase().includes(q);
+        const matchEmail = (e.parent1Email || e.tutorEmail || "").toLowerCase().includes(q);
+        const matchPhone = (e.parent1Phone || e.tutorPhone || "").toLowerCase().includes(q);
         const matchGrade = (e.studentGrade || "").toLowerCase().includes(q);
+        const matchSchool = (e.school || "").toLowerCase().includes(q);
         const matchComments = (e.comments || "").toLowerCase().includes(q);
-        if (!matchName && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchComments) {
+        if (!matchName && !matchDni && !matchTutor && !matchEmail && !matchPhone && !matchGrade && !matchSchool && !matchComments) {
           return false;
         }
       }
 
-      // 2. Level Filter
+      // 2. School Filter
+      if (enrollmentSchoolFilter !== "all") {
+        const sch = (e.school || "Escuela N.º 1030").toLowerCase();
+        if (enrollmentSchoolFilter === "Escuela N.º 1030" && !sch.includes("1030")) return false;
+        if (enrollmentSchoolFilter === "Escuela N.º 1739" && !sch.includes("1739")) return false;
+      }
+
+      // 3. Level Filter
       if (enrollmentLevelFilter !== "all") {
-        const lvl = (e.studentLevel || "").toLowerCase();
+        const lvl = (e.studentLevel || e.studentGrade || "").toLowerCase();
         if (!lvl.includes(enrollmentLevelFilter)) return false;
       }
 
-      // 3. Date Preset Filter
+      // 4. Date Preset Filter
       const itemDate = new Date(e.createdAt);
       const now = new Date();
       if (enrollmentDatePreset === "today") {
@@ -288,7 +309,211 @@ export function AdminDashboard({
 
       return true;
     });
-  }, [enrollmentList, enrollmentSearchQuery, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
+  }, [enrollmentList, enrollmentSearchQuery, enrollmentSchoolFilter, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
+
+  const handleSelectAllEnrollments = () => {
+    if (selectedEnrollmentIds.length === filteredEnrollments.length) {
+      setSelectedEnrollmentIds([]);
+    } else {
+      setSelectedEnrollmentIds(filteredEnrollments.map(e => e.id));
+    }
+  };
+
+  const handleToggleSelectEnrollment = (id: string) => {
+    setSelectedEnrollmentIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDownloadSinglePdf = (e: any) => {
+    downloadFilledContract({
+      studentName: e.studentName || "",
+      studentDni: e.studentDni || "",
+      school: e.school || "Escuela N.º 1030",
+      level: e.studentLevel || "Nivel Primario",
+      studentGrade: e.studentGrade || "",
+      hasSiblings: Boolean(e.hasSiblings),
+      siblingDetails: e.siblingDetails || "",
+      parent1Name: e.parent1Name || e.tutorName || "",
+      parent1Dni: e.parent1Dni || "",
+      parent1Relationship: e.parent1Relationship || "Madre/Padre/Tutor",
+      parent1Phone: e.parent1Phone || e.tutorPhone || "",
+      parent1Email: e.parent1Email || e.tutorEmail || "",
+      parent1Address: e.parent1Address || "",
+      parent1City: e.parent1City || "Esquel",
+      parent1PostalCode: e.parent1PostalCode || "9200",
+      isSingleParent: Boolean(e.isSingleParent),
+      parent2Name: e.parent2Name || "",
+      parent2Dni: e.parent2Dni || "",
+      parent2Relationship: e.parent2Relationship || "",
+      parent2Phone: e.parent2Phone || "",
+      parent2Email: e.parent2Email || "",
+      parent2Address: e.parent2Address || "",
+      parent2City: e.parent2City || "Esquel",
+      parent2PostalCode: e.parent2PostalCode || "9200",
+      billingName: e.billingName || e.parent1Name || e.tutorName || "",
+      billingCuit: e.billingCuit || e.parent1Dni || "",
+      billingTaxCondition: e.billingTaxCondition || "Consumidor Final",
+      billingEmail: e.billingEmail || e.parent1Email || e.tutorEmail || "",
+      billingAddress: e.billingAddress || e.parent1Address || "",
+      signature1Data: e.signature1Data || null,
+      signature2Data: e.signature2Data || null,
+      trackingNumber: e.trackingNumber || e.id,
+      signedAt: e.createdAt
+    });
+  };
+
+  const handleDownloadZip = async (itemsToZip: any[], zipName: string) => {
+    if (itemsToZip.length === 0) return;
+    setIsZipping(true);
+    try {
+      const zip = new JSZip();
+      for (const item of itemsToZip) {
+        const doc = generateContractPdf({
+          studentName: item.studentName || "",
+          studentDni: item.studentDni || "",
+          school: item.school || "Escuela N.º 1030",
+          level: item.studentLevel || "Nivel Primario",
+          studentGrade: item.studentGrade || "",
+          hasSiblings: Boolean(item.hasSiblings),
+          siblingDetails: item.siblingDetails || "",
+          parent1Name: item.parent1Name || item.tutorName || "",
+          parent1Dni: item.parent1Dni || "",
+          parent1Relationship: item.parent1Relationship || "Madre/Padre/Tutor",
+          parent1Phone: item.parent1Phone || item.tutorPhone || "",
+          parent1Email: item.parent1Email || item.tutorEmail || "",
+          parent1Address: item.parent1Address || "",
+          parent1City: item.parent1City || "Esquel",
+          parent1PostalCode: item.parent1PostalCode || "9200",
+          isSingleParent: Boolean(item.isSingleParent),
+          parent2Name: item.parent2Name || "",
+          parent2Dni: item.parent2Dni || "",
+          parent2Relationship: item.parent2Relationship || "",
+          parent2Phone: item.parent2Phone || "",
+          parent2Email: item.parent2Email || "",
+          parent2Address: item.parent2Address || "",
+          parent2City: item.parent2City || "Esquel",
+          parent2PostalCode: item.parent2PostalCode || "9200",
+          billingName: item.billingName || item.parent1Name || item.tutorName || "",
+          billingCuit: item.billingCuit || item.parent1Dni || "",
+          billingTaxCondition: item.billingTaxCondition || "Consumidor Final",
+          billingEmail: item.billingEmail || item.parent1Email || item.tutorEmail || "",
+          billingAddress: item.billingAddress || item.parent1Address || "",
+          signature1Data: item.signature1Data || null,
+          signature2Data: item.signature2Data || null,
+          trackingNumber: item.trackingNumber || item.id,
+          signedAt: item.createdAt
+        });
+        const pdfBlob = doc.output("blob");
+        const cleanName = (item.studentName || "Aspirante").replace(/[^a-zA-Z0-9]/g, "_");
+        const schoolFolder = (item.school || "Escuela_1030").includes("1739") ? "Escuela_1739" : "Escuela_1030";
+        zip.folder(schoolFolder)?.file(`Contrato_2027_${cleanName}_${item.studentDni || item.id}.pdf`, pdfBlob);
+      }
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${zipName}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error generating zip:", err);
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (filteredEnrollments.length === 0) return;
+    const headers = [
+      "ID",
+      "N.° Trámite",
+      "Fecha",
+      "Escuela",
+      "Nivel",
+      "Sala/Grado/Año",
+      "Aspirante",
+      "DNI Aspirante",
+      "Hermanos",
+      "Detalle Hermanos",
+      "Responsable 1",
+      "DNI Resp 1",
+      "Vínculo Resp 1",
+      "Teléfono Resp 1",
+      "Email Resp 1",
+      "Domicilio Resp 1",
+      "Ciudad Resp 1",
+      "CP Resp 1",
+      "Único Responsable",
+      "Responsable 2",
+      "DNI Resp 2",
+      "Vínculo Resp 2",
+      "Teléfono Resp 2",
+      "Email Resp 2",
+      "Domicilio Resp 2",
+      "Facturación Titular",
+      "Facturación CUIT",
+      "Facturación Condición",
+      "Facturación Email",
+      "Facturación Domicilio",
+      "Estado",
+      "Firma 1 Registrada",
+      "Firma 2 Registrada"
+    ];
+
+    const rows = filteredEnrollments.map((e: any) => [
+      e.id,
+      e.trackingNumber || `FEE-2027-${e.id.substring(0, 5)}`,
+      new Date(e.createdAt).toLocaleDateString() + " " + new Date(e.createdAt).toLocaleTimeString(),
+      e.school || "Escuela N.º 1030",
+      e.studentLevel || "-",
+      e.studentGrade || "-",
+      e.studentName || "-",
+      e.studentDni || "-",
+      e.hasSiblings ? "SÍ" : "NO",
+      e.siblingDetails || "-",
+      e.parent1Name || e.tutorName || "-",
+      e.parent1Dni || "-",
+      e.parent1Relationship || "Madre/Padre/Tutor",
+      e.parent1Phone || e.tutorPhone || "-",
+      e.parent1Email || e.tutorEmail || "-",
+      e.parent1Address || "-",
+      e.parent1City || "Esquel",
+      e.parent1PostalCode || "9200",
+      e.isSingleParent ? "SÍ" : "NO",
+      e.parent2Name || "-",
+      e.parent2Dni || "-",
+      e.parent2Relationship || "-",
+      e.parent2Phone || "-",
+      e.parent2Email || "-",
+      e.parent2Address || "-",
+      e.billingName || e.parent1Name || e.tutorName || "-",
+      e.billingCuit || e.parent1Dni || "-",
+      e.billingTaxCondition || "Consumidor Final",
+      e.billingEmail || e.parent1Email || e.tutorEmail || "-",
+      e.billingAddress || e.parent1Address || "-",
+      e.status || "PENDING",
+      e.signature1Data ? "SÍ" : "NO",
+      e.signature2Data ? "SÍ" : (e.isSingleParent ? "N/A" : "NO")
+    ]);
+
+    const csvContent = "\uFEFF" + [
+      headers.map(h => `"${h}"`).join(";"),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    ].join("\r\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Reinscripciones_2027_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   
   // User Management State
   const [userList, setUserList] = useState<any[]>(users || []);
@@ -617,40 +842,77 @@ export function AdminDashboard({
         {hasEnrollmentsPerm && activeTab === "enrollments" && (
           <div>
             {/* Header with Title and Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-brand-green">Inscripciones y Solicitudes</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-brand-green">Reinscripciones y Solicitudes 2027</h2>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wide">
+                    Ciclo 2027
+                  </span>
+                </div>
                 <p className="text-xs text-brand-foreground/70 mt-1 font-medium">
-                  Gestioná los aspirantes, filtrá por niveles o períodos y consultá las métricas de admisión.
+                  Gestión integral de reinscripciones de las Escuelas N.º 1030 y N.º 1739 con contratos firmados y exportación.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+
+              {/* Action Buttons Toolbar */}
+              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                 <button 
                   onClick={() => setShowAnalyticsModal(true)}
-                  className="flex items-center gap-2 bg-brand-green text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-full hover:bg-brand-blue transition-all shadow-md shrink-0 cursor-pointer"
+                  className="flex items-center gap-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green font-bold text-xs px-3.5 py-2 rounded-xl transition-all border border-brand-green/20 cursor-pointer shadow-2xs"
                 >
-                  <BarChart3 className="w-4 h-4" /> Estadísticas & Métricas
+                  <BarChart3 className="w-4 h-4" /> Métricas
                 </button>
-                <div className="bg-brand-gray/10 p-1 rounded-full flex items-center shrink-0 border">
+
+                <button 
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs px-3.5 py-2 rounded-xl transition-all border border-emerald-200 cursor-pointer shadow-2xs"
+                  title="Exportar base de datos completa a Excel / CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Excel
+                </button>
+
+                {selectedEnrollmentIds.length > 0 && (
+                  <button 
+                    disabled={isZipping}
+                    onClick={() => handleDownloadZip(filteredEnrollments.filter(e => selectedEnrollmentIds.includes(e.id)), `Contratos_Seleccionados_${selectedEnrollmentIds.length}`)}
+                    className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  >
+                    {isZipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4" />}
+                    Descargar Seleccionados ({selectedEnrollmentIds.length} ZIP)
+                  </button>
+                )}
+
+                <button 
+                  disabled={isZipping || filteredEnrollments.length === 0}
+                  onClick={() => handleDownloadZip(filteredEnrollments, `Contratos_Reinscripciones_2027_Total_${filteredEnrollments.length}`)}
+                  className="flex items-center gap-1.5 bg-brand-blue hover:bg-brand-green text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  title="Descargar todos los contratos filtrados en un archivo comprimido ZIP"
+                >
+                  {isZipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Descargar Todos (ZIP)
+                </button>
+
+                <div className="bg-brand-gray/10 p-1 rounded-xl flex items-center shrink-0 border ml-auto lg:ml-0">
                   <button
                     onClick={() => setEnrollmentViewMode("cards")}
                     className={cn(
-                      "p-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                      enrollmentViewMode === "cards" ? "bg-white text-brand-blue shadow-sm" : "text-brand-foreground/60 hover:text-brand-blue"
+                      "p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                      enrollmentViewMode === "cards" ? "bg-white text-brand-blue shadow-2xs" : "text-brand-foreground/60 hover:text-brand-blue"
                     )}
                     title="Vista en Fichas"
                   >
-                    <LayoutGrid className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Fichas</span>
+                    <LayoutGrid className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setEnrollmentViewMode("table")}
                     className={cn(
-                      "p-1.5 sm:px-3 sm:py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                      enrollmentViewMode === "table" ? "bg-white text-brand-blue shadow-sm" : "text-brand-foreground/60 hover:text-brand-blue"
+                      "p-1.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer",
+                      enrollmentViewMode === "table" ? "bg-white text-brand-blue shadow-2xs" : "text-brand-foreground/60 hover:text-brand-blue"
                     )}
                     title="Vista en Tabla"
                   >
-                    <List className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Tabla</span>
+                    <List className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -659,76 +921,63 @@ export function AdminDashboard({
             {/* Quick Metrics KPI Banner */}
             {(() => {
               const totalAll = enrollmentList.length;
-              const inicialCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("inicial")).length;
-              const primarioCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("primario")).length;
-              const secundarioCount = enrollmentList.filter(e => (e.studentLevel || "").toLowerCase().includes("secundario")).length;
+              const esc1030Count = enrollmentList.filter((e: any) => (e.school || "").includes("1030") || !(e.school || "").includes("1739")).length;
+              const esc1739Count = enrollmentList.filter((e: any) => (e.school || "").includes("1739")).length;
 
               return (
                 <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                     <button
-                      onClick={() => setEnrollmentLevelFilter("all")}
+                      onClick={() => {
+                        setEnrollmentSchoolFilter("all");
+                        setEnrollmentLevelFilter("all");
+                      }}
                       className={cn(
                         "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentLevelFilter === "all" ? "bg-brand-blue text-white shadow-md scale-[1.02] border-brand-blue" : "bg-brand-blue/5 border-brand-blue/10 hover:bg-brand-blue/10"
+                        enrollmentSchoolFilter === "all" ? "bg-brand-blue text-white shadow-md scale-[1.01] border-brand-blue" : "bg-brand-blue/5 border-brand-blue/10 hover:bg-brand-blue/10"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "all" ? "text-white/80" : "text-brand-blue")}>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "all" ? "text-white/80" : "text-brand-blue")}>
                         Total General
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "all" ? "text-white" : "text-brand-blue")}>
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "all" ? "text-white" : "text-brand-blue")}>
                         {totalAll}
                       </span>
                     </button>
 
                     <button
-                      onClick={() => setEnrollmentLevelFilter("inicial")}
+                      onClick={() => setEnrollmentSchoolFilter("Escuela N.º 1030")}
                       className={cn(
                         "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentLevelFilter === "inicial" ? "bg-brand-yellow-dark text-white shadow-md scale-[1.02] border-brand-yellow-dark" : "bg-brand-yellow/10 border-brand-yellow/20 hover:bg-brand-yellow/20"
+                        enrollmentSchoolFilter === "Escuela N.º 1030" ? "bg-emerald-700 text-white shadow-md scale-[1.01] border-emerald-700" : "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "inicial" ? "text-white/80" : "text-brand-yellow-dark")}>
-                        Nivel Inicial
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "Escuela N.º 1030" ? "text-white/80" : "text-emerald-800")}>
+                        Escuela N.º 1030 (Jardín / Primaria)
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "inicial" ? "text-white" : "text-brand-yellow-dark")}>
-                        {inicialCount}
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "Escuela N.º 1030" ? "text-white" : "text-emerald-800")}>
+                        {esc1030Count}
                       </span>
                     </button>
 
                     <button
-                      onClick={() => setEnrollmentLevelFilter("primario")}
+                      onClick={() => setEnrollmentSchoolFilter("Escuela N.º 1739")}
                       className={cn(
                         "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentLevelFilter === "primario" ? "bg-brand-green text-white shadow-md scale-[1.02] border-brand-green" : "bg-brand-green/5 border-brand-green/10 hover:bg-brand-green/10"
+                        enrollmentSchoolFilter === "Escuela N.º 1739" ? "bg-blue-800 text-white shadow-md scale-[1.01] border-blue-800" : "bg-blue-50/70 border-blue-200 hover:bg-blue-100"
                       )}
                     >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "primario" ? "text-white/80" : "text-brand-green")}>
-                        Nivel Primario
+                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "Escuela N.º 1739" ? "text-white/80" : "text-blue-900")}>
+                        Escuela N.º 1739 (Secundaria)
                       </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "primario" ? "text-white" : "text-brand-green")}>
-                        {primarioCount}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setEnrollmentLevelFilter("secundario")}
-                      className={cn(
-                        "p-4 rounded-2xl border text-left transition-all cursor-pointer",
-                        enrollmentLevelFilter === "secundario" ? "bg-brand-lightblue text-white shadow-md scale-[1.02] border-brand-lightblue" : "bg-brand-lightblue/5 border-brand-lightblue/10 hover:bg-brand-lightblue/10"
-                      )}
-                    >
-                      <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentLevelFilter === "secundario" ? "text-white/80" : "text-brand-lightblue")}>
-                        Nivel Secundario
-                      </span>
-                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentLevelFilter === "secundario" ? "text-white" : "text-brand-lightblue")}>
-                        {secundarioCount}
+                      <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "Escuela N.º 1739" ? "text-white" : "text-blue-900")}>
+                        {esc1739Count}
                       </span>
                     </button>
                   </div>
 
                   {/* Filter & Search Bar */}
-                  <div className="bg-white border rounded-2xl p-4 sm:p-5 shadow-sm mb-6 space-y-4">
+                  <div className="bg-white border rounded-2xl p-4 sm:p-5 shadow-xs mb-6 space-y-4">
                     <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
                       {/* Search Bar */}
                       <div className="relative flex-1">
@@ -737,7 +986,7 @@ export function AdminDashboard({
                           type="text"
                           value={enrollmentSearchQuery}
                           onChange={(e) => setEnrollmentSearchQuery(e.target.value)}
-                          placeholder="Buscar por aspirante, tutor, email, teléfono o comentarios..."
+                          placeholder="Buscar por aspirante, DNI, responsable, teléfono, email, curso..."
                           className="w-full pl-10 pr-9 py-2 border rounded-xl text-xs sm:text-sm font-medium bg-brand-gray/5 focus:bg-white focus:ring-2 focus:ring-brand-green/20 outline-none transition-all"
                         />
                         {enrollmentSearchQuery && (
@@ -771,7 +1020,7 @@ export function AdminDashboard({
                             className={cn(
                               "text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer",
                               enrollmentDatePreset === preset.key
-                                ? "bg-brand-blue text-white shadow-sm"
+                                ? "bg-brand-blue text-white shadow-xs"
                                 : "bg-brand-gray/10 hover:bg-brand-gray/20 text-brand-foreground/70"
                             )}
                           >
@@ -810,7 +1059,7 @@ export function AdminDashboard({
                               setCustomStartDate("");
                               setCustomEndDate("");
                             }}
-                            className="text-[11px] text-red-500 hover:underline ml-auto"
+                            className="text-[11px] text-red-500 hover:underline ml-auto cursor-pointer"
                           >
                             Limpiar fechas
                           </button>
@@ -818,16 +1067,36 @@ export function AdminDashboard({
                       </div>
                     )}
 
-                    {/* Active Filters Summary */}
+                    {/* Active Filters & Multi-Select Status */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t text-xs">
-                      <span className="text-brand-foreground/70 font-semibold">
-                        Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {enrollmentList.length} inscripciones
-                      </span>
-                      {(enrollmentSearchQuery || enrollmentLevelFilter !== "all" || enrollmentDatePreset !== "all" || customStartDate || customEndDate) && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleSelectAllEnrollments}
+                          className="font-bold text-brand-blue hover:underline flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {selectedEnrollmentIds.length === filteredEnrollments.length && filteredEnrollments.length > 0 ? (
+                            <>
+                              <CheckSquare className="w-4 h-4 text-emerald-600" /> Deseleccionar todo
+                            </>
+                          ) : (
+                            <>
+                              <Square className="w-4 h-4 text-slate-400" /> Seleccionar todos ({filteredEnrollments.length})
+                            </>
+                          )}
+                        </button>
+                        <span className="text-brand-foreground/60">|</span>
+                        <span className="text-brand-foreground/70 font-semibold">
+                          Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {enrollmentList.length} registros
+                        </span>
+                      </div>
+
+                      {(enrollmentSearchQuery || enrollmentSchoolFilter !== "all" || enrollmentLevelFilter !== "all" || enrollmentDatePreset !== "all" || customStartDate || customEndDate) && (
                         <button
                           type="button"
                           onClick={() => {
                             setEnrollmentSearchQuery("");
+                            setEnrollmentSchoolFilter("all");
                             setEnrollmentLevelFilter("all");
                             setEnrollmentDatePreset("all");
                             setCustomStartDate("");
@@ -844,66 +1113,120 @@ export function AdminDashboard({
                   {/* Render Cards or Table */}
                   {enrollmentViewMode === "cards" ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                      {filteredEnrollments.map((e) => {
-                        const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
-                        let levelColor = "bg-brand-yellow/10 text-brand-yellow-dark border-brand-yellow/20";
-                        if ((e.studentLevel || "").toLowerCase().includes("primario")) {
-                          levelColor = "bg-brand-green/10 text-brand-green border-brand-green/20";
-                        } else if ((e.studentLevel || "").toLowerCase().includes("secundario")) {
-                          levelColor = "bg-brand-blue/10 text-brand-blue border-brand-blue/20";
-                        }
+                      {filteredEnrollments.map((e: any) => {
+                        const isSelected = selectedEnrollmentIds.includes(e.id);
+                        const isEsc1739 = (e.school || "").includes("1739");
+
                         return (
-                          <div key={e.id} className="bg-white border rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                          <div 
+                            key={e.id} 
+                            className={cn(
+                              "bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative",
+                              isSelected ? "ring-2 ring-emerald-500 border-emerald-300 bg-emerald-50/20" : ""
+                            )}
+                          >
                             <div>
-                              <div className="flex justify-between items-start gap-4 mb-4">
-                                <div className="w-10 h-10 rounded-full bg-brand-gray/10 flex items-center justify-center font-extrabold text-brand-blue shrink-0">
-                                  {initial}
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-[10px] text-brand-foreground/50 font-medium block">
-                                    {new Date(e.createdAt).toLocaleDateString()}
+                              {/* Header Card */}
+                              <div className="flex justify-between items-start gap-3 mb-3">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handleToggleSelectEnrollment(e.id)}
+                                    className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                  <span className={cn(
+                                    "text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border",
+                                    isEsc1739 ? "bg-blue-50 text-blue-800 border-blue-200" : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  )}>
+                                    {e.school || "Escuela N.º 1030"}
                                   </span>
-                                  <span className={cn("inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1", levelColor)}>
-                                    {e.studentLevel}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
-                              <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
-                              
-                              <div className="space-y-2 border-t pt-3 text-xs mb-4">
-                                <p className="text-brand-foreground/75"><span className="font-bold">Tutor:</span> {e.tutorName}</p>
-                                <p className="text-brand-foreground/75 flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5 text-brand-blue" /> {e.tutorEmail}</p>
-                                <p className="text-brand-foreground/75 flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-brand-green" /> {e.tutorPhone}</p>
+                                </label>
+                                <span className="text-[10px] text-brand-foreground/50 font-semibold">
+                                  {new Date(e.createdAt).toLocaleDateString()}
+                                </span>
                               </div>
 
-                              {e.comments && (
-                                <div className="bg-brand-gray/5 border p-2.5 rounded-xl text-[11px] text-brand-foreground/80 leading-normal max-h-24 overflow-y-auto mb-4">
-                                  <span className="font-bold block mb-0.5">Comentarios:</span>
-                                  {e.comments}
+                              {/* Student Info */}
+                              <div className="mb-3">
+                                <h4 className="font-extrabold text-brand-blue text-base leading-snug">
+                                  {e.studentName}
+                                </h4>
+                                <div className="flex items-center gap-2 text-xs text-brand-foreground/70 mt-0.5 font-medium">
+                                  <span>DNI: {e.studentDni || "---"}</span>
+                                  <span>•</span>
+                                  <span className="font-bold text-emerald-700">{e.studentGrade}</span>
                                 </div>
-                              )}
+                                {e.hasSiblings && (
+                                  <p className="text-[10px] text-amber-700 bg-amber-50 rounded-md px-2 py-0.5 mt-1.5 border border-amber-200 inline-block">
+                                    Hno/a: {e.siblingDetails || "Sí"}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Responsible & Contact */}
+                              <div className="space-y-1.5 border-t pt-3 text-xs mb-3 text-slate-700">
+                                <p className="truncate">
+                                  <span className="font-bold text-slate-900">Resp. 1:</span> {e.parent1Name || e.tutorName || "---"} ({e.parent1Relationship || "Tutor"})
+                                </p>
+                                <p className="flex items-center gap-1.5 truncate text-slate-600">
+                                  <Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.parent1Email || e.tutorEmail}
+                                </p>
+                                <p className="flex items-center gap-1.5 text-slate-600">
+                                  <Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.parent1Phone || e.tutorPhone}
+                                </p>
+                              </div>
+
+                              {/* Signatures indicator */}
+                              <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-200/60 mb-3">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Firma Digital 1: {e.signature1Data ? "✓ Registrada" : "Pendiente"}</span>
+                                {e.isSingleParent ? (
+                                  <span className="text-amber-700 ml-auto">(Único Resp.)</span>
+                                ) : (
+                                  <span className="ml-auto">F2: {e.signature2Data ? "✓" : "---"}</span>
+                                )}
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2 border-t pt-3">
-                              <a href={`mailto:${e.tutorEmail}`} className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors">
-                                Enviar Mail
-                              </a>
-                              <a href={`tel:${e.tutorPhone}`} className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors">
-                                Llamar
-                              </a>
-                              <button 
-                                onClick={() => handleDeleteEnrollment(e.id)} 
-                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer" 
-                                title="Eliminar inscripción"
+                            {/* Card Footer Actions */}
+                            <div className="border-t pt-3 space-y-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadSinglePdf(e)}
+                                className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Download className="w-3.5 h-3.5" /> Descargar Contrato (PDF)
                               </button>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setInspectingEnrollment(e)}
+                                  className="flex-1 text-center bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
+                                >
+                                  Ver Ficha
+                                </button>
+                                <a 
+                                  href={`mailto:${e.parent1Email || e.tutorEmail}`} 
+                                  className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border"
+                                  title="Enviar correo"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                </a>
+                                <button 
+                                  onClick={() => handleDeleteEnrollment(e.id)} 
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
+                                  title="Eliminar inscripción"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
                       })}
+
                       {filteredEnrollments.length === 0 && (
                         <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
                           No se encontraron inscripciones con los filtros seleccionados.
@@ -911,43 +1234,94 @@ export function AdminDashboard({
                       )}
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-xl border mb-8">
+                    <div className="overflow-x-auto rounded-2xl border mb-8 shadow-xs bg-white">
                       <table className="w-full text-left border-collapse">
                         <thead>
-                          <tr className="bg-brand-gray/5 text-brand-green text-sm">
-                            <th className="p-4 font-bold border-b">Recibido</th>
-                            <th className="p-4 font-bold border-b">Aspirante</th>
-                            <th className="p-4 font-bold border-b">Nivel / Grado</th>
-                            <th className="p-4 font-bold border-b">Tutor</th>
-                            <th className="p-4 font-bold border-b">Contacto</th>
-                            <th className="p-4 font-bold border-b">Comentarios</th>
-                            <th className="p-4 font-bold border-b text-right">Acción</th>
+                          <tr className="bg-slate-50 text-slate-700 text-xs border-b">
+                            <th className="p-4 w-10">
+                              <input
+                                type="checkbox"
+                                checked={selectedEnrollmentIds.length === filteredEnrollments.length && filteredEnrollments.length > 0}
+                                onChange={handleSelectAllEnrollments}
+                                className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                              />
+                            </th>
+                            <th className="p-4 font-bold">Fecha / N.°</th>
+                            <th className="p-4 font-bold">Escuela & Curso</th>
+                            <th className="p-4 font-bold">Aspirante</th>
+                            <th className="p-4 font-bold">Responsable Principal</th>
+                            <th className="p-4 font-bold">Firmas</th>
+                            <th className="p-4 font-bold text-right">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="text-sm">
-                          {filteredEnrollments.map((e) => (
-                            <tr key={e.id} className="border-b last:border-0 hover:bg-brand-green/5 transition-colors">
-                              <td className="p-4 text-brand-foreground/70">{new Date(e.createdAt).toLocaleDateString()}</td>
-                              <td className="p-4 font-semibold text-brand-blue">{e.studentName}</td>
-                              <td className="p-4">
-                                <span className="px-2 py-1 bg-brand-green/10 text-brand-green rounded-md font-semibold text-xs">
-                                  {e.studentLevel} ({e.studentGrade})
-                                </span>
-                              </td>
-                              <td className="p-4 font-medium">{e.tutorName}</td>
-                              <td className="p-4 text-xs text-brand-foreground/70">{e.tutorEmail}<br/>{e.tutorPhone}</td>
-                              <td className="p-4 max-w-[150px] truncate text-xs" title={e.comments || ""}>{e.comments || "-"}</td>
-                              <td className="p-4 text-right">
-                                <button 
-                                  onClick={() => handleDeleteEnrollment(e.id)} 
-                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" 
-                                  title="Eliminar inscripción"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                        <tbody className="text-xs">
+                          {filteredEnrollments.map((e: any) => {
+                            const isSelected = selectedEnrollmentIds.includes(e.id);
+                            return (
+                              <tr key={e.id} className={cn("border-b last:border-0 hover:bg-emerald-50/30 transition-colors", isSelected ? "bg-emerald-50/40" : "")}>
+                                <td className="p-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handleToggleSelectEnrollment(e.id)}
+                                    className="w-4 h-4 text-emerald-600 rounded-md border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="p-4 text-slate-500 whitespace-nowrap">
+                                  <span className="font-semibold text-slate-800 block">{new Date(e.createdAt).toLocaleDateString()}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">{e.trackingNumber || `FEE-${e.id.substring(0, 5)}`}</span>
+                                </td>
+                                <td className="p-4">
+                                  <span className="font-bold text-slate-900 block">{e.school || "Escuela N.º 1030"}</span>
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md font-semibold text-[10px] inline-block mt-0.5">
+                                    {e.studentGrade}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-bold text-brand-blue">
+                                  <div>{e.studentName}</div>
+                                  <div className="text-[10px] text-slate-400 font-normal">DNI: {e.studentDni || "---"}</div>
+                                </td>
+                                <td className="p-4">
+                                  <div className="font-semibold text-slate-800">{e.parent1Name || e.tutorName}</div>
+                                  <div className="text-[11px] text-slate-500">{e.parent1Phone || e.tutorPhone} • {e.parent1Email || e.tutorEmail}</div>
+                                </td>
+                                <td className="p-4">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1",
+                                    e.signature1Data ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+                                  )}>
+                                    <ShieldCheck className="w-3 h-3" />
+                                    {e.signature1Data ? "Firmado" : "Pendiente"}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right whitespace-nowrap space-x-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadSinglePdf(e)}
+                                    className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer inline-flex"
+                                    title="Descargar Contrato Firmado (PDF)"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setInspectingEnrollment(e)}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer inline-flex"
+                                    title="Ver Ficha y Firmas"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteEnrollment(e.id)} 
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex" 
+                                    title="Eliminar inscripción"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {filteredEnrollments.length === 0 && (
                             <tr>
                               <td colSpan={7} className="p-8 text-center text-brand-gray">
@@ -1411,6 +1785,15 @@ export function AdminDashboard({
         <EnrollmentAnalyticsModal 
           enrollments={enrollmentList}
           onClose={() => setShowAnalyticsModal(false)}
+        />
+      )}
+
+      {/* Inspect Enrollment Details & Signatures Modal */}
+      {inspectingEnrollment && (
+        <InspectEnrollmentModal
+          enrollment={inspectingEnrollment}
+          onClose={() => setInspectingEnrollment(null)}
+          onDownloadPdf={handleDownloadSinglePdf}
         />
       )}
 
@@ -2922,5 +3305,186 @@ function ResetUserPasswordModal({
     </div>
   );
 }
+
+function InspectEnrollmentModal({
+  enrollment,
+  onClose,
+  onDownloadPdf
+}: {
+  enrollment: any;
+  onClose: () => void;
+  onDownloadPdf: (enrollment: any) => void;
+}) {
+  if (!enrollment) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 relative my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="bg-slate-900 text-white p-6 relative">
+          <button 
+            onClick={onClose}
+            className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center gap-2 mb-2">
+            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              {enrollment.school || "Escuela N.º 1030"}
+            </span>
+            <span className="text-slate-400 text-xs font-mono">
+              Trámite: {enrollment.trackingNumber || `FEE-2027-${enrollment.id.substring(0, 5)}`}
+            </span>
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            {enrollment.studentName}
+          </h2>
+          <p className="text-xs text-slate-300 mt-0.5">
+            DNI {enrollment.studentDni || "---"} • {enrollment.studentGrade} • Recibido el {new Date(enrollment.createdAt).toLocaleDateString()} a las {new Date(enrollment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto text-xs text-slate-700">
+          
+          {/* Sibling info */}
+          {enrollment.hasSiblings && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <span className="font-extrabold text-amber-900 block mb-1">Hermanos/as en la institución:</span>
+              <p className="text-amber-800 font-medium">{enrollment.siblingDetails || "Registrado en el formulario"}</p>
+            </div>
+          )}
+
+          {/* Responsable 1 */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 border-b pb-2">
+              <Users className="w-4 h-4 text-emerald-600" />
+              Responsable 1 ({enrollment.parent1Relationship || "Madre/Padre/Tutor"})
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div><span className="font-semibold text-slate-500">Nombre Completo:</span> <span className="font-bold text-slate-900">{enrollment.parent1Name || enrollment.tutorName}</span></div>
+              <div><span className="font-semibold text-slate-500">DNI:</span> <span className="font-bold text-slate-900">{enrollment.parent1Dni || "---"}</span></div>
+              <div><span className="font-semibold text-slate-500">Teléfono:</span> <span className="font-bold text-slate-900">{enrollment.parent1Phone || enrollment.tutorPhone}</span></div>
+              <div><span className="font-semibold text-slate-500">Email:</span> <span className="font-bold text-slate-900">{enrollment.parent1Email || enrollment.tutorEmail}</span></div>
+              <div className="sm:col-span-2"><span className="font-semibold text-slate-500">Domicilio:</span> <span className="font-bold text-slate-900">{enrollment.parent1Address || "---"} ({enrollment.parent1City || "Esquel"}, CP {enrollment.parent1PostalCode || "9200"})</span></div>
+            </div>
+          </div>
+
+          {/* Responsable 2 */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 border-b pb-2">
+              <Users className="w-4 h-4 text-blue-600" />
+              Responsable 2 {enrollment.isSingleParent ? "(Declaración de Único Responsable)" : `(${enrollment.parent2Relationship || "Madre/Padre/Tutor"})`}
+            </h4>
+            {enrollment.isSingleParent ? (
+              <p className="text-slate-600 italic">
+                El declarante consignó bajo declaración jurada ser el/la único/a responsable parental habilitado/a para formalizar la reinscripción.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <div><span className="font-semibold text-slate-500">Nombre Completo:</span> <span className="font-bold text-slate-900">{enrollment.parent2Name || "---"}</span></div>
+                <div><span className="font-semibold text-slate-500">DNI:</span> <span className="font-bold text-slate-900">{enrollment.parent2Dni || "---"}</span></div>
+                <div><span className="font-semibold text-slate-500">Teléfono:</span> <span className="font-bold text-slate-900">{enrollment.parent2Phone || "---"}</span></div>
+                <div><span className="font-semibold text-slate-500">Email:</span> <span className="font-bold text-slate-900">{enrollment.parent2Email || "---"}</span></div>
+                <div className="sm:col-span-2"><span className="font-semibold text-slate-500">Domicilio:</span> <span className="font-bold text-slate-900">{enrollment.parent2Address || "---"}</span></div>
+              </div>
+            )}
+          </div>
+
+          {/* Facturación */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5 border-b pb-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              Datos de Facturación
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div><span className="font-semibold text-slate-500">Titular:</span> <span className="font-bold text-slate-900">{enrollment.billingName || enrollment.parent1Name || enrollment.tutorName}</span></div>
+              <div><span className="font-semibold text-slate-500">CUIT / CUIL / DNI:</span> <span className="font-bold text-slate-900">{enrollment.billingCuit || enrollment.parent1Dni}</span></div>
+              <div><span className="font-semibold text-slate-500">Condición Fiscal:</span> <span className="font-bold text-slate-900">{enrollment.billingTaxCondition || "Consumidor Final"}</span></div>
+              <div><span className="font-semibold text-slate-500">Email Factura:</span> <span className="font-bold text-slate-900">{enrollment.billingEmail || enrollment.parent1Email || enrollment.tutorEmail}</span></div>
+              <div className="sm:col-span-2"><span className="font-semibold text-slate-500">Domicilio Fiscal:</span> <span className="font-bold text-slate-900">{enrollment.billingAddress || enrollment.parent1Address || "---"}</span></div>
+            </div>
+          </div>
+
+          {/* Firmas Digitales Holográficas */}
+          <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+            <h4 className="font-extrabold text-slate-900 text-sm flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              Firmas Digitales Estampadas en el Contrato
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="border rounded-xl p-3 bg-slate-50 text-center">
+                <span className="text-[10px] font-bold text-slate-500 block mb-2">
+                  Firma Responsable 1 ({enrollment.parent1Name || enrollment.tutorName})
+                </span>
+                {enrollment.signature1Data ? (
+                  <div className="bg-white border rounded-lg p-2 h-24 flex items-center justify-center">
+                    <img src={enrollment.signature1Data} alt="Firma 1" className="max-h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="h-24 flex items-center justify-center text-slate-400 italic">
+                    Sin registro visual
+                  </div>
+                )}
+                <span className="text-[9px] text-slate-400 block mt-1">DNI: {enrollment.parent1Dni || "---"}</span>
+              </div>
+
+              <div className="border rounded-xl p-3 bg-slate-50 text-center">
+                <span className="text-[10px] font-bold text-slate-500 block mb-2">
+                  Firma Responsable 2 {enrollment.isSingleParent ? "(No aplica)" : `(${enrollment.parent2Name || "Resp. 2"})`}
+                </span>
+                {enrollment.isSingleParent ? (
+                  <div className="bg-white border rounded-lg p-2 h-24 flex items-center justify-center text-slate-400 italic text-[11px]">
+                    Declaración de Responsable Único
+                  </div>
+                ) : enrollment.signature2Data ? (
+                  <div className="bg-white border rounded-lg p-2 h-24 flex items-center justify-center">
+                    <img src={enrollment.signature2Data} alt="Firma 2" className="max-h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="h-24 flex items-center justify-center text-slate-400 italic">
+                    Sin registro visual
+                  </div>
+                )}
+                <span className="text-[9px] text-slate-400 block mt-1">DNI: {enrollment.parent2Dni || "---"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Comments if any */}
+          {enrollment.comments && (
+            <div className="bg-slate-100 rounded-2xl p-4">
+              <span className="font-bold text-slate-700 block mb-1">Observaciones / Comentarios:</span>
+              <p className="text-slate-600 whitespace-pre-line">{enrollment.comments}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 sm:p-6 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-full font-bold text-xs border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            Cerrar Ficha
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onDownloadPdf(enrollment)}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Download className="w-4 h-4" /> Descargar Contrato Oficial (8 Páginas PDF)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 

@@ -1,24 +1,56 @@
-import { z } from "zod";
+export interface Reinscripcion2027Input {
+  // Estudiante
+  studentName: string;
+  studentDni: string;
+  school: string;
+  studentGrade: string;
+  studentLevel?: string;
+  hasSiblings: boolean;
+  siblingDetails?: string;
 
-const formSchema = z.object({
-  tutorName: z.string().min(2, "El nombre del tutor es obligatorio"),
-  tutorEmail: z.string().email("Correo inválido"),
-  tutorPhone: z.string().min(6, "Teléfono inválido"),
-  studentName: z.string().min(2, "El nombre del estudiante es obligatorio"),
-  studentLevel: z.enum(["Inicial", "Primario", "Secundario"]),
-  studentGrade: z.string().min(1, "Especifique sala o grado"),
-  comments: z.string().min(5, "Por favor complete este campo contándonos sobre su historia o escuela de procedencia"),
-});
+  // Responsable 1
+  parent1Name: string;
+  parent1Dni: string;
+  parent1Relationship: string;
+  parent1Phone: string;
+  parent1Email: string;
+  parent1Address: string;
+  parent1City: string;
+  parent1PostalCode: string;
 
-export type FormInput = z.infer<typeof formSchema>;
+  // Responsable 2
+  isSingleParent: boolean;
+  parent2Name?: string;
+  parent2Dni?: string;
+  parent2Relationship?: string;
+  parent2Phone?: string;
+  parent2Email?: string;
+  parent2Address?: string;
+  parent2City?: string;
+  parent2PostalCode?: string;
 
-export async function submitEnrollment(data: FormInput) {
+  // Facturación
+  billingName: string;
+  billingCuit: string;
+  billingTaxCondition: string;
+  billingEmail: string;
+  billingAddress: string;
+
+  // Declaraciones y Firmas
+  contractAccepted: boolean;
+  dataAccepted: boolean;
+  termsAccepted: boolean;
+  signature1Data: string | null;
+  signature2Data?: string | null;
+  comments?: string;
+}
+
+export async function submitEnrollment(data: any) {
   try {
-    const parsed = formSchema.parse(data);
     const res = await fetch("/api/enroll.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsed),
+      body: JSON.stringify(data),
     });
     return await res.json();
   } catch (error: any) {

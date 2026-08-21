@@ -103,6 +103,113 @@ function ensureUserTableSchema($pdo) {
     }
 }
 
+// Asegurar estructura de la tabla Enrollment para Reinscripciones 2027
+function ensureEnrollmentTableSchema($pdo) {
+    if (!$pdo) return;
+    static $enrollmentSchemaChecked = false;
+    if ($enrollmentSchemaChecked) return;
+
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `Enrollment` (
+                `id` VARCHAR(36) PRIMARY KEY,
+                `trackingNumber` VARCHAR(50) NULL,
+                `studentName` VARCHAR(191) NOT NULL,
+                `studentDni` VARCHAR(50) NULL,
+                `school` VARCHAR(100) NULL DEFAULT 'Escuela N.º 1030',
+                `studentLevel` VARCHAR(50) NULL,
+                `studentGrade` VARCHAR(100) NOT NULL,
+                `hasSiblings` TINYINT(1) DEFAULT 0,
+                `siblingDetails` TEXT NULL,
+                `parent1Name` VARCHAR(191) NULL,
+                `parent1Dni` VARCHAR(50) NULL,
+                `parent1Relationship` VARCHAR(100) NULL,
+                `parent1Phone` VARCHAR(100) NULL,
+                `parent1Email` VARCHAR(191) NULL,
+                `parent1Address` VARCHAR(255) NULL,
+                `parent1City` VARCHAR(100) NULL,
+                `parent1PostalCode` VARCHAR(50) NULL,
+                `isSingleParent` TINYINT(1) DEFAULT 0,
+                `parent2Name` VARCHAR(191) NULL,
+                `parent2Dni` VARCHAR(50) NULL,
+                `parent2Relationship` VARCHAR(100) NULL,
+                `parent2Phone` VARCHAR(100) NULL,
+                `parent2Email` VARCHAR(191) NULL,
+                `parent2Address` VARCHAR(255) NULL,
+                `parent2City` VARCHAR(100) NULL,
+                `parent2PostalCode` VARCHAR(50) NULL,
+                `billingName` VARCHAR(191) NULL,
+                `billingCuit` VARCHAR(50) NULL,
+                `billingTaxCondition` VARCHAR(100) NULL,
+                `billingEmail` VARCHAR(191) NULL,
+                `billingAddress` VARCHAR(255) NULL,
+                `contractAccepted` TINYINT(1) DEFAULT 1,
+                `dataAccepted` TINYINT(1) DEFAULT 1,
+                `termsAccepted` TINYINT(1) DEFAULT 1,
+                `signature1Data` LONGTEXT NULL,
+                `signature2Data` LONGTEXT NULL,
+                `tutorName` VARCHAR(191) NULL,
+                `tutorEmail` VARCHAR(191) NULL,
+                `tutorPhone` VARCHAR(100) NULL,
+                `comments` TEXT NULL,
+                `status` VARCHAR(50) DEFAULT 'PENDING',
+                `contractVersion` VARCHAR(50) DEFAULT '2027.v1',
+                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        $stmt = $pdo->query("SHOW COLUMNS FROM `Enrollment`");
+        $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
+
+        $newCols = [
+            'trackingNumber'      => "VARCHAR(50) NULL",
+            'studentDni'          => "VARCHAR(50) NULL",
+            'school'              => "VARCHAR(100) NULL DEFAULT 'Escuela N.º 1030'",
+            'hasSiblings'         => "TINYINT(1) DEFAULT 0",
+            'siblingDetails'      => "TEXT NULL",
+            'parent1Name'         => "VARCHAR(191) NULL",
+            'parent1Dni'          => "VARCHAR(50) NULL",
+            'parent1Relationship' => "VARCHAR(100) NULL",
+            'parent1Phone'        => "VARCHAR(100) NULL",
+            'parent1Email'        => "VARCHAR(191) NULL",
+            'parent1Address'      => "VARCHAR(255) NULL",
+            'parent1City'         => "VARCHAR(100) NULL",
+            'parent1PostalCode'   => "VARCHAR(50) NULL",
+            'isSingleParent'      => "TINYINT(1) DEFAULT 0",
+            'parent2Name'         => "VARCHAR(191) NULL",
+            'parent2Dni'          => "VARCHAR(50) NULL",
+            'parent2Relationship' => "VARCHAR(100) NULL",
+            'parent2Phone'        => "VARCHAR(100) NULL",
+            'parent2Email'        => "VARCHAR(191) NULL",
+            'parent2Address'      => "VARCHAR(255) NULL",
+            'parent2City'         => "VARCHAR(100) NULL",
+            'parent2PostalCode'   => "VARCHAR(50) NULL",
+            'billingName'         => "VARCHAR(191) NULL",
+            'billingCuit'         => "VARCHAR(50) NULL",
+            'billingTaxCondition' => "VARCHAR(100) NULL",
+            'billingEmail'        => "VARCHAR(191) NULL",
+            'billingAddress'      => "VARCHAR(255) NULL",
+            'contractAccepted'    => "TINYINT(1) DEFAULT 1",
+            'dataAccepted'        => "TINYINT(1) DEFAULT 1",
+            'termsAccepted'       => "TINYINT(1) DEFAULT 1",
+            'signature1Data'      => "LONGTEXT NULL",
+            'signature2Data'      => "LONGTEXT NULL",
+            'contractVersion'     => "VARCHAR(50) DEFAULT '2027.v1'"
+        ];
+
+        foreach ($newCols as $colName => $colDef) {
+            if (!in_array($colName, $cols, true)) {
+                @$pdo->exec("ALTER TABLE `Enrollment` ADD COLUMN `$colName` $colDef");
+            }
+        }
+
+        $enrollmentSchemaChecked = true;
+    } catch (Exception $e) {
+        error_log("Enrollment schema auto-migration notice: " . $e->getMessage());
+    }
+}
+
 // Conexión PDO única y ultra-resiliente (con fallback multi-host)
 function getPDO() {
     static $pdo = null;
@@ -120,6 +227,7 @@ function getPDO() {
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
             ensureUserTableSchema($pdo);
+            ensureEnrollmentTableSchema($pdo);
             return $pdo;
         } catch (PDOException $e) {
             $lastException = $e;
