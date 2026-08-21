@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { 
   logoutAdmin, 
   createPost, 
@@ -60,6 +60,10 @@ import {
   RefreshCw,
   KeyRound,
   ShieldCheck,
+  ShieldAlert,
+  Activity,
+  History,
+  MessageCircle,
   AlertCircle,
   Download,
   CheckSquare,
@@ -188,6 +192,38 @@ function generateSuggestedPassword(): string {
   return `${word}${symbol}${num}${rand}`;
 }
 
+export function getWhatsAppUrl(rawPhone: string, studentName: string, trackingNumber?: string, isReinscripcion = true): string {
+  if (!rawPhone || !rawPhone.trim()) return "";
+  let clean = rawPhone.replace(/[^0-9]/g, "");
+  if (!clean) return "";
+  if (clean.startsWith("0")) clean = clean.substring(1);
+  if (clean.startsWith("15")) clean = clean.substring(2);
+  
+  if (clean.length === 10 && !clean.startsWith("54")) {
+    clean = `549${clean}`;
+  } else if (clean.length < 10 && !clean.startsWith("54")) {
+    clean = `5492945${clean}`;
+  } else if (!clean.startsWith("54")) {
+    clean = `54${clean}`;
+  }
+
+  const text = isReinscripcion
+    ? `Hola! Nos comunicamos desde la Fundación Educativa Esquel (Escuelas N.º 1030 y 1739) respecto al trámite de reinscripción 2027 del estudiante ${studentName}${trackingNumber ? ` (Trámite: ${trackingNumber})` : ""}.`
+    : `Hola! Nos comunicamos desde la Fundación Educativa Esquel (Escuelas N.º 1030 y 1739) respecto a la preinscripción del aspirante ${studentName}.`;
+
+  return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+}
+
+export function formatDurationSeconds(seconds: number): string {
+  if (!seconds || seconds <= 0) return "0 min";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes} min`;
+}
+
 export function AdminDashboard({ 
   posts, 
   enrollments, 
@@ -213,12 +249,103 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "preinscripciones" | "contacts" | "users" | "gallery">(() => {
+  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "preinscripciones" | "contacts" | "users" | "gallery" | "audit">(() => {
     if (userPerms.includes("enrollments") || isSuperAdmin) return "reinscripciones";
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
     if (userPerms.includes("contacts")) return "contacts";
     return "reinscripciones";
   });
+
+  // Estado y Monitoreo de Auditoría y Actividad
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [userActivityList, setUserActivityList] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [auditSearchQuery, setAuditSearchQuery] = useState("");
+  const [auditActionFilter, setAuditActionFilter] = useState("ALL");
+  const [selectedUserSessions, setSelectedUserSessions] = useState<any | null>(null);
+  const [isUserIdle, setIsUserIdle] = useState(false);
+  const [sessionActiveSeconds, setSessionActiveSeconds] = useState(0);
+
+  // 1. Detección inteligente de inactividad (>2 min) y envío de Heartbeat al backend
+  useEffect(() => {
+    let lastActivity = Date.now();
+    let idleState = false;
+
+    const onUserInteraction = () => {
+      lastActivity = Date.now();
+      if (idleState) {
+        idleState = false;
+        setIsUserIdle(false);
+      }
+    };
+
+    window.addEventListener("mousemove", onUserInteraction, { passive: true });
+    window.addEventListener("keydown", onUserInteraction, { passive: true });
+    window.addEventListener("scroll", onUserInteraction, { passive: true });
+    window.addEventListener("click", onUserInteraction, { passive: true });
+    window.addEventListener("touchstart", onUserInteraction, { passive: true });
+
+    const interval = setInterval(() => {
+      const elapsedSinceActivity = Date.now() - lastActivity;
+      // Si pasaron más de 120 segundos (2 minutos) sin actividad de mouse/teclado, detener conteo
+      if (elapsedSinceActivity >= 120000) {
+        if (!idleState) {
+          idleState = true;
+          setIsUserIdle(true);
+        }
+        return;
+      }
+
+      // Usuario activo: enviar ping de 20 segundos
+      const token = localStorage.getItem("fee_admin_token");
+      if (token) {
+        fetch("/api/admin.php?action=heartbeat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            activeSeconds: 20,
+            sessionId: session?.sessionId
+          })
+        }).catch(() => {});
+      }
+
+      setSessionActiveSeconds(prev => prev + 20);
+    }, 20000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("mousemove", onUserInteraction);
+      window.removeEventListener("keydown", onUserInteraction);
+      window.removeEventListener("scroll", onUserInteraction);
+      window.removeEventListener("click", onUserInteraction);
+      window.removeEventListener("touchstart", onUserInteraction);
+    };
+  }, [session?.sessionId]);
+
+  const fetchAuditData = async () => {
+    if (!isSuperAdmin) return;
+    setIsLoadingAudit(true);
+    try {
+      const token = localStorage.getItem("fee_admin_token");
+      const res = await fetch("/api/admin.php?action=get_audit_data", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditLogs(data.auditLogs || []);
+        setUserActivityList(data.userActivity || []);
+      }
+    } catch (err) {
+      console.error("Error fetching audit data:", err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  };
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
@@ -899,6 +1026,22 @@ export function AdminDashboard({
               <UserCheck className="w-4 h-4" /> Usuarios
             </button>
           )}
+
+          {isSuperAdmin && (
+            <button 
+              onClick={() => {
+                setActiveTab("audit");
+                fetchAuditData();
+              }}
+              className={cn(
+                "flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                activeTab === "audit" ? "bg-slate-900 text-white shadow-md" : "text-slate-700 hover:bg-slate-100"
+              )}
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span>Auditoría & Sesiones</span>
+            </button>
+          )}
         </div>
         <button 
           onClick={handleLogout}
@@ -1396,6 +1539,20 @@ export function AdminDashboard({
                                   >
                                     Ver Ficha Familiar
                                   </button>
+                                  {(() => {
+                                    const wa = getWhatsAppUrl(s.parent1Phone, s.studentName, s.trackingNumber, true);
+                                    return wa ? (
+                                      <a 
+                                        href={wa} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-emerald-200 cursor-pointer"
+                                        title="Enviar WhatsApp"
+                                      >
+                                        <MessageCircle className="w-4 h-4" />
+                                      </a>
+                                    ) : null;
+                                  })()}
                                   <a 
                                     href={`mailto:${s.parent1Email}`} 
                                     className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
@@ -1403,13 +1560,15 @@ export function AdminDashboard({
                                   >
                                     <Mail className="w-4 h-4" />
                                   </a>
-                                  <button 
-                                    onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
-                                    title="Eliminar inscripción"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  {isSuperAdmin && (
+                                    <button 
+                                      onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border border-red-200" 
+                                      title="Eliminar inscripción (Solo Super Admin)"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1487,6 +1646,20 @@ export function AdminDashboard({
                                   </td>
                                   <td className="p-4 text-right whitespace-nowrap">
                                     <div className="flex items-center justify-end gap-1.5">
+                                      {(() => {
+                                        const wa = getWhatsAppUrl(s.parent1Phone, s.studentName, s.trackingNumber, true);
+                                        return wa ? (
+                                          <a 
+                                            href={wa} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-200 cursor-pointer"
+                                            title="Enviar WhatsApp"
+                                          >
+                                            <MessageCircle className="w-4 h-4" />
+                                          </a>
+                                        ) : null;
+                                      })()}
                                       <button
                                         type="button"
                                         onClick={() => handleDownloadSinglePdf(s.rawEnrollment)}
@@ -1503,13 +1676,15 @@ export function AdminDashboard({
                                       >
                                         <Eye className="w-4 h-4" />
                                       </button>
-                                      <button 
-                                        onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
-                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                        title="Eliminar registro"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
+                                      {isSuperAdmin && (
+                                        <button 
+                                          onClick={() => handleDeleteEnrollment(s.enrollmentId)} 
+                                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer border border-red-200"
+                                          title="Eliminar registro (Solo Super Admin)"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1624,6 +1799,20 @@ export function AdminDashboard({
                                   >
                                     Ver Ficha
                                   </button>
+                                  {(() => {
+                                    const wa = getWhatsAppUrl(e.parent1Phone || e.tutorPhone, e.studentName, e.trackingNumber, true);
+                                    return wa ? (
+                                      <a 
+                                        href={wa} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-emerald-200 cursor-pointer"
+                                        title="Enviar WhatsApp"
+                                      >
+                                        <MessageCircle className="w-4 h-4" />
+                                      </a>
+                                    ) : null;
+                                  })()}
                                   <a 
                                     href={`mailto:${e.parent1Email || e.tutorEmail}`} 
                                     className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
@@ -1631,13 +1820,15 @@ export function AdminDashboard({
                                   >
                                     <Mail className="w-4 h-4" />
                                   </a>
-                                  <button 
-                                    onClick={() => handleDeleteEnrollment(e.id)} 
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
-                                    title="Eliminar inscripción"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  {isSuperAdmin && (
+                                    <button 
+                                      onClick={() => handleDeleteEnrollment(e.id)} 
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border border-red-200" 
+                                      title="Eliminar inscripción (Solo Super Admin)"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1716,6 +1907,20 @@ export function AdminDashboard({
                                   </td>
                                   <td className="p-4 text-right whitespace-nowrap">
                                     <div className="flex items-center justify-end gap-1.5">
+                                      {(() => {
+                                        const wa = getWhatsAppUrl(e.parent1Phone || e.tutorPhone, e.studentName, e.trackingNumber, true);
+                                        return wa ? (
+                                          <a
+                                            href={wa}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-200 cursor-pointer"
+                                            title="Enviar WhatsApp"
+                                          >
+                                            <MessageCircle className="w-4 h-4" />
+                                          </a>
+                                        ) : null;
+                                      })()}
                                       <button
                                         type="button"
                                         onClick={() => handleDownloadSinglePdf(e)}
@@ -1732,13 +1937,15 @@ export function AdminDashboard({
                                       >
                                         <Eye className="w-4 h-4" />
                                       </button>
-                                      <button 
-                                        onClick={() => handleDeleteEnrollment(e.id)} 
-                                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                        title="Eliminar inscripción"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
+                                      {isSuperAdmin && (
+                                        <button 
+                                          onClick={() => handleDeleteEnrollment(e.id)} 
+                                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer border border-red-200"
+                                          title="Eliminar inscripción (Solo Super Admin)"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>
@@ -1824,6 +2031,20 @@ export function AdminDashboard({
                     </div>
 
                     <div className="flex items-center gap-2 border-t pt-3">
+                      {(() => {
+                        const wa = getWhatsAppUrl(e.tutorPhone || e.parent1Phone, e.studentName, undefined, false);
+                        return wa ? (
+                          <a 
+                            href={wa} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-emerald-200 cursor-pointer"
+                            title="Enviar WhatsApp"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </a>
+                        ) : null;
+                      })()}
                       <a 
                         href={`mailto:${e.tutorEmail || e.parent1Email}`} 
                         className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
@@ -1836,13 +2057,15 @@ export function AdminDashboard({
                       >
                         Llamar
                       </a>
-                      <button 
-                        onClick={() => handleDeleteEnrollment(e.id)} 
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
-                        title="Eliminar solicitud"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isSuperAdmin && (
+                        <button 
+                          onClick={() => handleDeleteEnrollment(e.id)} 
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border border-red-200" 
+                          title="Eliminar solicitud (Solo Super Admin)"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -2271,6 +2494,352 @@ export function AdminDashboard({
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* TAB DE AUDITORÍA Y SESIONES (EXCLUSIVO SUPER_ADMIN)                       */}
+        {/* ========================================================================= */}
+        {isSuperAdmin && activeTab === "audit" && (
+          <div>
+            {/* Header & Controls */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-slate-900">Auditoría & Monitoreo de Sesiones</h2>
+                  <span className="bg-slate-900 text-amber-400 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wide border border-slate-700">
+                    Super Admin
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Control de accesos, tiempos de permanencia online (con pausa tras 2 min de inactividad de mouse/teclado) y registro histórico de cambios.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Live Activity Status Pill */}
+                <div className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border shadow-xs transition-all",
+                  isUserIdle 
+                    ? "bg-amber-50 text-amber-800 border-amber-300" 
+                    : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                )}>
+                  <span className={cn(
+                    "w-2.5 h-2.5 rounded-full",
+                    isUserIdle ? "bg-amber-500" : "bg-emerald-500 animate-pulse"
+                  )} />
+                  <span>
+                    {isUserIdle ? "Sesión Pausada (>2m inactivo)" : `En línea: ${formatDurationSeconds(sessionActiveSeconds)}`}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchAuditData}
+                  disabled={isLoadingAudit}
+                  className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs px-3.5 py-2 rounded-xl transition-all border border-slate-200 cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Recargar registros de auditoría"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", isLoadingAudit ? "animate-spin" : "")} />
+                  <span>Actualizar</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Cards */}
+            {(() => {
+              const totalLogins = userActivityList.reduce((acc, u) => acc + (u.loginCount || 0), 0);
+              const totalActiveSeconds = userActivityList.reduce((acc, u) => acc + (u.totalOnlineSeconds || 0), 0);
+              const onlineUsersCount = userActivityList.filter(u => u.isCurrentlyOnline).length;
+              const totalLogs = auditLogs.length;
+
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                      <KeyRound className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-black text-slate-900">{totalLogins}</div>
+                      <div className="text-[11px] font-semibold text-slate-500">Inicios de Sesión Totales</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-black text-slate-900">{formatDurationSeconds(totalActiveSeconds)}</div>
+                      <div className="text-[11px] font-semibold text-slate-500">Tiempo Online Acumulado</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+                        {userActivityList.length}
+                        {onlineUsersCount > 0 && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                            {onlineUsersCount} online
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] font-semibold text-slate-500">Usuarios Monitoreados</div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                      <History className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="text-xl sm:text-2xl font-black text-slate-900">{totalLogs}</div>
+                      <div className="text-[11px] font-semibold text-slate-500">Eventos Auditados</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* SECCIÓN 1: PERMANENCIA ONLINE Y SESIONES POR USUARIO */}
+            <div className="bg-white border rounded-3xl p-6 shadow-xs mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-bold text-slate-900 text-base">Actividad & Permanencia de Administradores</h3>
+                </div>
+                <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+                  El cronómetro se pausa tras 2 min de inactividad de mouse o teclado
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-700 text-xs border-b">
+                      <th className="p-4 font-bold">Usuario / Administrador</th>
+                      <th className="p-4 font-bold">Rol</th>
+                      <th className="p-4 font-bold">Estado en Vivo</th>
+                      <th className="p-4 font-bold">Cant. Inicios</th>
+                      <th className="p-4 font-bold">Último Acceso</th>
+                      <th className="p-4 font-bold">Tiempo Activo Total</th>
+                      <th className="p-4 font-bold text-right">Historial de Sesiones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-xs">
+                    {userActivityList.map((u) => {
+                      const isCurrentSessionUser = (session?.username && u.username && session.username.toLowerCase() === u.username.toLowerCase());
+
+                      return (
+                        <tr key={u.userId || u.username} className="border-b last:border-0 hover:bg-slate-50/60 transition-colors">
+                          <td className="p-4">
+                            <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                              {u.name || u.username}
+                              {isCurrentSessionUser && (
+                                <span className="text-[9px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.5 rounded-md">
+                                  TÚ
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">@{u.username}</div>
+                          </td>
+                          <td className="p-4">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider border",
+                              u.role === "SUPER_ADMIN" 
+                                ? "bg-slate-900 text-amber-400 border-slate-700" 
+                                : "bg-blue-50 text-blue-800 border-blue-200"
+                            )}>
+                              {u.role === "SUPER_ADMIN" ? "Super Admin" : "Gestor / Editor"}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {u.isCurrentlyOnline ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                                Online Activo
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                Desconectado
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <span className="font-extrabold text-slate-800 text-sm">
+                              {u.loginCount || 0}
+                            </span>
+                            <span className="text-slate-400 text-[11px] ml-1">veces</span>
+                          </td>
+                          <td className="p-4 text-slate-600 whitespace-nowrap">
+                            {u.lastLoginAt ? (
+                              <div>
+                                <span className="font-semibold text-slate-800 block">
+                                  {new Date(u.lastLoginAt).toLocaleDateString()}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  {new Date(u.lastLoginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">Sin registro</span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <span className="font-mono font-bold text-emerald-700 text-xs bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                              {formatDurationSeconds(u.totalOnlineSeconds || 0)}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserSessions(u)}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                              <span>Ver Sesiones ({Array.isArray(u.sessions) ? u.sessions.length : 0})</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {userActivityList.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400">
+                          No hay registros de actividad aún. Inicie sesión para generar métricas.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* SECCIÓN 2: HISTORIAL DE AUDITORÍA Y MODIFICACIONES */}
+            <div className="bg-white border rounded-3xl p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-bold text-slate-900 text-base">Registro de Cambios y Modificaciones (Audit Trail)</h3>
+                </div>
+
+                {/* Search & Filter */}
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={auditSearchQuery}
+                      onChange={(e) => setAuditSearchQuery(e.target.value)}
+                      placeholder="Buscar por usuario, acción..."
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={auditActionFilter}
+                    onChange={(e) => setAuditActionFilter(e.target.value)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-slate-900 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Todas las acciones</option>
+                    <option value="LOGIN">Inicios de Sesión</option>
+                    <option value="ENROLLMENT">Inscripciones / Legajos</option>
+                    <option value="POST">Noticias & Blog</option>
+                    <option value="USER">Usuarios & Roles</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Table of Audit Logs */}
+              {(() => {
+                const filteredLogs = auditLogs.filter((log) => {
+                  if (auditActionFilter !== "ALL") {
+                    if (auditActionFilter === "LOGIN" && log.action !== "LOGIN" && log.action !== "LOGOUT") return false;
+                    if (auditActionFilter === "ENROLLMENT" && log.entityType !== "ENROLLMENT") return false;
+                    if (auditActionFilter === "POST" && log.entityType !== "POST") return false;
+                    if (auditActionFilter === "USER" && log.entityType !== "USER") return false;
+                  }
+                  if (auditSearchQuery.trim()) {
+                    const q = auditSearchQuery.toLowerCase();
+                    const text = `${log.username || ""} ${log.action || ""} ${log.details || ""} ${log.ip || ""}`.toLowerCase();
+                    return text.includes(q);
+                  }
+                  return true;
+                });
+
+                return (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-700 text-xs border-b">
+                          <th className="p-4 font-bold whitespace-nowrap">Fecha & Hora</th>
+                          <th className="p-4 font-bold">Administrador</th>
+                          <th className="p-4 font-bold">Acción / Módulo</th>
+                          <th className="p-4 font-bold">Detalle del Cambio</th>
+                          <th className="p-4 font-bold text-right">Dirección IP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs">
+                        {filteredLogs.map((log) => {
+                          const isDelete = log.action && log.action.includes("DELETE");
+                          const isLogin = log.action === "LOGIN";
+                          const isCreate = log.action && log.action.includes("CREATE");
+
+                          return (
+                            <tr key={log.id} className="border-b last:border-0 hover:bg-slate-50/60 transition-colors">
+                              <td className="p-4 text-slate-500 whitespace-nowrap font-mono text-[11px]">
+                                {log.timestamp || "---"}
+                              </td>
+                              <td className="p-4 font-bold text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span>@{log.username}</span>
+                                  {log.userRole && (
+                                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-normal">
+                                      {log.userRole}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded-md text-[10px] font-extrabold border inline-block",
+                                  isDelete ? "bg-red-50 text-red-700 border-red-200" :
+                                  isLogin ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                  isCreate ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                  "bg-amber-50 text-amber-700 border-amber-200"
+                                )}>
+                                  {log.action}
+                                </span>
+                              </td>
+                              <td className="p-4 text-slate-700 font-medium">
+                                {log.details}
+                              </td>
+                              <td className="p-4 text-right text-slate-400 font-mono text-[11px]">
+                                {log.ip || "---"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {filteredLogs.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-slate-400">
+                              No se encontraron registros de auditoría con los criterios de búsqueda.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Editor Modal */}
@@ -2313,6 +2882,74 @@ export function AdminDashboard({
           onClose={() => setInspectingEnrollment(null)}
           onDownloadPdf={handleDownloadSinglePdf}
         />
+      )}
+
+      {/* Modal de Detalle de Sesiones de Usuario (Super Admin) */}
+      {selectedUserSessions && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-2xl w-full shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center pb-4 border-b">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                  <History className="w-5 h-5 text-emerald-600" />
+                  Sesiones de {selectedUserSessions.name || selectedUserSessions.username}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  @{selectedUserSessions.username} • {selectedUserSessions.loginCount} inicios de sesión registrados
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserSessions(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-4 space-y-3 flex-1">
+              {Array.isArray(selectedUserSessions.sessions) && selectedUserSessions.sessions.length > 0 ? (
+                selectedUserSessions.sessions.map((sess: any, idx: number) => (
+                  <div key={sess.sessionId || idx} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+                    <div>
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                        <span>Ingreso: {sess.loginAt}</span>
+                        {idx === 0 && (
+                          <span className="bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-2 py-0.5 rounded-full">
+                            Más Reciente
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 font-mono">
+                        IP: {sess.ip || "127.0.0.1"} • {sess.userAgent || "Navegador web"}
+                      </div>
+                    </div>
+
+                    <div className="sm:text-right shrink-0">
+                      <div className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl inline-block">
+                        ⏱️ Tiempo activo: {formatDurationSeconds(sess.activeSeconds || 0)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No hay sesiones detalladas almacenadas aún para este usuario.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedUserSessions(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* First Login Mandatory Password Change Modal */}
