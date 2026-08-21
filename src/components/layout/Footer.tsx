@@ -108,37 +108,53 @@ export function Footer() {
           {/* Col 4 */}
           <div className="flex flex-col gap-4 relative z-10">
             <h4 className="text-lg font-bold text-brand-yellow">Contacto</h4>
-            <ul className="flex flex-col gap-4 text-xs text-white/80">
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-brand-lightblue shrink-0 mt-0.5" />
-                <span className="leading-tight">
-                  <strong>Admin / Inicial / Primaria:</strong><br />
-                  Chacabuco 1029, Esquel
-                </span>
+            <ul className="flex flex-col gap-3 text-xs text-white/80">
+              {/* Administración Central */}
+              <li className="space-y-1">
+                <div className="flex items-start gap-1.5 text-white font-semibold">
+                  <MapPin className="w-3.5 h-3.5 text-brand-lightblue shrink-0 mt-0.5" />
+                  <span>Administración (Chacabuco 1029)</span>
+                </div>
+                <div className="pl-5 space-y-0.5 text-[11px] text-white/70">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <span>(02945) 456053</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
+                  </div>
+                </div>
               </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <span>(02945) 456053</span>
+
+              {/* Inicial y Primaria */}
+              <li className="space-y-1 pt-1.5 border-t border-white/10">
+                <div className="text-white font-semibold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>Inicial & Primaria (Esc. N° 1030)</span>
+                </div>
+                <div className="pl-3 text-[11px] text-white/70 flex items-center gap-1.5">
+                  <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
+                  <a href="mailto:equipodirectivo1030@gmail.com" className="hover:text-white transition-colors">equipodirectivo1030@gmail.com</a>
+                </div>
               </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
-              </li>
-              <li className="border-t border-white/10 my-1"></li>
-              <li className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-brand-lightblue shrink-0 mt-0.5" />
-                <span className="leading-tight">
-                  <strong>Sede Secundaria:</strong><br />
-                  Gobernador Galina 2888
-                </span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <span>2945-404000</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-brand-lightblue shrink-0" />
-                <a href="mailto:escuela1739.fee@gmail.com" className="hover:text-white transition-colors">escuela1739.fee@gmail.com</a>
+
+              {/* Secundaria */}
+              <li className="space-y-1 pt-1.5 border-t border-white/10">
+                <div className="flex items-start gap-1.5 text-white font-semibold">
+                  <MapPin className="w-3.5 h-3.5 text-brand-lightblue shrink-0 mt-0.5" />
+                  <span>Secundaria (Esc. N° 1739 - Galina 2888)</span>
+                </div>
+                <div className="pl-5 space-y-0.5 text-[11px] text-white/70">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <span>2945-404000</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
+                    <a href="mailto:escuela1739.fee@gmail.com" className="hover:text-white transition-colors">escuela1739.fee@gmail.com</a>
+                  </div>
+                </div>
               </li>
             </ul>
           </div>
