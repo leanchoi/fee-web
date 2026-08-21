@@ -290,10 +290,11 @@ export function generateContractPdf(data?: EnrollmentContractData): jsPDF {
     "La matriculación y permanencia del/de la alumno/a implican el conocimiento y aceptación razonable de dichas reglamentaciones institucionales, en tanto resulten compatibles con la normativa educativa y el ordenamiento jurídico vigente."
   );
 
-  printClause(
-    "Cláusula 4° – Reserva de vacante",
-    `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo ${cycleYear} y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de Nivel ${level} (${school}). La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`
-  );
+  const clause4Text = isBlank
+    ? "A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ______________________________________________________________________________________ D.N.I. Nº __________________ desde el ciclo lectivo _______________ y hasta la finalización del presente contrato, correspondiente al año/grado/sala _______________________ de Nivel _________________________________. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo."
+    : `A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a ${studentName} D.N.I. Nº ${studentDni} desde el ciclo lectivo 2027 y hasta la finalización del presente contrato, correspondiente al año/grado/sala ${grade} de Nivel ${level} (${school}). La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.`;
+
+  printClause("Cláusula 4° – Reserva de vacante", clause4Text);
 
   printClause(
     "Cláusula 5° – Adhesión al proyecto institucional",

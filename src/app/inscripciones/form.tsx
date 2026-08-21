@@ -47,6 +47,11 @@ const LEVEL_CONFIG = {
   }
 };
 
+const MONTH_NAMES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+];
+
 export function EnrollmentForm() {
   // Estado del formulario
   const [formData, setFormData] = useState<EnrollmentContractData>({
@@ -1193,6 +1198,19 @@ export function EnrollmentForm() {
                 <p className="text-slate-500">Chacabuco Nº 1029, Esquel, Chubut — Escuelas N.º 1030 y N.º 1739</p>
               </div>
 
+              {/* Comparecencia Oficial */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-slate-700 leading-relaxed text-xs">
+                {formData.isSingleParent ? (
+                  <p>
+                    En la ciudad de Esquel, a los <strong>{new Date().getDate()}</strong> días del mes de <strong>{MONTH_NAMES[new Date().getMonth()]}</strong> del año <strong>{new Date().getFullYear()}</strong>, entre la Fundación Educativa Esquel, con domicilio legal en Chacabuco Nº 1029 de la ciudad de Esquel, Provincia del Chubut, en adelante denominada “LA FUNDACIÓN”, y por la otra parte <strong>{formData.parent1Relationship || "Sr./Sra."} {formData.parent1Name || "_____________________________"}</strong> D.N.I. Nº <strong>{formData.parent1Dni || "_______"}</strong> (en carácter de único/a responsable parental habilitado/a), quien constituye domicilio en <strong>{formData.parent1Address || "_____________________________"}</strong> de la ciudad de <strong>{formData.parent1City || "Esquel"}</strong>, en adelante denominado/a “EL/LA RESPONSABLE PARENTAL”, se celebra el presente contrato sujeto a las siguientes cláusulas y condiciones particulares.
+                  </p>
+                ) : (
+                  <p>
+                    En la ciudad de Esquel, a los <strong>{new Date().getDate()}</strong> días del mes de <strong>{MONTH_NAMES[new Date().getMonth()]}</strong> del año <strong>{new Date().getFullYear()}</strong>, entre la Fundación Educativa Esquel, con domicilio legal en Chacabuco Nº 1029 de la ciudad de Esquel, Provincia del Chubut, en adelante denominada “LA FUNDACIÓN”, y por la otra parte <strong>{formData.parent1Relationship || "Sr./Sra."} {formData.parent1Name || "_____________________________"}</strong> D.N.I. Nº <strong>{formData.parent1Dni || "_______"}</strong> y <strong>{formData.parent2Relationship || "Sr./Sra."} {formData.parent2Name || "_____________________________"}</strong> D.N.I. Nº <strong>{formData.parent2Dni || "_______"}</strong>, quienes constituyen domicilio en <strong>{formData.parent1Address || "_____________________________"}</strong> de la ciudad de <strong>{formData.parent1City || "Esquel"}</strong>, en adelante denominados “LOS RESPONSABLES PARENTALES”, se celebra el presente contrato sujeto a las siguientes cláusulas y condiciones particulares.
+                  </p>
+                )}
+              </div>
+
               {/* DISPOSICIONES PRELIMINARES */}
               <div className="space-y-3">
                 <h6 className="font-extrabold text-sm text-slate-900 border-b pb-1">DISPOSICIONES PRELIMINARES</h6>
@@ -1247,7 +1265,7 @@ export function EnrollmentForm() {
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 4° – Reserva de vacante</p>
                   <p className="mt-1 text-slate-600">
-                    A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reservará una vacante para el/la alumno/a individualizado/a en la documentación de matriculación, exclusivamente para el ciclo lectivo correspondiente. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.
+                    A solicitud de LOS RESPONSABLES PARENTALES y sujeto al cumplimiento de las condiciones establecidas en el presente contrato, LA FUNDACIÓN reserva una vacante para el/la alumno/a <strong>{formData.studentName || "______________________________________________________________________________________"}</strong> D.N.I. Nº <strong>{formData.studentDni || "__________________"}</strong> desde el ciclo lectivo <strong>2027</strong> y hasta la finalización del presente contrato, correspondiente al año/grado/sala <strong>{formData.studentGrade || "_______________________"}</strong> de Nivel <strong>{formData.studentLevel || determineLevel(formData.studentGrade, formData.school) || "_________________________________"}</strong>. La continuidad en ciclos posteriores requerirá completar el procedimiento anual de reinscripción y cumplir las condiciones vigentes para cada ciclo lectivo.
                   </p>
                 </div>
 
@@ -1257,7 +1275,10 @@ export function EnrollmentForm() {
                     LOS RESPONSABLES PARENTALES declaran conocer y adherir al Proyecto Educativo Institucional, al Acuerdo Escolar de Convivencia y a las reglamentaciones internas vigentes de LA FUNDACIÓN.
                   </p>
                   <p className="mt-1 text-slate-600">
-                    Asimismo, aceptan la organización institucional, pedagógica y administrativa dispuesta por LA FUNDACIÓN, incluyendo la distribución horaria, conformación de cursos, reasignación de divisiones y demás adecuaciones razonablemente necesarias para el correcto funcionamiento del servicio educativo. Toda modificación sustancial que pudiera afectar significativamente las condiciones esenciales de prestación del servicio educativo será informada oportunamente mediante los canales institucionales habituales.
+                    Asimismo, aceptan la organización institucional, pedagógica y administrativa dispuesta por LA FUNDACIÓN, incluyendo la distribución horaria, conformación de cursos, reasignación de divisiones y demás adecuaciones razonablemente necesarias para el correcto funcionamiento del servicio educativo.
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    Toda modificación sustancial que pudiera afectar significativamente las condiciones esenciales de prestación del servicio educativo será informada oportunamente mediante los canales institucionales habituales, siempre que no importen modificaciones irrazonables o sustanciales del servicio originalmente contratado.
                   </p>
                 </div>
 
@@ -1415,7 +1436,7 @@ export function EnrollmentForm() {
                 <div>
                   <p className="font-bold text-slate-900">Cláusula 17° – Becas</p>
                   <p className="mt-1 text-slate-600">
-                    LOS RESPONSABLES PARENTALES podrán solicitar becas o ayudas económicas conforme al Reglamento General de Becas vigente en la Administración de LA FUNDACIÓN.
+                    LOS RESPONSABLES PARENTALES podrán solicitar becas o ayudas económicas conforme al Reglamento General de Becas vigente, disponible en la Administración de LA FUNDACIÓN.
                   </p>
                   <p className="mt-1 text-slate-600">
                     La presentación de la solicitud no genera derecho automático a su otorgamiento, renovación ni continuidad, quedando sujeta a evaluación institucional conforme a los criterios establecidos en la reglamentación correspondiente.
@@ -1500,8 +1521,10 @@ export function EnrollmentForm() {
                 </div>
               </div>
 
-              <div className="pt-2 border-t text-slate-500 italic text-[11px]">
-                Las partes constituyen domicilio especial en los indicados en el encabezado y acuerdan someter cualquier controversia a los Tribunales Ordinarios de la ciudad de Esquel.
+              <div className="pt-4 border-t border-slate-200 text-slate-600 text-xs leading-relaxed">
+                <p>
+                  Las partes constituyen domicilio especial en los indicados en el encabezado del presente contrato, donde serán válidas todas las notificaciones judiciales y extrajudiciales, asimismo, acuerdan someter cualquier controversia derivada del presente contrato a los Tribunales Ordinarios de la ciudad de Esquel, renunciando a cualquier otro fuero o jurisdicción.
+                </p>
               </div>
             </div>
 
