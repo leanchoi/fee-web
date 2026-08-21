@@ -95,26 +95,39 @@ $dataAccepted        = !empty($data['dataAccepted']) ? 1 : 0;
 $termsAccepted       = !empty($data['termsAccepted']) ? 1 : 0;
 $signature1Data      = $data['signature1Data'] ?? null;
 $signature2Data      = $data['signature2Data'] ?? null;
-$comments            = htmlspecialchars(trim($data['comments'] ?? ''), ENT_QUOTES, 'UTF-8');
+$enrollmentType = htmlspecialchars(trim($data['type'] ?? ''), ENT_QUOTES, 'UTF-8');
+if (empty($enrollmentType)) {
+    $enrollmentType = (!empty($data['signature1Data']) || !empty($data['studentDni'])) ? 'reinscripcion_2027' : 'preinscripcion_general';
+}
 
-if (empty($studentName) || empty($studentDni) || empty($studentGrade) || empty($parent1Name) || empty($parent1Dni) || empty($parent1Email) || empty($parent1Phone)) {
-    http_response_code(422);
-    echo json_encode(["success" => false, "error" => "Por favor complete todos los campos obligatorios del estudiante y responsable principal."]);
-    exit;
+if ($enrollmentType === 'reinscripcion_2027') {
+    if (empty($studentName) || empty($studentDni) || empty($studentGrade) || empty($parent1Name) || empty($parent1Dni) || empty($parent1Email) || empty($parent1Phone)) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "Por favor complete todos los campos obligatorios del estudiante y responsable principal."]);
+        exit;
+    }
+} else {
+    // Preinscripción general (Aspirantes nuevos)
+    if (empty($studentName) || empty($parent1Name) || empty($parent1Email) || empty($parent1Phone)) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "Por favor complete los campos obligatorios (Nombre del aspirante, Tutor, Email y Teléfono)."]);
+        exit;
+    }
 }
 
 if (!filter_var($parent1Email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(422);
-    echo json_encode(["success" => false, "error" => "El correo electrónico del Responsable 1 no es válido."]);
+    echo json_encode(["success" => false, "error" => "El correo electrónico del contacto no es válido."]);
     exit;
 }
 
 $id = generateUUID();
-$trackingNumber = 'FEE-2027-' . strtoupper(substr(md5(uniqid()), 0, 5));
+$trackingNumber = ($enrollmentType === 'reinscripcion_2027' ? 'FEE-2027-' : 'PRE-') . strtoupper(substr(md5(uniqid()), 0, 5));
 $now = date('Y-m-d H:i:s');
 
 $record = [
     'id'                  => $id,
+    'type'                => $enrollmentType,
     'trackingNumber'      => $trackingNumber,
     'studentName'         => $studentName,
     'studentDni'          => $studentDni,
@@ -124,10 +137,13 @@ $record = [
     'hasSiblings'         => $hasSiblings,
     'siblingDetails'      => $siblingDetails,
     'parent1Name'         => $parent1Name,
+    'tutorName'           => $parent1Name,
     'parent1Dni'          => $parent1Dni,
     'parent1Relationship' => $parent1Relationship,
     'parent1Phone'        => $parent1Phone,
+    'tutorPhone'          => $parent1Phone,
     'parent1Email'        => $parent1Email,
+    'tutorEmail'          => $parent1Email,
     'parent1Address'      => $parent1Address,
     'parent1City'         => $parent1City,
     'parent1PostalCode'   => $parent1PostalCode,
@@ -150,13 +166,10 @@ $record = [
     'termsAccepted'       => $termsAccepted,
     'signature1Data'      => $signature1Data,
     'signature2Data'      => $signature2Data,
-    'tutorName'           => $parent1Name,
-    'tutorEmail'          => $parent1Email,
-    'tutorPhone'          => $parent1Phone,
     'comments'            => $comments,
     'status'              => 'PENDING',
     'contractVersion'     => '2027.v1',
-    'createdAt'           => $now
+    'createdAt'           => $now,
 ];
 
 // 3. Guardar en almacenamiento protegido con flock y límite de tamaño
@@ -214,7 +227,7 @@ try {
         ensureEnrollmentTableSchema($pdo);
         $stmt = $pdo->prepare("
             INSERT INTO `Enrollment` (
-                `id`, `trackingNumber`, `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
+                `id`, `type`, `trackingNumber`, `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
                 `hasSiblings`, `siblingDetails`, `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`,
                 `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`, `isSingleParent`, `parent2Name`,
                 `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Address`, `parent2City`,
@@ -223,7 +236,7 @@ try {
                 `tutorName`, `tutorEmail`, `tutorPhone`, `comments`, `status`, `contractVersion`, `createdAt`
             )
             VALUES (
-                :id, :trackingNumber, :studentName, :studentDni, :school, :studentLevel, :studentGrade,
+                :id, :type, :trackingNumber, :studentName, :studentDni, :school, :studentLevel, :studentGrade,
                 :hasSiblings, :siblingDetails, :parent1Name, :parent1Dni, :parent1Relationship, :parent1Phone,
                 :parent1Email, :parent1Address, :parent1City, :parent1PostalCode, :isSingleParent, :parent2Name,
                 :parent2Dni, :parent2Relationship, :parent2Phone, :parent2Email, :parent2Address, :parent2City,
@@ -234,6 +247,7 @@ try {
         ");
         $stmt->execute([
             ':id'                  => $id,
+            ':type'                => $enrollmentType,
             ':trackingNumber'      => $trackingNumber,
             ':studentName'         => $studentName,
             ':studentDni'          => $studentDni,

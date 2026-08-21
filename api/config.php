@@ -163,11 +163,13 @@ function ensureEnrollmentTableSchema($pdo) {
         $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
 
         $newCols = [
+            'type'                => "VARCHAR(50) DEFAULT 'reinscripcion_2027'",
             'trackingNumber'      => "VARCHAR(50) NULL",
             'studentDni'          => "VARCHAR(50) NULL",
             'school'              => "VARCHAR(100) NULL DEFAULT 'Escuela N.º 1030'",
             'hasSiblings'         => "TINYINT(1) DEFAULT 0",
             'siblingDetails'      => "TEXT NULL",
+            'siblingsJson'        => "TEXT NULL",
             'parent1Name'         => "VARCHAR(191) NULL",
             'parent1Dni'          => "VARCHAR(50) NULL",
             'parent1Relationship' => "VARCHAR(100) NULL",

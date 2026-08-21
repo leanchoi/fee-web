@@ -212,11 +212,11 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "enrollments" | "contacts" | "users" | "gallery">(() => {
+  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "preinscripciones" | "contacts" | "users" | "gallery">(() => {
+    if (userPerms.includes("enrollments") || isSuperAdmin) return "reinscripciones";
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
-    if (userPerms.includes("enrollments")) return "enrollments";
     if (userPerms.includes("contacts")) return "contacts";
-    return "posts";
+    return "reinscripciones";
   });
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -233,6 +233,20 @@ export function AdminDashboard({
   const [enrollmentList, setEnrollmentList] = useState<Enrollment[]>(enrollments || []);
   const [contactList, setContactList] = useState<ContactMessage[]>(contactMessages || []);
 
+  // Partition between Reinscripciones 2027 and Preinscripciones Generales
+  const reinscripcionesList = useMemo(() => {
+    return enrollmentList.filter((e: any) => {
+      if (e.type === "preinscripcion_general") return false;
+      return true; // Todos los de 2027 o con datos de contrato
+    });
+  }, [enrollmentList]);
+
+  const preinscripcionesList = useMemo(() => {
+    return enrollmentList.filter((e: any) => {
+      return e.type === "preinscripcion_general" || (!e.studentDni && !e.signature1Data && !e.parent1Dni);
+    });
+  }, [enrollmentList]);
+
   // Enrollments Filtering, Selection & ZIP Export State
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [enrollmentSearchQuery, setEnrollmentSearchQuery] = useState("");
@@ -247,7 +261,7 @@ export function AdminDashboard({
   const [inspectingEnrollment, setInspectingEnrollment] = useState<any | null>(null);
 
   const filteredEnrollments = useMemo(() => {
-    return enrollmentList.filter((e: any) => {
+    return reinscripcionesList.filter((e: any) => {
       // 1. Search Query
       if (enrollmentSearchQuery.trim()) {
         const q = enrollmentSearchQuery.toLowerCase();
@@ -295,11 +309,12 @@ export function AdminDashboard({
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         if (itemDate < thirtyDaysAgo) return false;
       } else if (enrollmentDatePreset === "thisYear") {
-        if (itemDate.getFullYear() !== now.getFullYear()) return false;
+        const startOfYear = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        if (itemDate < startOfYear) return false;
       } else if (enrollmentDatePreset === "custom") {
         if (customStartDate) {
-          const start = new Date(customStartDate + "T00:00:00");
-          if (itemDate < start) return false;
+          const s = new Date(customStartDate + "T00:00:00");
+          if (itemDate < s) return false;
         }
         if (customEndDate) {
           const end = new Date(customEndDate + "T23:59:59");
@@ -309,7 +324,7 @@ export function AdminDashboard({
 
       return true;
     });
-  }, [enrollmentList, enrollmentSearchQuery, enrollmentSchoolFilter, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
+  }, [reinscripcionesList, enrollmentSearchQuery, enrollmentSchoolFilter, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
 
   const handleSelectAllEnrollments = () => {
     if (selectedEnrollmentIds.length === filteredEnrollments.length) {
@@ -747,10 +762,39 @@ export function AdminDashboard({
           
           {hasEnrollmentsPerm && (
             <button 
-              onClick={() => setActiveTab("enrollments")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "enrollments" ? "bg-brand-green text-white shadow-md" : "text-brand-green hover:bg-brand-gray/10"}`}
+              onClick={() => setActiveTab("reinscripciones")}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                activeTab === "reinscripciones" ? "bg-emerald-700 text-white shadow-md" : "text-emerald-800 hover:bg-emerald-50"
+              )}
             >
-              <Users className="w-4 h-4" /> Inscripciones
+              <ShieldCheck className="w-4 h-4" />
+              <span>Reinscripciones 2027</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-black",
+                activeTab === "reinscripciones" ? "bg-white text-emerald-900" : "bg-emerald-100 text-emerald-800"
+              )}>
+                {reinscripcionesList.length}
+              </span>
+            </button>
+          )}
+
+          {hasEnrollmentsPerm && (
+            <button 
+              onClick={() => setActiveTab("preinscripciones")}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                activeTab === "preinscripciones" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-blue/10"
+              )}
+            >
+              <Users className="w-4 h-4" />
+              <span>Preinscripciones</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-black",
+                activeTab === "preinscripciones" ? "bg-white text-brand-blue" : "bg-brand-blue/10 text-brand-blue"
+              )}>
+                {preinscripcionesList.length}
+              </span>
             </button>
           )}
           
@@ -839,7 +883,7 @@ export function AdminDashboard({
           </div>
         )}
 
-        {hasEnrollmentsPerm && activeTab === "enrollments" && (
+        {hasEnrollmentsPerm && activeTab === "reinscripciones" && (
           <div>
             {/* Header with Title and Actions */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -920,9 +964,9 @@ export function AdminDashboard({
 
             {/* Quick Metrics KPI Banner */}
             {(() => {
-              const totalAll = enrollmentList.length;
-              const esc1030Count = enrollmentList.filter((e: any) => (e.school || "").includes("1030") || !(e.school || "").includes("1739")).length;
-              const esc1739Count = enrollmentList.filter((e: any) => (e.school || "").includes("1739")).length;
+              const totalAll = reinscripcionesList.length;
+              const esc1030Count = reinscripcionesList.filter((e: any) => (e.school || "").includes("1030") || !(e.school || "").includes("1739")).length;
+              const esc1739Count = reinscripcionesList.filter((e: any) => (e.school || "").includes("1739")).length;
 
               return (
                 <>
@@ -938,7 +982,7 @@ export function AdminDashboard({
                       )}
                     >
                       <span className={cn("text-[10px] font-bold uppercase tracking-wider block mb-1", enrollmentSchoolFilter === "all" ? "text-white/80" : "text-brand-blue")}>
-                        Total General
+                        Total General Reinscripciones
                       </span>
                       <span className={cn("text-2xl sm:text-3xl font-black", enrollmentSchoolFilter === "all" ? "text-white" : "text-brand-blue")}>
                         {totalAll}
@@ -992,7 +1036,7 @@ export function AdminDashboard({
                         {enrollmentSearchQuery && (
                           <button
                             onClick={() => setEnrollmentSearchQuery("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-foreground/40 hover:text-brand-blue"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-foreground/40 hover:text-brand-blue cursor-pointer"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1087,7 +1131,7 @@ export function AdminDashboard({
                         </button>
                         <span className="text-brand-foreground/60">|</span>
                         <span className="text-brand-foreground/70 font-semibold">
-                          Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {enrollmentList.length} registros
+                          Mostrando <strong className="text-brand-blue">{filteredEnrollments.length}</strong> de {reinscripcionesList.length} reinscripciones
                         </span>
                       </div>
 
@@ -1209,7 +1253,7 @@ export function AdminDashboard({
                                 </button>
                                 <a 
                                   href={`mailto:${e.parent1Email || e.tutorEmail}`} 
-                                  className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border"
+                                  className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-xl transition-colors border cursor-pointer"
                                   title="Enviar correo"
                                 >
                                   <Mail className="w-4 h-4" />
@@ -1229,7 +1273,7 @@ export function AdminDashboard({
 
                       {filteredEnrollments.length === 0 && (
                         <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
-                          No se encontraron inscripciones con los filtros seleccionados.
+                          No se encontraron reinscripciones con los filtros seleccionados.
                         </div>
                       )}
                     </div>
@@ -1336,6 +1380,101 @@ export function AdminDashboard({
                 </>
               );
             })()}
+          </div>
+        )}
+
+        {/* TAB DE PREINSCRIPCIONES GENERALES */}
+        {hasEnrollmentsPerm && activeTab === "preinscripciones" && (
+          <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-bold text-brand-blue">Preinscripciones Generales</h2>
+                  <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wide">
+                    Nuevos Ingresantes
+                  </span>
+                </div>
+                <p className="text-xs text-brand-foreground/70 mt-1">
+                  Aspirantes a vacantes nuevas y lista de espera para Nivel Inicial, Primario y Secundario.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold px-3 py-1.5 bg-brand-blue/10 text-brand-blue rounded-full">
+                  Total: {preinscripcionesList.length} aspirantes
+                </span>
+              </div>
+            </div>
+
+            {/* Listado de Preinscripciones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {preinscripcionesList.map((e: any) => {
+                const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
+                return (
+                  <div key={e.id} className="bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start gap-4 mb-4">
+                        <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center font-extrabold text-brand-blue shrink-0">
+                          {initial}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-brand-foreground/50 font-semibold block">
+                            {new Date(e.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 bg-blue-50 text-blue-800 border-blue-200">
+                            {e.studentLevel || "Nivel Primario"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
+                      <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
+
+                      <div className="space-y-1.5 border-t pt-3 text-xs mb-4 text-slate-700">
+                        <p className="truncate"><span className="font-bold text-slate-900">Tutor:</span> {e.tutorName || e.parent1Name || "---"}</p>
+                        <p className="flex items-center gap-1.5 truncate text-slate-600"><Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.tutorEmail || e.parent1Email}</p>
+                        <p className="flex items-center gap-1.5 text-slate-600"><Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.tutorPhone || e.parent1Phone}</p>
+                      </div>
+
+                      {e.comments && (
+                        <div className="bg-slate-50 border p-2.5 rounded-xl text-[11px] text-slate-700 leading-normal max-h-24 overflow-y-auto mb-4">
+                          <span className="font-bold block mb-0.5 text-slate-900">Comentarios:</span>
+                          {e.comments}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 border-t pt-3">
+                      <a 
+                        href={`mailto:${e.tutorEmail || e.parent1Email}`} 
+                        className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Enviar Mail
+                      </a>
+                      <a 
+                        href={`tel:${e.tutorPhone || e.parent1Phone}`} 
+                        className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
+                      >
+                        Llamar
+                      </a>
+                      <button 
+                        onClick={() => handleDeleteEnrollment(e.id)} 
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border" 
+                        title="Eliminar solicitud"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {preinscripcionesList.length === 0 && (
+                <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
+                  No hay solicitudes de preinscripción registradas actualmente.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
