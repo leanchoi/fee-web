@@ -109,33 +109,34 @@ export function Footer() {
           <div className="flex flex-col gap-4 relative z-10">
             <h4 className="text-lg font-bold text-brand-yellow">Contacto</h4>
             <ul className="flex flex-col gap-3 text-xs text-white/80">
-              {/* Administración Central */}
+              {/* Inicial y Primaria */}
               <li className="space-y-1">
                 <div className="flex items-start gap-1.5 text-white font-semibold">
                   <MapPin className="w-3.5 h-3.5 text-brand-lightblue shrink-0 mt-0.5" />
-                  <span>Administración (Chacabuco 1029)</span>
+                  <span>Inicial & Primaria (Esc. N° 1030)</span>
                 </div>
                 <div className="pl-5 space-y-0.5 text-[11px] text-white/70">
+                  <div>Chacabuco 1029, Esquel</div>
                   <div className="flex items-center gap-1.5">
                     <Phone className="w-3 h-3 text-brand-lightblue shrink-0" />
                     <span>(02945) 456053</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
-                    <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
+                    <a href="mailto:equipodirectivo1030@gmail.com" className="hover:text-white transition-colors">equipodirectivo1030@gmail.com</a>
                   </div>
                 </div>
               </li>
 
-              {/* Inicial y Primaria */}
+              {/* Administración Central */}
               <li className="space-y-1 pt-1.5 border-t border-white/10">
                 <div className="text-white font-semibold flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Inicial & Primaria (Esc. N° 1030)</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-lightblue"></span>
+                  <span>Administración</span>
                 </div>
                 <div className="pl-3 text-[11px] text-white/70 flex items-center gap-1.5">
                   <Mail className="w-3 h-3 text-brand-lightblue shrink-0" />
-                  <a href="mailto:equipodirectivo1030@gmail.com" className="hover:text-white transition-colors">equipodirectivo1030@gmail.com</a>
+                  <a href="mailto:escuelafeesquel@gmail.com" className="hover:text-white transition-colors">escuelafeesquel@gmail.com</a>
                 </div>
               </li>
 
