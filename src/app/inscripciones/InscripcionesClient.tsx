@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { EnrollmentForm } from "./form";
 import { PreinscripcionForm } from "../preinscripciones/form";
-import { ShieldCheck, Users } from "lucide-react";
+import { ShieldCheck, Users, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Control temporal para deshabilitar la pestaña de Nuevos Ingresantes durante el período exclusivo de reinscripciones
@@ -14,6 +14,28 @@ export function InscripcionesClient() {
 
   return (
     <div>
+      {/* Cartel Rojo de Aviso Importante */}
+      <div className="bg-red-50 border-2 border-red-500 rounded-3xl p-6 sm:p-7 mb-8 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="p-3 bg-red-600 text-white rounded-2xl shrink-0 shadow-md">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="bg-red-600 text-white text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                Aviso Importante — Período Exclusivo
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-red-900 leading-snug">
+              Habilitado únicamente para alumnos que ya estén anotados en la institución y hermanos/as de los mismos.
+            </h3>
+            <p className="text-xs sm:text-sm text-red-800 font-medium leading-relaxed">
+              El período de inscripción regular para <strong className="font-extrabold text-red-950 underline decoration-red-400 decoration-2">nuevos alumnos</strong> a la institución iniciará con posterioridad a esta etapa de reinscripción.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Selector de Modalidad (Visible solo si Nuevos Ingresantes está habilitado) */}
       {SHOW_PREINSCRIPCIONES && (
         <div className="flex justify-center mb-8">

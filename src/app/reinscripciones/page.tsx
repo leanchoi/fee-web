@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import { EnrollmentForm } from "../inscripciones/form";
-import Link from "next/link";
-import { Users, ArrowRight } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Formulario de Reinscripción – Ciclo Lectivo 2027 | Fundación Educativa Esquel",
@@ -30,18 +29,26 @@ export default function ReinscripcionesPage() {
       <section className="-mt-6 relative z-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-4xl">
           
-          {/* Banner para nuevos ingresantes */}
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-            <div className="flex items-center gap-2 text-xs text-blue-950 font-medium">
-              <Users className="w-5 h-5 text-blue-600 shrink-0" />
-              <span>¿Busca vacante para un estudiante que no cursa actualmente en la Fundación?</span>
+          {/* Cartel Rojo de Aviso Importante */}
+          <div className="bg-red-50 border-2 border-red-500 rounded-3xl p-6 sm:p-7 mb-8 shadow-xl relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="p-3 bg-red-600 text-white rounded-2xl shrink-0 shadow-md">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="bg-red-600 text-white text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                    Aviso Importante — Período Exclusivo
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-red-900 leading-snug">
+                  Habilitado únicamente para alumnos que ya estén anotados en la institución y hermanos/as de los mismos.
+                </h3>
+                <p className="text-xs sm:text-sm text-red-800 font-medium leading-relaxed">
+                  El período de inscripción regular para <strong className="font-extrabold text-red-950 underline decoration-red-400 decoration-2">nuevos alumnos</strong> a la institución iniciará con posterioridad a esta etapa de reinscripción.
+                </p>
+              </div>
             </div>
-            <Link 
-              href="/preinscripciones"
-              className="text-xs font-bold text-blue-800 hover:text-blue-950 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1 shrink-0"
-            >
-              Ir a Preinscripciones <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
 
           <div className="bg-white rounded-3xl p-6 sm:p-10 md:p-12 shadow-xl border border-slate-200/80">
