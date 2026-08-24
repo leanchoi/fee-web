@@ -42,10 +42,10 @@ export default function ReinscripcionesPage() {
                   </span>
                 </div>
                 <h3 className="text-base sm:text-lg font-black text-red-900 leading-snug">
-                  Habilitado únicamente para alumnos que ya estén anotados en la institución y hermanos/as de los mismos.
+                  Habilitado únicamente para la reinscripción de estudiantes que ya concurren a la Fundación.
                 </h3>
                 <p className="text-xs sm:text-sm text-red-800 font-medium leading-relaxed">
-                  El período de inscripción regular para <strong className="font-extrabold text-red-950 underline decoration-red-400 decoration-2">nuevos alumnos</strong> a la institución iniciará con posterioridad a esta etapa de reinscripción.
+                  El período de inscripción para <strong className="font-extrabold text-red-950 underline decoration-red-400 decoration-2">nuevos ingresantes</strong> a la institución iniciará con posterioridad a esta etapa de reinscripción.
                 </p>
               </div>
             </div>
