@@ -6,23 +6,39 @@ import { ArrowLeft, Calendar, Loader2 } from "lucide-react";
 import { PostItem } from "@/lib/defaultPosts";
 
 export function BlogPostClient({ slug, initialPost }: { slug: string; initialPost?: PostItem | null }) {
-  const [post, setPost] = useState<PostItem | null | undefined>(initialPost);
-  const [loading, setLoading] = useState(!initialPost);
+  const [post, setPost] = useState<PostItem | null | undefined>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin.php?action=get_posts&slug=" + encodeURIComponent(slug))
+    let targetSlug = slug;
+    if (typeof window !== "undefined") {
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      if (parts.length >= 2 && parts[0] === "blog") {
+        targetSlug = decodeURIComponent(parts[1]);
+      }
+    }
+
+    if (initialPost && initialPost.slug === targetSlug) {
+      setPost(initialPost);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    fetch("/api/admin.php?action=get_posts&slug=" + encodeURIComponent(targetSlug))
       .then((res) => res.json())
       .then((data) => {
         if (data && data.success && data.post) {
           setPost(data.post);
-        } else if (!initialPost) {
+          if (typeof document !== "undefined" && data.post.title) {
+            document.title = `${data.post.title} | Novedades FEE`;
+          }
+        } else {
           setPost(null);
         }
       })
       .catch(() => {
-        if (!initialPost) {
-          setPost(null);
-        }
+        setPost(null);
       })
       .finally(() => {
         setLoading(false);
