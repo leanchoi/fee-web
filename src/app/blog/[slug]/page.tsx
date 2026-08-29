@@ -40,7 +40,7 @@ export async function generateStaticParams() {
       return [...defaultSlugs, ...dbSlugs];
     }
   } catch (e) {}
-  return defaultSlugs;
+  return defaultSlugs.length > 0 ? defaultSlugs : [{ slug: "_post" }];
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<Params> }) {
