@@ -97,7 +97,7 @@ export function BlogPostClient({ slug, initialPost }: { slug: string; initialPos
           </h1>
 
           {post.excerpt && (
-            <p className="text-lg md:text-xl text-white/80 font-medium leading-relaxed">
+            <p className="text-lg md:text-xl text-white/80 font-medium leading-relaxed whitespace-pre-wrap">
               {post.excerpt}
             </p>
           )}
@@ -133,7 +133,7 @@ export function BlogPostClient({ slug, initialPost }: { slug: string; initialPos
                       const fontClass = block.data?.fontFamily === 'serif' ? 'font-serif' : block.data?.fontFamily === 'mono' ? 'font-mono' : 'font-sans';
 
                       return (
-                        <Tag key={block.id || bIdx} className={`${colorClass} ${alignClass} ${fontClass} text-lg leading-relaxed font-medium`}>
+                        <Tag key={block.id || bIdx} className={`${colorClass} ${alignClass} ${fontClass} text-lg leading-relaxed font-medium whitespace-pre-wrap`}>
                           {block.data?.text}
                         </Tag>
                       );

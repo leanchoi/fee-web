@@ -3663,7 +3663,7 @@ function PostEditorModal({ post, onClose, onSave }: { post: Post | null; onClose
               </div>
 
               {excerpt && (
-                <p className="text-brand-foreground/80 font-medium leading-relaxed italic border-l-4 border-brand-yellow pl-4 py-1 bg-brand-yellow/5 rounded-r-xl text-sm">
+                <p className="text-brand-foreground/80 font-medium leading-relaxed italic border-l-4 border-brand-yellow pl-4 py-1 bg-brand-yellow/5 rounded-r-xl text-sm whitespace-pre-wrap">
                   {excerpt}
                 </p>
               )}
@@ -3678,7 +3678,7 @@ function PostEditorModal({ post, onClose, onSave }: { post: Post | null; onClose
                     const fontClass = block.data.fontFamily === "serif" ? "font-serif" : block.data.fontFamily === "mono" ? "font-mono" : "font-sans";
                     
                     return (
-                      <Tag key={block.id} className={cn(colorClass, alignClass, fontClass, "leading-relaxed text-sm md:text-base font-semibold")}>
+                      <Tag key={block.id} className={cn(colorClass, alignClass, fontClass, "leading-relaxed text-sm md:text-base font-semibold whitespace-pre-wrap")}>
                         {block.data.text || <span className="text-gray-300 italic">Bloque de texto vacío...</span>}
                       </Tag>
                     );
