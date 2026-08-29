@@ -1,13 +1,35 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Calendar } from "lucide-react";
-import { INITIAL_POSTS } from "@/lib/defaultPosts";
+import { INITIAL_POSTS, PostItem } from "@/lib/defaultPosts";
 
 export function NewsPreview() {
+  const [posts, setPosts] = useState<PostItem[]>(INITIAL_POSTS);
+
+  useEffect(() => {
+    fetch("/api/admin.php?action=get_posts")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.posts)) {
+          setPosts(data.posts.slice(0, 3));
+        }
+      })
+      .catch(() => {
+        // Fallback a INITIAL_POSTS
+      });
+  }, []);
+
   const colorMap: Record<string, string> = {
     "Institucional": "bg-brand-green",
     "Inglés": "bg-brand-lightblue",
     "Comunidad": "bg-brand-yellow"
   };
+
+  if (posts.length === 0) {
+    return null;
+  }
 
   return (
     <section className="py-24 bg-white">
@@ -31,8 +53,10 @@ export function NewsPreview() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {INITIAL_POSTS.map((post) => {
+          {posts.map((post) => {
             const color = colorMap[post.category] || "bg-brand-green";
+            const excerpt = post.excerpt || (typeof post.content === 'string' ? post.content.replace(/<[^>]*>?/gm, '').replace(/\[.*\]/, '').substring(0, 120) + "..." : "");
+
             return (
               <Link 
                 key={post.id || post.slug} 
@@ -54,7 +78,7 @@ export function NewsPreview() {
                     {post.title}
                   </h3>
                   <p className="text-brand-foreground/70 text-sm leading-relaxed mb-6 line-clamp-3">
-                    {post.excerpt}
+                    {excerpt}
                   </p>
                   <div className="mt-auto flex justify-end">
                     <div className="w-10 h-10 rounded-full bg-brand-blue/5 flex items-center justify-center group-hover:bg-brand-green group-hover:text-white transition-colors text-brand-blue">
