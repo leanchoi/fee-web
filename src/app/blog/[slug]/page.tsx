@@ -114,10 +114,75 @@ export default async function BlogPostPage({ params }: { params: Promise<Params>
 
       {/* Content */}
       <section className="container mx-auto px-6 lg:px-12 max-w-3xl py-12">
-        <div className="prose prose-lg max-w-none text-brand-foreground/85 leading-relaxed space-y-6">
-          <p className="text-lg leading-relaxed whitespace-pre-line">
-            {post.content}
-          </p>
+        <div className="text-brand-foreground/85 leading-relaxed space-y-6">
+          {(() => {
+            if (typeof post.content === "string" && post.content.trim().startsWith("[")) {
+              try {
+                const parsedBlocks = JSON.parse(post.content);
+                if (Array.isArray(parsedBlocks) && parsedBlocks.length > 0) {
+                  return parsedBlocks.map((block: any, bIdx: number) => {
+                    if (block.type === "text") {
+                      const Tag = (block.data?.tag || "p") as any;
+                      const colorClass = block.data?.color || "text-brand-blue";
+                      const alignClass = block.data?.align === "center" ? "text-center" : block.data?.align === "right" ? "text-right" : "text-left";
+                      const fontClass = block.data?.fontFamily === "serif" ? "font-serif" : block.data?.fontFamily === "mono" ? "font-mono" : "font-sans";
+
+                      return (
+                        <Tag key={block.id || bIdx} className={`${colorClass} ${alignClass} ${fontClass} text-lg leading-relaxed font-medium`}>
+                          {block.data?.text}
+                        </Tag>
+                      );
+                    }
+                    if (block.type === "image") {
+                      const images = block.data?.images || [];
+                      if (images.length === 0) return null;
+                      return (
+                        <div key={block.id || bIdx} className="my-8 space-y-3">
+                          <div className={`grid ${images.length > 1 ? "grid-cols-1 md:grid-cols-2 gap-4" : "grid-cols-1"}`}>
+                            {images.map((img: string, i: number) => (
+                              <div key={i} className="rounded-2xl overflow-hidden shadow-md border bg-slate-100">
+                                <img src={img} alt={`Imagen ${i + 1}`} className="w-full h-auto object-cover max-h-[500px]" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (block.type === "video") {
+                      const { videoType, youtubeUrl, videoUrl } = block.data || {};
+                      if (videoType === "youtube" && youtubeUrl) {
+                        let embedUrl = youtubeUrl;
+                        if (youtubeUrl.includes("watch?v=")) {
+                          embedUrl = youtubeUrl.replace("watch?v=", "embed/");
+                        } else if (youtubeUrl.includes("youtu.be/")) {
+                          embedUrl = youtubeUrl.replace("youtu.be/", "www.youtube.com/embed/");
+                        }
+                        return (
+                          <div key={block.id || bIdx} className="my-8 aspect-video w-full rounded-2xl overflow-hidden shadow-lg border">
+                            <iframe src={embedUrl} title="Video" className="w-full h-full" allowFullScreen />
+                          </div>
+                        );
+                      }
+                      if (videoUrl) {
+                        return (
+                          <div key={block.id || bIdx} className="my-8 aspect-video w-full rounded-2xl overflow-hidden shadow-lg border bg-black">
+                            <video src={videoUrl} controls className="w-full h-full object-contain" />
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  });
+                }
+              } catch (e) {}
+            }
+
+            return (
+              <p className="text-lg leading-relaxed whitespace-pre-line">
+                {post.content}
+              </p>
+            );
+          })()}
         </div>
       </section>
     </article>

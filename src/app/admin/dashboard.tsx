@@ -385,6 +385,14 @@ export function AdminDashboard({
   const [showModal, setShowModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
+  // Posts / Novedades State
+  const [postList, setPostList] = useState<Post[]>(() => (Array.isArray(posts) ? posts : []));
+  useEffect(() => {
+    if (Array.isArray(posts)) {
+      setPostList(posts);
+    }
+  }, [posts]);
+
   // Gallery State (default to preloaded official 12 items if empty)
   const [galleryList, setGalleryList] = useState<any[]>(() => {
     if (Array.isArray(gallery) && gallery.length > 0) return gallery;
@@ -858,25 +866,34 @@ export function AdminDashboard({
   };
 
   const handleDeletePost = async (id: string) => {
-    if (!confirm("¿Eliminar este post definitivamente?")) return;
+    if (!confirm("¿Eliminar esta novedad definitivamente?")) return;
     try {
       const res = await deletePost(id);
       if (res.success) {
+        if (res.posts && Array.isArray(res.posts)) {
+          setPostList(res.posts);
+        } else {
+          setPostList(prev => prev.filter(p => p.id !== id));
+        }
         router.refresh();
       } else {
-        alert(res.error || "Error al eliminar");
+        alert(res.error || "Error al eliminar la novedad");
       }
     } catch (err: any) {
-      alert(err.message || "Error");
+      alert(err.message || "Error al conectar con el servidor");
     }
   };
 
   const handleToggleState = async (id: string, current: boolean) => {
     try {
-      await togglePostPublish(id, current);
+      setPostList(prev => prev.map(p => p.id === id ? { ...p, published: !current } : p));
+      const res = await togglePostPublish(id, current);
+      if (res && res.success && res.posts) {
+        setPostList(res.posts);
+      }
       router.refresh();
     } catch (err: any) {
-      alert(err.message || "Error");
+      alert(err.message || "Error al cambiar estado de publicación");
     }
   };
 
@@ -1136,7 +1153,7 @@ export function AdminDashboard({
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {posts.map(p => (
+                  {postList.map(p => (
                     <tr key={p.id} className="border-b last:border-0 hover:bg-brand-gray/5 transition-colors">
                       <td className="p-4 font-medium max-w-[200px] truncate">{p.title}</td>
                       <td className="p-4">
@@ -1151,19 +1168,19 @@ export function AdminDashboard({
                         </span>
                       </td>
                       <td className="p-4 text-right flex justify-end gap-2">
-                        <button onClick={() => handleEditPost(p)} className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-colors" title="Editar Contenido">
+                        <button onClick={() => handleEditPost(p)} className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-colors cursor-pointer" title="Editar Contenido">
                           <Edit className="w-4 h-4"/>
                         </button>
-                        <button onClick={() => handleToggleState(p.id, p.published)} className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-colors" title={p.published ? "Ocultar" : "Publicar"}>
+                        <button onClick={() => handleToggleState(p.id, p.published)} className="p-2 text-brand-blue hover:bg-brand-blue/10 rounded-lg transition-colors cursor-pointer" title={p.published ? "Ocultar" : "Publicar"}>
                           {p.published ? <EyeOff className="w-4 h-4"/> : <Eye className="w-4 h-4"/>}
                         </button>
-                        <button onClick={() => handleDeletePost(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                        <button onClick={() => handleDeletePost(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Eliminar">
                           <Trash2 className="w-4 h-4"/>
                         </button>
                       </td>
                     </tr>
                   ))}
-                  {posts.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-brand-gray">No hay novedades cargadas.</td></tr>}
+                  {postList.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-brand-gray">No hay novedades cargadas.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -2957,6 +2974,22 @@ export function AdminDashboard({
             setShowModal(false);
             setEditingPost(null);
           }} 
+          onSave={(savedPost, updatedPosts) => {
+            if (updatedPosts && Array.isArray(updatedPosts)) {
+              setPostList(updatedPosts);
+            } else if (savedPost) {
+              setPostList(prev => {
+                const idx = prev.findIndex(p => p.id === savedPost.id);
+                if (idx >= 0) {
+                  const copy = [...prev];
+                  copy[idx] = savedPost;
+                  return copy;
+                } else {
+                  return [savedPost, ...prev];
+                }
+              });
+            }
+          }}
         />
       )}
 
@@ -3085,12 +3118,13 @@ export function AdminDashboard({
   );
 }
 
-function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => void }) {
+function PostEditorModal({ post, onClose, onSave }: { post: Post | null; onClose: () => void; onSave?: (savedPost: any, postsList?: any[]) => void }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState(post?.title || "");
   const [category, setCategory] = useState(post?.category || "Institucional");
   const [excerpt, setExcerpt] = useState(post?.excerpt || "");
+  const [errorToast, setErrorToast] = useState("");
   
   const [blocks, setBlocks] = useState<Block[]>(() => {
     if (post && post.content) {
@@ -3120,22 +3154,64 @@ function PostEditorModal({ post, onClose }: { post: Post | null; onClose: () => 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!title.trim()) {
+      alert("Por favor ingresá el título de la novedad.");
+      return;
+    }
+
     setLoading(true);
-    const fd = new FormData(e.currentTarget);
-    
-    // Set the content as the serialized blocks JSON string
-    fd.set("content", JSON.stringify(blocks));
+    setErrorToast("");
     
     try {
-      if (post) {
-        await updatePost(post.id, fd);
-      } else {
-        await createPost(fd);
+      // Check if image file was selected for cover
+      let imageUrl = post?.imageUrl || "";
+      const fileInput = e.currentTarget.elements.namedItem("imageFile") as HTMLInputElement;
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const upFd = new FormData();
+        upFd.append("file", fileInput.files[0]);
+        const upRes = await uploadMediaAction(upFd);
+        if (upRes.success && upRes.url) {
+          imageUrl = upRes.url;
+        } else {
+          throw new Error(upRes.error || "Error al subir la foto de portada.");
+        }
       }
-      onClose();
-      router.refresh();
+
+      const slug = post?.slug || title.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || `novedad-${Date.now()}`;
+
+      const postData = {
+        id: post?.id,
+        title: title.trim(),
+        slug: slug,
+        category: category,
+        excerpt: excerpt.trim(),
+        content: JSON.stringify(blocks),
+        imageUrl: imageUrl,
+        published: true
+      };
+
+      let res;
+      if (post) {
+        res = await updatePost(post.id, postData);
+      } else {
+        res = await createPost(postData);
+      }
+
+      if (res && res.success) {
+        if (onSave) {
+          onSave(res.post || { ...postData, id: post?.id || 'post-' + Date.now(), createdAt: post?.createdAt || new Date().toISOString() }, res.posts);
+        }
+        onClose();
+        router.refresh();
+      } else {
+        throw new Error(res?.error || "Error al guardar en el servidor");
+      }
     } catch (err: any) {
-      alert(err.message || "Error al guardar el post");
+      setErrorToast(err.message || "Error al guardar la novedad");
+      alert(err.message || "Error al guardar la novedad");
     } finally {
       setLoading(false);
     }

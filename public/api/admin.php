@@ -104,6 +104,64 @@ $initialGallery = [
     ]
 ];
 
+// 3 Novedades oficiales iniciales
+$initialPosts = [
+    [
+        'id'        => 'post-1',
+        'title'     => 'Inicio del Ciclo Lectivo 2026',
+        'slug'      => 'inicio-ciclo-lectivo-2026',
+        'category'  => 'Institucional',
+        'excerpt'   => 'Comenzamos un nuevo año con la esperanza y el compromiso renovado de toda la comunidad educativa, recibiendo a las familias y nuevos ingresantes.',
+        'content'   => '[{"id":"1","type":"text","data":{"text":"Damos inicio a un nuevo año escolar con gran entusiasmo y el compromiso de siempre. Durante esta primera semana, las familias y estudiantes de los tres niveles compartieron las jornadas de bienvenida e integración pedagógica. Agradecemos a toda la comunidad por acompañarnos en este hermoso camino formativo.","tag":"p","color":"text-brand-blue","fontFamily":"font-sans","align":"left"}}]',
+        'imageUrl'  => '/photos/fee_photo_07.jpg',
+        'published' => 1,
+        'createdAt' => '2026-02-26 10:00:00',
+        'updatedAt' => '2026-02-26 10:00:00'
+    ],
+    [
+        'id'        => 'post-2',
+        'title'     => 'Cambridge English Acreditation',
+        'slug'      => 'cambridge-english-acreditation',
+        'category'  => 'Inglés',
+        'excerpt'   => 'Felicitamos a los alumnos de 6to año que han obtenido su First Certificate con honores en las mesas internacionales de evaluación.',
+        'content'   => '[{"id":"1","type":"text","data":{"text":"Queremos hacer un reconocimiento especial a nuestros estudiantes de Nivel Secundario por su destacado desempeño en las certificaciones internacionales de Cambridge English (B2 First y C1 Advanced). Su dedicación y el acompañamiento del equipo docente de inglés demuestran la solidez de nuestro proyecto bilingüe.","tag":"p","color":"text-brand-blue","fontFamily":"font-sans","align":"left"}}]',
+        'imageUrl'  => '/photos/fee_photo_12.jpg',
+        'published' => 1,
+        'createdAt' => '2026-03-14 10:00:00',
+        'updatedAt' => '2026-03-14 10:00:00'
+    ],
+    [
+        'id'        => 'post-3',
+        'title'     => 'Kermesse Solidaria de Otoño',
+        'slug'      => 'kermesse-solidaria-de-otono',
+        'category'  => 'Comunidad',
+        'excerpt'   => 'Invitamos a todas las familias al gran evento solidario del año en el SUM de la sede primaria para compartir juegos, buffet y proyectos comunitarios.',
+        'content'   => '[{"id":"1","type":"text","data":{"text":"El próximo sábado nos encontramos toda la comunidad de la Fundación Educativa Esquel para celebrar nuestra tradicional Kermesse de Otoño. Habrá stands recreativos organizados por los cursos, buffet solidario a beneficio de proyectos estudiantiles y presentaciones artísticas. ¡Los esperamos a todos!","tag":"p","color":"text-brand-blue","fontFamily":"font-sans","align":"left"}}]',
+        'imageUrl'  => '/photos/fee_photo_14.jpg',
+        'published' => 1,
+        'createdAt' => '2026-04-02 10:00:00',
+        'updatedAt' => '2026-04-02 10:00:00'
+    ]
+];
+
+// Endpoint público para obtener noticias / posts del Blog
+if (($_GET['action'] ?? '') === 'get_posts') {
+    $postsFile = __DIR__ . '/data/posts.json';
+    $items = [];
+    if (file_exists($postsFile)) {
+        $items = json_decode(file_get_contents($postsFile), true) ?: [];
+    }
+    if (empty($items)) {
+        $items = $initialPosts;
+        if (!is_dir(__DIR__ . '/data')) {
+            @mkdir(__DIR__ . '/data', 0755, true);
+        }
+        @file_put_contents($postsFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+    echo json_encode(["success" => true, "posts" => $items]);
+    exit;
+}
+
 // Endpoint público para obtener fotos de la galería Home
 if (($_GET['action'] ?? '') === 'get_gallery') {
     $galleryFile = __DIR__ . '/data/gallery.json';
@@ -279,8 +337,22 @@ switch ($action) {
             }
         }
 
-        if ($canBlog && empty($posts)) {
-            $posts = $initialPosts;
+        if ($canBlog) {
+            $postsFile = $dataDir . '/posts.json';
+            if (file_exists($postsFile)) {
+                $jsonPosts = json_decode(file_get_contents($postsFile), true) ?: [];
+                $existingIds = array_column($posts, 'id');
+                foreach ($jsonPosts as $item) {
+                    if (!in_array($item['id'], $existingIds)) {
+                        $posts[] = $item;
+                    }
+                }
+            }
+            if (empty($posts)) {
+                $posts = $initialPosts;
+                if (!is_dir($dataDir)) @mkdir($dataDir, 0755, true);
+                @file_put_contents($postsFile, json_encode($posts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            }
         }
 
         if ($isSuperAdmin) {
@@ -441,25 +513,103 @@ switch ($action) {
             exit;
         }
 
-        $title     = trim($bodyData['title'] ?? '');
-        $slug      = trim($bodyData['slug'] ?? '');
-        $content   = $bodyData['content'] ?? '';
-        $excerpt   = trim($bodyData['excerpt'] ?? '');
-        $imageUrl  = trim($bodyData['imageUrl'] ?? '');
-        $category  = trim($bodyData['category'] ?? 'Novedades');
-        $published = !empty($bodyData['published']) ? 1 : 0;
-        $id        = $bodyData['id'] ?? '';
+        $id        = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
+        $title     = trim($bodyData['title'] ?? ($_POST['title'] ?? ''));
+        $slug      = trim($bodyData['slug'] ?? ($_POST['slug'] ?? ''));
+        $content   = $bodyData['content'] ?? ($_POST['content'] ?? '');
+        $excerpt   = trim($bodyData['excerpt'] ?? ($_POST['excerpt'] ?? ''));
+        $imageUrl  = trim($bodyData['imageUrl'] ?? ($_POST['imageUrl'] ?? ''));
+        $category  = trim($bodyData['category'] ?? ($_POST['category'] ?? 'Institucional'));
+        $published = isset($bodyData['published']) ? (!empty($bodyData['published']) ? 1 : 0) : (isset($_POST['published']) ? (!empty($_POST['published']) ? 1 : 0) : 1);
 
-        if (empty($title) || empty($slug)) {
+        if (empty($title)) {
             http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Título y slug son obligatorios"]);
+            echo json_encode(["success" => false, "error" => "El título es obligatorio"]);
             exit;
         }
 
+        if (empty($slug)) {
+            $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
+            $slug = trim($slug, '-');
+            if (empty($slug)) $slug = 'novedad-' . time();
+        }
+
+        $postsFile = __DIR__ . '/data/posts.json';
+        $items = [];
+        if (file_exists($postsFile)) {
+            $items = json_decode(file_get_contents($postsFile), true) ?: [];
+        }
+        if (empty($items)) {
+            $items = $initialPosts;
+        }
+
+        $found = false;
+        $savedItem = null;
+        $now = date('Y-m-d H:i:s');
+        $contentStr = is_string($content) ? $content : json_encode($content, JSON_UNESCAPED_UNICODE);
+
+        if ($id) {
+            foreach ($items as &$it) {
+                if ($it['id'] === $id) {
+                    $it['title']     = $title;
+                    $it['slug']      = $slug;
+                    $it['content']   = $contentStr;
+                    $it['excerpt']   = $excerpt;
+                    if (!empty($imageUrl) || !isset($it['imageUrl'])) {
+                        $it['imageUrl'] = $imageUrl;
+                    }
+                    $it['category']  = $category;
+                    $it['published'] = (int)$published;
+                    $it['updatedAt'] = $now;
+                    $found = true;
+                    $savedItem = $it;
+                    break;
+                }
+            }
+        }
+
+        if (!$found) {
+            $newId = $id ?: ('post-' . generateUUID());
+            $savedItem = [
+                'id'        => $newId,
+                'title'     => $title,
+                'slug'      => $slug,
+                'content'   => $contentStr,
+                'excerpt'   => $excerpt,
+                'imageUrl'  => $imageUrl,
+                'category'  => $category,
+                'published' => (int)$published,
+                'createdAt' => $now,
+                'updatedAt' => $now
+            ];
+            array_unshift($items, $savedItem);
+        }
+
+        if (!is_dir(__DIR__ . '/data')) @mkdir(__DIR__ . '/data', 0755, true);
+        @file_put_contents($postsFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // Actualizar en base de datos MySQL si está disponible
         try {
             $pdo = getPDO();
             if ($pdo) {
-                if ($id && strpos($id, 'post-') !== 0) {
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS `Post` (
+                        `id` VARCHAR(36) PRIMARY KEY,
+                        `title` VARCHAR(255) NOT NULL,
+                        `slug` VARCHAR(255) UNIQUE NOT NULL,
+                        `content` LONGTEXT NOT NULL,
+                        `excerpt` TEXT NULL,
+                        `imageUrl` VARCHAR(500) NULL,
+                        `category` VARCHAR(100) DEFAULT 'Institucional',
+                        `published` TINYINT(1) DEFAULT 1,
+                        `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                        `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                ");
+
+                $check = $pdo->prepare("SELECT `id` FROM `Post` WHERE `id` = :id LIMIT 1");
+                $check->execute([':id' => $savedItem['id']]);
+                if ($check->fetch()) {
                     $stmt = $pdo->prepare("
                         UPDATE `Post` SET `title` = :title, `slug` = :slug, `content` = :content, 
                         `excerpt` = :excerpt, `imageUrl` = :imageUrl, `category` = :category, 
@@ -469,36 +619,36 @@ switch ($action) {
                     $stmt->execute([
                         ':title'     => $title,
                         ':slug'      => $slug,
-                        ':content'   => $content,
+                        ':content'   => $contentStr,
                         ':excerpt'   => $excerpt,
                         ':imageUrl'  => $imageUrl,
                         ':category'  => $category,
-                        ':published' => $published,
-                        ':id'        => $id
+                        ':published' => (int)$published,
+                        ':id'        => $savedItem['id']
                     ]);
                 } else {
-                    $newId = generateUUID();
                     $stmt = $pdo->prepare("
                         INSERT INTO `Post` (`id`, `title`, `slug`, `content`, `excerpt`, `imageUrl`, `category`, `published`, `createdAt`, `updatedAt`)
                         VALUES (:id, :title, :slug, :content, :excerpt, :imageUrl, :category, :published, NOW(3), NOW(3))
                     ");
                     $stmt->execute([
-                        ':id'        => $newId,
+                        ':id'        => $savedItem['id'],
                         ':title'     => $title,
                         ':slug'      => $slug,
-                        ':content'   => $content,
+                        ':content'   => $contentStr,
                         ':excerpt'   => $excerpt,
                         ':imageUrl'  => $imageUrl,
                         ':category'  => $category,
-                        ':published' => $published
+                        ':published' => (int)$published
                     ]);
                 }
             }
         } catch (Exception $e) {
-            error_log("Save post error: " . $e->getMessage());
+            error_log("Save post DB error: " . $e->getMessage());
         }
 
-        echo json_encode(["success" => true]);
+        recordAuditLog($session, $found ? 'UPDATE_POST' : 'CREATE_POST', 'POST', "Guardó noticia/post '$title' ($slug)");
+        echo json_encode(["success" => true, "post" => $savedItem, "posts" => $items]);
         break;
 
     // 6. Eliminar Post
@@ -509,18 +659,36 @@ switch ($action) {
             exit;
         }
 
-        $id = $bodyData['id'] ?? ($_POST['id'] ?? '');
+        $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
+        if (empty($id)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "ID de post requerido"]);
+            exit;
+        }
+
+        $postsFile = __DIR__ . '/data/posts.json';
+        $items = [];
+        if (file_exists($postsFile)) {
+            $items = json_decode(file_get_contents($postsFile), true) ?: [];
+        }
+        if (empty($items)) {
+            $items = $initialPosts;
+        }
+        $items = array_values(array_filter($items, fn($it) => ($it['id'] ?? '') !== $id));
+        @file_put_contents($postsFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
         try {
             $pdo = getPDO();
-            if ($pdo && $id) {
+            if ($pdo) {
                 $stmt = $pdo->prepare("DELETE FROM `Post` WHERE `id` = :id");
                 $stmt->execute([':id' => $id]);
             }
         } catch (Exception $e) {
-            error_log("Delete post error: " . $e->getMessage());
+            error_log("Delete post DB error: " . $e->getMessage());
         }
 
-        echo json_encode(["success" => true]);
+        recordAuditLog($session, 'DELETE_POST', 'POST', "Eliminó la noticia/post ID $id");
+        echo json_encode(["success" => true, "posts" => $items]);
         break;
 
     // 7. Guardar / Editar Item de Galería de Fotos
