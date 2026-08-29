@@ -54,7 +54,7 @@ if (!empty($data['website_url']) || !empty($data['bot_check'])) {
 
 // Extraer campos de Reinscripción 2027
 $studentName  = htmlspecialchars(trim($data['studentName'] ?? ''), ENT_QUOTES, 'UTF-8');
-$studentDni   = htmlspecialchars(trim($data['studentDni'] ?? ''), ENT_QUOTES, 'UTF-8');
+$studentDni   = preg_replace('/[^0-9]/', '', (string)($data['studentDni'] ?? ''));
 $school       = htmlspecialchars(trim($data['school'] ?? 'Escuela N.º 1030'), ENT_QUOTES, 'UTF-8');
 $studentGrade = htmlspecialchars(trim($data['studentGrade'] ?? ''), ENT_QUOTES, 'UTF-8');
 $studentLevel = htmlspecialchars(trim($data['studentLevel'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -63,7 +63,7 @@ $siblingDetails = htmlspecialchars(trim($data['siblingDetails'] ?? ''), ENT_QUOT
 
 // Responsable 1
 $parent1Name         = htmlspecialchars(trim($data['parent1Name'] ?? ($data['tutorName'] ?? '')), ENT_QUOTES, 'UTF-8');
-$parent1Dni          = htmlspecialchars(trim($data['parent1Dni'] ?? ''), ENT_QUOTES, 'UTF-8');
+$parent1Dni          = preg_replace('/[^0-9]/', '', (string)($data['parent1Dni'] ?? ''));
 $parent1Relationship = htmlspecialchars(trim($data['parent1Relationship'] ?? 'Madre/Padre/Tutor'), ENT_QUOTES, 'UTF-8');
 $parent1Phone        = htmlspecialchars(trim($data['parent1Phone'] ?? ($data['tutorPhone'] ?? '')), ENT_QUOTES, 'UTF-8');
 $parent1Email        = trim($data['parent1Email'] ?? ($data['tutorEmail'] ?? ''));
@@ -73,18 +73,32 @@ $parent1PostalCode   = htmlspecialchars(trim($data['parent1PostalCode'] ?? '9200
 
 // Responsable 2
 $isSingleParent      = !empty($data['isSingleParent']) ? 1 : 0;
-$parent2Name         = htmlspecialchars(trim($data['parent2Name'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2Dni          = htmlspecialchars(trim($data['parent2Dni'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2Relationship = htmlspecialchars(trim($data['parent2Relationship'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2Phone        = htmlspecialchars(trim($data['parent2Phone'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2Email        = trim($data['parent2Email'] ?? '');
-$parent2Address      = htmlspecialchars(trim($data['parent2Address'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2City         = htmlspecialchars(trim($data['parent2City'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent2PostalCode   = htmlspecialchars(trim($data['parent2PostalCode'] ?? ''), ENT_QUOTES, 'UTF-8');
+if ($isSingleParent) {
+    // Si declaró ser único responsable, limpiar cualquier dato residual
+    $parent2Name         = '';
+    $parent2Dni          = '';
+    $parent2Relationship = '';
+    $parent2Phone        = '';
+    $parent2Email        = '';
+    $parent2Address      = '';
+    $parent2City         = '';
+    $parent2PostalCode   = '';
+    $signature2Data      = null;
+} else {
+    $parent2Name         = htmlspecialchars(trim($data['parent2Name'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $parent2Dni          = preg_replace('/[^0-9]/', '', (string)($data['parent2Dni'] ?? ''));
+    $parent2Relationship = htmlspecialchars(trim($data['parent2Relationship'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $parent2Phone        = htmlspecialchars(trim($data['parent2Phone'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $parent2Email        = trim($data['parent2Email'] ?? '');
+    $parent2Address      = htmlspecialchars(trim($data['parent2Address'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $parent2City         = htmlspecialchars(trim($data['parent2City'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $parent2PostalCode   = htmlspecialchars(trim($data['parent2PostalCode'] ?? ''), ENT_QUOTES, 'UTF-8');
+    $signature2Data      = $data['signature2Data'] ?? null;
+}
 
 // Facturación
 $billingName         = htmlspecialchars(trim($data['billingName'] ?? $parent1Name), ENT_QUOTES, 'UTF-8');
-$billingCuit         = htmlspecialchars(trim($data['billingCuit'] ?? $parent1Dni), ENT_QUOTES, 'UTF-8');
+$billingCuit         = preg_replace('/[^0-9]/', '', (string)($data['billingCuit'] ?? $parent1Dni));
 $billingTaxCondition = htmlspecialchars(trim($data['billingTaxCondition'] ?? 'Consumidor Final'), ENT_QUOTES, 'UTF-8');
 $billingEmail        = trim($data['billingEmail'] ?? $parent1Email);
 $billingAddress      = htmlspecialchars(trim($data['billingAddress'] ?? $parent1Address), ENT_QUOTES, 'UTF-8');
@@ -94,16 +108,48 @@ $contractAccepted    = !empty($data['contractAccepted']) ? 1 : 0;
 $dataAccepted        = !empty($data['dataAccepted']) ? 1 : 0;
 $termsAccepted       = !empty($data['termsAccepted']) ? 1 : 0;
 $signature1Data      = $data['signature1Data'] ?? null;
-$signature2Data      = $data['signature2Data'] ?? null;
+$comments            = htmlspecialchars(trim($data['comments'] ?? ''), ENT_QUOTES, 'UTF-8');
+
 $enrollmentType = htmlspecialchars(trim($data['type'] ?? ''), ENT_QUOTES, 'UTF-8');
 if (empty($enrollmentType)) {
-    $enrollmentType = (!empty($data['signature1Data']) || !empty($data['studentDni'])) ? 'reinscripcion_2027' : 'preinscripcion_general';
+    $enrollmentType = (!empty($data['signature1Data']) || !empty($studentDni)) ? 'reinscripcion_2027' : 'preinscripcion_general';
 }
 
 if ($enrollmentType === 'reinscripcion_2027') {
     if (empty($studentName) || empty($studentDni) || empty($studentGrade) || empty($parent1Name) || empty($parent1Dni) || empty($parent1Email) || empty($parent1Phone)) {
         http_response_code(422);
         echo json_encode(["success" => false, "error" => "Por favor complete todos los campos obligatorios del estudiante y responsable principal."]);
+        exit;
+    }
+
+    // Validar DNI (7 u 8 dígitos)
+    if (strlen($studentDni) < 7 || strlen($studentDni) > 8) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "El DNI del estudiante debe tener 7 u 8 dígitos numéricos válidos."]);
+        exit;
+    }
+    if (strlen($parent1Dni) < 7 || strlen($parent1Dni) > 8) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "El DNI del Responsable 1 debe tener 7 u 8 dígitos numéricos válidos."]);
+        exit;
+    }
+    if (!$isSingleParent && !empty($parent2Dni) && (strlen($parent2Dni) < 7 || strlen($parent2Dni) > 8)) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "El DNI del Responsable 2 debe tener 7 u 8 dígitos numéricos válidos."]);
+        exit;
+    }
+
+    // Validar CUIT (8 u 11 dígitos)
+    if (strlen($billingCuit) !== 8 && strlen($billingCuit) !== 11) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "El CUIT / DNI de facturación debe contener 8 u 11 dígitos numéricos."]);
+        exit;
+    }
+
+    // Validar Domicilio no sea únicamente numérico
+    if (!empty($parent1Address) && preg_match('/^[\d\s\-\+\(\)\.\,\/]+$/', $parent1Address)) {
+        http_response_code(422);
+        echo json_encode(["success" => false, "error" => "El domicilio debe incluir calle y número (no puede ser un número de teléfono)."]);
         exit;
     }
 } else {

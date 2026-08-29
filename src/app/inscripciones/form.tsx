@@ -171,12 +171,50 @@ export function EnrollmentForm() {
     }));
   };
 
+  // Validadores auxiliares de datos
+  const isValidDni = (dni: string): boolean => {
+    const clean = (dni || "").replace(/[^0-9]/g, "");
+    return clean.length >= 7 && clean.length <= 8;
+  };
+
+  const isValidCuit = (cuit: string): boolean => {
+    const clean = (cuit || "").replace(/[^0-9]/g, "");
+    if (clean.length === 7 || clean.length === 8) {
+      return true; // DNI de persona física utilizado para facturar
+    }
+    if (clean.length !== 11) {
+      return false;
+    }
+    // Algoritmo Módulo 11 de AFIP
+    const multipliers = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    let sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(clean[i], 10) * multipliers[i];
+    }
+    const mod = sum % 11;
+    const expectedDigit = mod === 0 ? 0 : mod === 1 ? (clean.startsWith("20") || clean.startsWith("27") ? 9 : 4) : 11 - mod;
+    return parseInt(clean[10], 10) === expectedDigit;
+  };
+
+  const isValidAddress = (address: string): boolean => {
+    const trimmed = (address || "").trim();
+    if (trimmed.length < 3) return false;
+    // Rechazar si contiene exclusivamente números, espacios o caracteres de teléfono
+    if (/^[\d\s\-\+\(\)\.\,\/]+$/.test(trimmed)) return false;
+    return true;
+  };
+
   const validateForm = (): boolean => {
     setErrorMessage(null);
 
-    // 1. Estudiante
-    if (!formData.studentName.trim() || !formData.studentDni.trim() || !formData.studentGrade) {
+    // 1. Estudiante Titular
+    const cleanStudentDni = (formData.studentDni || "").replace(/[^0-9]/g, "");
+    if (!formData.studentName.trim() || !cleanStudentDni || !formData.studentGrade) {
       setErrorMessage("Por favor complete los datos obligatorios del estudiante (Nombre, DNI, Nivel y Curso 2027).");
+      return false;
+    }
+    if (!isValidDni(cleanStudentDni)) {
+      setErrorMessage("El DNI del estudiante debe contener 7 u 8 dígitos numéricos (sin puntos ni letras).");
       return false;
     }
 
@@ -191,20 +229,30 @@ export function EnrollmentForm() {
       for (let i = 0; i < siblingsList.length; i++) {
         const sib = siblingsList[i];
         if (!sib.name.trim()) {
-          setErrorMessage(`Por favor ingrese el Nombre y Apellido del Hermano/a #${i + 1}.`);
+          setErrorMessage(`Por favor ingrese el Nombre y Apellido del Hijo/a #${i + 1}.`);
           return false;
         }
-        if (!sib.dni || !sib.dni.trim()) {
-          setErrorMessage(`Por favor ingrese el DNI del Hermano/a #${i + 1} (${sib.name}).`);
+        const cleanSibDni = (sib.dni || "").replace(/[^0-9]/g, "");
+        if (!cleanSibDni) {
+          setErrorMessage(`Por favor ingrese el DNI del Hijo/a #${i + 1} (${sib.name}).`);
+          return false;
+        }
+        if (!isValidDni(cleanSibDni)) {
+          setErrorMessage(`El DNI del Hijo/a #${i + 1} (${sib.name}) debe contener 7 u 8 dígitos numéricos (sin puntos).`);
+          return false;
+        }
+        if (cleanSibDni === cleanStudentDni) {
+          setErrorMessage(`El DNI del Hijo/a #${i + 1} (${sib.name}) no puede ser igual al DNI del estudiante titular.`);
           return false;
         }
       }
     }
 
     // 2. Responsable 1
+    const cleanP1Dni = (formData.parent1Dni || "").replace(/[^0-9]/g, "");
     if (
       !formData.parent1Name.trim() ||
-      !formData.parent1Dni.trim() ||
+      !cleanP1Dni ||
       !formData.parent1Phone.trim() ||
       !formData.parent1Email.trim() ||
       !formData.parent1Address.trim()
@@ -212,23 +260,41 @@ export function EnrollmentForm() {
       setErrorMessage("Por favor complete todos los datos obligatorios del Responsable Parental 1.");
       return false;
     }
+    if (!isValidDni(cleanP1Dni)) {
+      setErrorMessage("El DNI del Responsable Parental 1 debe contener 7 u 8 dígitos numéricos.");
+      return false;
+    }
+    if (!isValidAddress(formData.parent1Address)) {
+      setErrorMessage("El Domicilio del Responsable 1 debe incluir calle y número (no puede ser un número de teléfono).");
+      return false;
+    }
 
     // 3. Responsable 2 (si no es monoparental)
     if (!formData.isSingleParent) {
+      const cleanP2Dni = (formData.parent2Dni || "").replace(/[^0-9]/g, "");
       if (
         !formData.parent2Name?.trim() ||
-        !formData.parent2Dni?.trim() ||
+        !cleanP2Dni ||
         !formData.parent2Phone?.trim() ||
         !formData.parent2Email?.trim()
       ) {
         setErrorMessage("Por favor complete los datos del Responsable Parental 2 o marque la casilla de único responsable parental.");
         return false;
       }
+      if (!isValidDni(cleanP2Dni)) {
+        setErrorMessage("El DNI del Responsable Parental 2 debe contener 7 u 8 dígitos numéricos.");
+        return false;
+      }
     }
 
     // 4. Facturación
-    if (!formData.billingName?.trim() || !formData.billingCuit?.trim() || !formData.billingEmail?.trim()) {
+    const cleanCuit = (formData.billingCuit || "").replace(/[^0-9]/g, "");
+    if (!formData.billingName?.trim() || !cleanCuit || !formData.billingEmail?.trim()) {
       setErrorMessage("Por favor complete los datos obligatorios de Facturación.");
+      return false;
+    }
+    if (!isValidCuit(cleanCuit)) {
+      setErrorMessage("El CUIT / CUIL / DNI de facturación no es válido. Debe contener 8 dígitos (DNI) u 11 dígitos con CUIT válido (sin guiones ni barras).");
       return false;
     }
 
@@ -317,6 +383,29 @@ export function EnrollmentForm() {
 
   // Pantalla de éxito tras el envío
   if (successData) {
+    const includedStudents = [
+      {
+        name: formData.studentName,
+        dni: formData.studentDni,
+        level: formData.studentLevel,
+        grade: formData.studentGrade,
+        school: formData.school,
+        role: "Titular"
+      },
+      ...(formData.hasSiblings
+        ? siblingsList
+            .filter(s => s.name.trim().length > 0)
+            .map(s => ({
+              name: s.name,
+              dni: s.dni || "---",
+              level: s.level || determineLevel(s.grade, s.school),
+              grade: s.grade,
+              school: s.school || determineSchool(s.level || "Nivel Primario"),
+              role: "Hijo/a adicional"
+            }))
+        : [])
+    ];
+
     return (
       <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-200 text-center max-w-2xl mx-auto animate-in fade-in zoom-in-95 duration-300">
         <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
@@ -328,12 +417,32 @@ export function EnrollmentForm() {
         </span>
 
         <h2 className="text-2xl md:text-3xl font-black text-slate-900 mb-3">
-          ¡Solicitud Presentada con Éxito!
+          ¡Trámite Familiar Presentado con Éxito!
         </h2>
 
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Hemos recibido la solicitud de reinscripción para el/la estudiante <strong>{formData.studentName}</strong> (DNI {formData.studentDni}) en <strong>{formData.studentLevel} — {formData.studentGrade} ({formData.school})</strong>.
+          Hemos recibido formalmente la solicitud de reinscripción. Con este trámite único quedaron reinscriptos los <strong>{includedStudents.length}</strong> estudiante(s) de tu grupo familiar:
         </p>
+
+        {/* Lista explícita de estudiantes reinscriptos */}
+        <div className="bg-emerald-50/60 border-2 border-emerald-300/80 rounded-2xl p-4 mb-6 text-left space-y-2.5">
+          <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900 block border-b border-emerald-200 pb-1.5">
+            Estudiantes incluidos en este trámite ({includedStudents.length}):
+          </span>
+          <div className="space-y-2">
+            {includedStudents.map((st, i) => (
+              <div key={i} className="flex items-start justify-between gap-2 text-xs bg-white p-2.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+                <div>
+                  <strong className="text-slate-900 text-sm font-bold block">{st.name}</strong>
+                  <span className="text-slate-500 font-medium">DNI: {st.dni} • {st.level} ({st.grade}) — {st.school}</span>
+                </div>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0">
+                  {st.role}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-8 text-left space-y-2">
           <div className="flex justify-between items-center text-xs">
@@ -341,10 +450,6 @@ export function EnrollmentForm() {
             <span className="font-mono font-bold text-slate-900 bg-slate-200/80 px-2.5 py-1 rounded-md text-sm">
               {successData.trackingNumber}
             </span>
-          </div>
-          <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
-            <span className="text-slate-500 font-semibold">Nivel & Curso:</span>
-            <span className="font-medium text-slate-700">{formData.studentLevel} — {formData.studentGrade}</span>
           </div>
           <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200">
             <span className="text-slate-500 font-semibold">Fecha y Hora:</span>
@@ -369,53 +474,6 @@ export function EnrollmentForm() {
             <Download className="w-4 h-4" />
             Descargar Copia del Contrato Firmado (PDF)
           </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSuccessData(null);
-              setFormData({
-                studentName: "",
-                studentDni: "",
-                studentLevel: "Nivel Inicial",
-                school: "Escuela N.º 1030",
-                studentGrade: "Sala de 3",
-                hasSiblings: false,
-                siblingDetails: "",
-                parent1Name: "",
-                parent1Dni: "",
-                parent1Relationship: "Madre",
-                parent1Phone: "",
-                parent1Email: "",
-                parent1Address: "",
-                parent1City: "Esquel",
-                parent1PostalCode: "9200",
-                isSingleParent: false,
-                parent2Name: "",
-                parent2Dni: "",
-                parent2Relationship: "Padre",
-                parent2Phone: "",
-                parent2Email: "",
-                parent2Address: "",
-                parent2City: "Esquel",
-                parent2PostalCode: "9200",
-                billingName: "",
-                billingCuit: "",
-                billingTaxCondition: "Consumidor Final",
-                billingEmail: "",
-                billingAddress: "",
-                signature1Data: null,
-                signature2Data: null,
-              });
-              setSiblingsList([{ id: "sib-1", name: "", level: "Nivel Inicial", school: "Escuela N.º 1030", grade: "Sala de 3" }]);
-              setContractAccepted(false);
-              setDataAccepted(false);
-              setTermsAccepted(false);
-            }}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline block mx-auto pt-2 cursor-pointer"
-          >
-            Completar reinscripción para otro/a estudiante
-          </button>
         </div>
       </div>
     );
@@ -424,18 +482,18 @@ export function EnrollmentForm() {
   return (
     <>
       <form onSubmit={handleOpenReview} className="space-y-10">
-        {/* Banner de Introducción */}
-        <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-5 text-sm text-blue-950 leading-relaxed space-y-2 shadow-2xs">
-          <div className="flex items-center gap-2 font-bold text-blue-900">
-            <ShieldCheck className="w-5 h-5 text-blue-600" />
-            Ciclo Lectivo 2027 — Escuelas N.º 1030 y N.º 1739
+        {/* Banner de Introducción Corregido */}
+        <div className="bg-emerald-50/90 border-2 border-emerald-500/80 rounded-3xl p-6 text-sm text-emerald-950 leading-relaxed space-y-3 shadow-md">
+          <div className="flex items-center gap-2.5 font-black text-emerald-900 text-base sm:text-lg">
+            <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+            Un solo formulario por familia — Ciclo Lectivo 2027
           </div>
-          <p>
-            Complete la información solicitada para iniciar la reinscripción del/de la estudiante para el ciclo lectivo 2027. La presentación de este formulario no implica la confirmación automática de la vacante. La reinscripción quedará sujeta a la verificación del cumplimiento de los requisitos administrativos y arancelarios establecidos por la Fundación.
+          <p className="font-medium text-emerald-900 text-xs sm:text-sm">
+            Si tenés más de un hijo/a que asiste a las escuelas de la Fundación (Escuela N.º 1030 y Escuela N.º 1739), <strong>incluí a todos en este mismo trámite</strong>. Todos quedarán formalmente reinscriptos bajo el mismo Contrato Marco, datos de contacto, facturación y firmas digitales.
           </p>
-          <p className="text-xs text-blue-800 font-semibold pt-1">
-            Los campos obligatorios están identificados con un asterisco (<span className="text-red-500 font-bold">*</span>). Deberá completarse un formulario por cada estudiante.
-          </p>
+          <div className="text-xs text-emerald-800 font-semibold pt-2 border-t border-emerald-200/80 flex items-center gap-2">
+            <span>Los campos obligatorios están identificados con un asterisco (<span className="text-red-500 font-bold">*</span>). Completá el estudiante titular a continuación y sumá a sus hermanos/as en el bloque correspondiente.</span>
+          </div>
         </div>
 
         {errorMessage && (
@@ -477,9 +535,12 @@ export function EnrollmentForm() {
               </label>
               <input
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
                 required
                 value={formData.studentDni}
-                onChange={e => setFormData({ ...formData, studentDni: e.target.value })}
+                onChange={e => setFormData({ ...formData, studentDni: e.target.value.replace(/[^0-9]/g, "").slice(0, 8) })}
                 placeholder="Sin puntos (ej. 45123456)"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all bg-white"
               />
@@ -522,7 +583,7 @@ export function EnrollmentForm() {
           <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                ¿Tiene hermanos/as que asisten a alguna de las escuelas de la Fundación? <span className="text-red-500">*</span>
+                ¿Tiene otros/as hijos/as (hermanos/as) que asisten a la Fundación? (Se reinscriben en este mismo formulario) <span className="text-red-500">*</span>
               </label>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer font-medium">
@@ -538,7 +599,7 @@ export function EnrollmentForm() {
                     }}
                     className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                   />
-                  Sí
+                  Sí, agregar hermano/a
                 </label>
                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer font-medium">
                   <input
@@ -548,7 +609,7 @@ export function EnrollmentForm() {
                     onChange={() => setFormData(prev => ({ ...prev, hasSiblings: false, siblingDetails: "" }))}
                     className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                   />
-                  No
+                  No, es el/la único/a
                 </label>
               </div>
             </div>
@@ -557,7 +618,7 @@ export function EnrollmentForm() {
               <div className="space-y-3 pt-3 border-t border-slate-200">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900">
-                    Detalle de Hermanos/as en la institución (hasta 4)
+                    Hijos/as adicionales a reinscribir en este trámite (hasta 4)
                   </span>
                   <span className="text-[11px] text-slate-500 font-medium">
                     {siblingsList.length} de 4 agregados
@@ -573,7 +634,7 @@ export function EnrollmentForm() {
                       <div key={sib.id || index} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            Hermano/a #{index + 1}
+                            Hijo/a #{index + 1} a reinscribir
                           </span>
                           {siblingsList.length > 1 && (
                             <button
@@ -598,7 +659,7 @@ export function EnrollmentForm() {
                                 required
                                 value={sib.name}
                                 onChange={e => handleSiblingFieldChange(index, "name", e.target.value)}
-                                placeholder="Nombre completo del hermano/a"
+                                placeholder="Nombre completo del hijo/a"
                                 className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs bg-white"
                               />
                             </div>
@@ -609,9 +670,12 @@ export function EnrollmentForm() {
                               </label>
                               <input
                                 type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={8}
                                 required
                                 value={sib.dni || ""}
-                                onChange={e => handleSiblingFieldChange(index, "dni", e.target.value)}
+                                onChange={e => handleSiblingFieldChange(index, "dni", e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
                                 placeholder="Sin puntos (ej. 48123456)"
                                 className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none text-xs bg-white"
                               />
@@ -661,7 +725,7 @@ export function EnrollmentForm() {
                     onClick={handleAddSibling}
                     className="w-full py-2.5 px-4 rounded-xl border border-dashed border-emerald-400 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" /> Agregar otro/a hermano/a
+                    <Plus className="w-4 h-4" /> Agregar otro/a hijo/a
                   </button>
                 )}
               </div>
@@ -700,10 +764,13 @@ export function EnrollmentForm() {
               </label>
               <input
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
                 required
                 value={formData.parent1Dni}
-                onChange={e => setFormData({ ...formData, parent1Dni: e.target.value })}
-                placeholder="Sin puntos"
+                onChange={e => setFormData({ ...formData, parent1Dni: e.target.value.replace(/[^0-9]/g, "").slice(0, 8) })}
+                placeholder="Sin puntos (ej. 28123456)"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all bg-white"
               />
             </div>
@@ -812,7 +879,22 @@ export function EnrollmentForm() {
               <input
                 type="checkbox"
                 checked={formData.isSingleParent === true}
-                onChange={e => setFormData({ ...formData, isSingleParent: e.target.checked })}
+                onChange={e => {
+                  const isSingle = e.target.checked;
+                  setFormData(prev => ({
+                    ...prev,
+                    isSingleParent: isSingle,
+                    parent2Name: isSingle ? "" : prev.parent2Name,
+                    parent2Dni: isSingle ? "" : prev.parent2Dni,
+                    parent2Relationship: isSingle ? "" : (prev.parent2Relationship || "Padre"),
+                    parent2Phone: isSingle ? "" : prev.parent2Phone,
+                    parent2Email: isSingle ? "" : prev.parent2Email,
+                    parent2Address: isSingle ? "" : prev.parent2Address,
+                    parent2City: isSingle ? "" : prev.parent2City,
+                    parent2PostalCode: isSingle ? "" : prev.parent2PostalCode,
+                    signature2Data: isSingle ? null : prev.signature2Data,
+                  }));
+                }}
                 className="w-5 h-5 shrink-0 text-emerald-600 rounded-md focus:ring-emerald-500 border-slate-300 cursor-pointer mt-0.5"
               />
               <span className="text-xs font-semibold text-slate-800 leading-snug">
@@ -843,10 +925,13 @@ export function EnrollmentForm() {
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={8}
                     required={!formData.isSingleParent}
                     value={formData.parent2Dni || ""}
-                    onChange={e => setFormData({ ...formData, parent2Dni: e.target.value })}
-                    placeholder="Sin puntos"
+                    onChange={e => setFormData({ ...formData, parent2Dni: e.target.value.replace(/[^0-9]/g, "").slice(0, 8) })}
+                    placeholder="Sin puntos (ej. 28654321)"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all bg-white"
                   />
                 </div>
@@ -941,10 +1026,13 @@ export function EnrollmentForm() {
               </label>
               <input
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={11}
                 required
                 value={formData.billingCuit || ""}
-                onChange={e => setFormData({ ...formData, billingCuit: e.target.value })}
-                placeholder="Sin guiones ni puntos"
+                onChange={e => setFormData({ ...formData, billingCuit: e.target.value.replace(/[^0-9]/g, "").slice(0, 11) })}
+                placeholder="Sin guiones ni puntos (8 u 11 dígitos)"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm transition-all bg-white"
               />
             </div>
@@ -1579,17 +1667,46 @@ export function EnrollmentForm() {
             </div>
 
             <div className="p-6 overflow-y-auto text-xs space-y-4 text-slate-700">
-              {/* Estudiante */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <span className="font-bold text-slate-900 uppercase tracking-wider block mb-2">Estudiante</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><strong>Nombre:</strong> {formData.studentName}</div>
-                  <div><strong>DNI:</strong> {formData.studentDni}</div>
-                  <div><strong>Nivel:</strong> {formData.studentLevel}</div>
-                  <div><strong>Curso 2027:</strong> {formData.studentGrade} ({formData.school})</div>
-                  {formData.hasSiblings && (
-                    <div className="col-span-2 text-slate-600"><strong>Hermanos/as:</strong> {formData.siblingDetails || "Registrados en el formulario"}</div>
-                  )}
+              {/* Estudiantes Incluidos */}
+              <div className="bg-emerald-50/70 border-2 border-emerald-400/80 rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                  <span className="font-extrabold text-emerald-950 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-emerald-700" />
+                    Estudiantes a Reinscribir en este Trámite Único ({1 + (formData.hasSiblings ? siblingsList.filter(s => s.name.trim().length > 0).length : 0)})
+                  </span>
+                  <span className="bg-emerald-200/80 text-emerald-900 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
+                    Mismo Contrato y Facturación
+                  </span>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {/* Titular */}
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <strong className="text-slate-900 text-sm font-bold">{formData.studentName}</strong>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        Estudiante Titular
+                      </span>
+                    </div>
+                    <div className="text-slate-600 text-xs">
+                      DNI: <strong>{formData.studentDni}</strong> • {formData.studentLevel} — <strong>{formData.studentGrade}</strong> ({formData.school})
+                    </div>
+                  </div>
+
+                  {/* Hermanos */}
+                  {formData.hasSiblings && siblingsList.filter(s => s.name.trim().length > 0).map((sib, idx) => (
+                    <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <strong className="text-slate-900 text-sm font-bold">{sib.name}</strong>
+                        <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          Hijo/a adicional #{idx + 1}
+                        </span>
+                      </div>
+                      <div className="text-slate-600 text-xs">
+                        DNI: <strong>{sib.dni || "---"}</strong> • {sib.level || determineLevel(sib.grade, sib.school)} — <strong>{sib.grade}</strong> ({sib.school || determineSchool(sib.level || "Nivel Primario")})
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1628,6 +1745,7 @@ export function EnrollmentForm() {
                   <div><strong>CUIT/CUIL:</strong> {formData.billingCuit}</div>
                   <div><strong>Condición:</strong> {formData.billingTaxCondition}</div>
                   <div><strong>Email facturas:</strong> {formData.billingEmail}</div>
+                  <div className="col-span-2"><strong>Domicilio fiscal:</strong> {formData.billingAddress || formData.parent1Address}</div>
                 </div>
               </div>
             </div>

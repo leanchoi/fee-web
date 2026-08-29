@@ -70,11 +70,18 @@ import {
   Square,
   FileSpreadsheet,
   FolderArchive,
-  ExternalLink
+  ExternalLink,
+  Home,
+  Layers,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  AlertOctagon
 } from "lucide-react";
 import JSZip from "jszip";
 import { generateContractPdf, downloadFilledContract, determineLevel, determineSchool, getContractFilename } from "@/lib/contractGenerator";
 import { extractAllStudents, extractStudentsFromEnrollment, ExtractedStudent } from "@/lib/studentExtractor";
+import { consolidateFamilies, exportCleanBaseToCSV, ConsolidatedFamilyGroup, CleanBaseStudent } from "@/lib/familyConsolidator";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -279,7 +286,7 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "preinscripciones" | "contacts" | "users" | "gallery" | "audit">(() => {
+  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "familias" | "base_limpia" | "preinscripciones" | "contacts" | "users" | "gallery" | "audit">(() => {
     if (userPerms.includes("enrollments") || isSuperAdmin) return "reinscripciones";
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
     if (userPerms.includes("contacts")) return "contacts";
@@ -593,6 +600,95 @@ export function AdminDashboard({
       return true;
     });
   }, [reinscripcionesList, enrollmentSearchQuery, enrollmentSchoolFilter, enrollmentLevelFilter, enrollmentDatePreset, customStartDate, customEndDate]);
+
+  // ========================================================
+  // CONSOLIDACIÓN FAMILIAR Y BASE LIMPIA (FASE 3 & BASE LIMPIA)
+  // ========================================================
+  const consolidatedFamiliesData = useMemo(() => {
+    return consolidateFamilies(reinscripcionesList);
+  }, [reinscripcionesList]);
+
+  // Filtros de Grupos Familiares
+  const [familySearchQuery, setFamilySearchQuery] = useState("");
+  const [familyFilterMode, setFamilyFilterMode] = useState<"all" | "multi" | "discrepancies">("all");
+  const [expandedFamilyKeys, setExpandedFamilyKeys] = useState<string[]>([]);
+
+  const toggleExpandFamily = (key: string) => {
+    setExpandedFamilyKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const filteredFamilies = useMemo(() => {
+    return consolidatedFamiliesData.families.filter((f: ConsolidatedFamilyGroup) => {
+      if (familyFilterMode === "multi" && !f.isMultiSubmission) return false;
+      if (familyFilterMode === "discrepancies" && !f.hasDiscrepancies) return false;
+
+      if (familySearchQuery.trim()) {
+        const terms = familySearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const corpus = [
+          f.familyDisplayName,
+          f.parent1Name,
+          f.parent1Dni,
+          f.parent1Phone,
+          f.parent1Email,
+          f.parent2Name,
+          f.parent2Dni,
+          f.billingName,
+          f.billingCuit,
+          f.activeTrackingNumber,
+          ...f.children.map(c => `${c.name} ${c.dni} ${c.grade} ${c.school}`)
+        ].join(" ").toLowerCase();
+
+        return terms.every(t => corpus.includes(t));
+      }
+
+      return true;
+    });
+  }, [consolidatedFamiliesData.families, familySearchQuery, familyFilterMode]);
+
+  // Filtros de Base Limpia
+  const [cleanBaseSearchQuery, setCleanBaseSearchQuery] = useState("");
+  const [cleanBaseSchoolFilter, setCleanBaseSchoolFilter] = useState<"all" | "Escuela N.º 1030" | "Escuela N.º 1739">("all");
+  const [cleanBaseLevelFilter, setCleanBaseLevelFilter] = useState<"all" | "inicial" | "primario" | "secundario">("all");
+
+  const filteredCleanStudents = useMemo(() => {
+    return consolidatedFamiliesData.cleanStudents.filter((s: CleanBaseStudent) => {
+      if (cleanBaseSchoolFilter !== "all") {
+        if (cleanBaseSchoolFilter === "Escuela N.º 1030" && !s.school.includes("1030")) return false;
+        if (cleanBaseSchoolFilter === "Escuela N.º 1739" && !s.school.includes("1739")) return false;
+      }
+
+      if (cleanBaseLevelFilter !== "all") {
+        const lvl = (s.studentLevel || s.studentGrade || "").toLowerCase();
+        if (!lvl.includes(cleanBaseLevelFilter)) return false;
+      }
+
+      if (cleanBaseSearchQuery.trim()) {
+        const terms = cleanBaseSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const corpus = [
+          s.studentName,
+          s.studentDni,
+          s.school,
+          s.studentLevel,
+          s.studentGrade,
+          s.parent1Name,
+          s.parent1Dni,
+          s.parent1Phone,
+          s.parent1Email,
+          s.parent2Name,
+          s.billingName,
+          s.billingCuit,
+          s.trackingNumber,
+          s.siblingsSummary
+        ].join(" ").toLowerCase();
+
+        return terms.every(t => corpus.includes(t));
+      }
+
+      return true;
+    });
+  }, [consolidatedFamiliesData.cleanStudents, cleanBaseSearchQuery, cleanBaseSchoolFilter, cleanBaseLevelFilter]);
 
   const handleSelectAllEnrollments = () => {
     if (selectedEnrollmentIds.length === filteredEnrollments.length) {
@@ -1063,6 +1159,44 @@ export function AdminDashboard({
                 activeTab === "reinscripciones" ? "bg-white text-emerald-900" : "bg-emerald-100 text-emerald-800"
               )}>
                 {reinscripcionesList.length}
+              </span>
+            </button>
+          )}
+
+          {hasEnrollmentsPerm && (
+            <button 
+              onClick={() => setActiveTab("familias")}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                activeTab === "familias" ? "bg-indigo-700 text-white shadow-md" : "text-indigo-900 hover:bg-indigo-50"
+              )}
+            >
+              <Home className="w-4 h-4" />
+              <span>Grupos Familiares</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-black",
+                activeTab === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
+              )}>
+                {consolidatedFamiliesData.families.length}
+              </span>
+            </button>
+          )}
+
+          {hasEnrollmentsPerm && (
+            <button 
+              onClick={() => setActiveTab("base_limpia")}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer border",
+                activeTab === "base_limpia" ? "bg-emerald-900 text-white border-emerald-950 shadow-md font-extrabold" : "text-emerald-900 border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100"
+              )}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <span>Base Limpia</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[10px] font-black",
+                activeTab === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
+              )}>
+                {consolidatedFamiliesData.cleanStudents.length} alumnos
               </span>
             </button>
           )}
@@ -2090,6 +2224,519 @@ export function AdminDashboard({
                 </>
               );
             })()}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 1: GRUPOS FAMILIARES CONSOLIDADOS (FASE 3) */}
+        {/* ======================================================== */}
+        {hasEnrollmentsPerm && activeTab === "familias" && (
+          <div>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-2xl font-black text-indigo-950">Grupos Familiares Consolidados</h2>
+                  <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-indigo-200">
+                    FEE 2027 • Consolidación Inteligente
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Unificación de trámites por grupo familiar. En caso de múltiples presentaciones, la <strong>última registrada</strong> es la que rige como oficial y vinculante.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-full">
+                  {consolidatedFamiliesData.metrics.totalFamilies} Familias ({consolidatedFamiliesData.metrics.totalUniqueStudents} Alumnos)
+                </span>
+              </div>
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Familias Únicas</span>
+                <span className="text-2xl font-black text-slate-900">{consolidatedFamiliesData.metrics.totalFamilies}</span>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Alumnos Únicos</span>
+                <span className="text-2xl font-black text-emerald-800">{consolidatedFamiliesData.metrics.totalUniqueStudents}</span>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5">
+                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Trámites Múltiples</span>
+                <span className="text-2xl font-black text-blue-800">{consolidatedFamiliesData.metrics.familiesWithDuplicates} familias</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Con Discrepancias</span>
+                <span className="text-2xl font-black text-amber-800">{consolidatedFamiliesData.metrics.familiesWithDiscrepancies} familias</span>
+              </div>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={familySearchQuery}
+                    onChange={e => setFamilySearchQuery(e.target.value)}
+                    placeholder="Buscar familia por nombre de padres, DNI, CUIT, teléfono, alumno o N° trámite..."
+                    className="w-full pl-9 pr-4 py-2 text-xs border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-200 shrink-0">
+                  {[
+                    { id: "all", label: `Todas (${consolidatedFamiliesData.families.length})` },
+                    { id: "multi", label: `Trámites Múltiples (${consolidatedFamiliesData.metrics.familiesWithDuplicates})` },
+                    { id: "discrepancies", label: `Discrepancias (${consolidatedFamiliesData.metrics.familiesWithDiscrepancies})` }
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setFamilyFilterMode(f.id as any)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                        familyFilterMode === f.id ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Family Cards Accordion */}
+            <div className="space-y-4 mb-8">
+              {filteredFamilies.map((fam: ConsolidatedFamilyGroup) => {
+                const isExpanded = expandedFamilyKeys.includes(fam.familyKey);
+                return (
+                  <div
+                    key={fam.familyKey}
+                    className={cn(
+                      "bg-white rounded-2xl border transition-all shadow-2xs",
+                      fam.hasDiscrepancies ? "border-amber-300" : "border-slate-200 hover:border-slate-300"
+                    )}
+                  >
+                    {/* Header */}
+                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-extrabold text-base text-slate-900">
+                            <HighlightText text={fam.familyDisplayName} highlight={familySearchQuery} />
+                          </h3>
+                          <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200">
+                            DNI Resp 1: <HighlightText text={fam.parent1Dni} highlight={familySearchQuery} />
+                          </span>
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-emerald-200">
+                            {fam.totalChildren} {fam.totalChildren === 1 ? "hijo/a" : "hijos/as"}
+                          </span>
+                          {fam.isMultiSubmission && (
+                            <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-blue-200">
+                              {fam.totalSubmissions} presentaciones
+                            </span>
+                          )}
+                          {fam.hasDiscrepancies && (
+                            <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-amber-600" /> Discrepancias detectadas
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span>Cel: <strong className="text-slate-700"><HighlightText text={fam.parent1Phone} highlight={familySearchQuery} /></strong></span>
+                          <span>•</span>
+                          <span>Email: <strong className="text-slate-700"><HighlightText text={fam.parent1Email} highlight={familySearchQuery} /></strong></span>
+                          <span>•</span>
+                          <span>Facturación: <strong className="text-slate-700"><HighlightText text={fam.billingName} highlight={familySearchQuery} /></strong> (CUIT: <HighlightText text={fam.billingCuit} highlight={familySearchQuery} />)</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        {(() => {
+                          const wa = getWhatsAppUrl(fam.parent1Phone, fam.children.map(c => c.name).join(", "), fam.activeTrackingNumber, true);
+                          return wa ? (
+                            <a
+                              href={wa}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-emerald-200 cursor-pointer"
+                              title="Enviar WhatsApp al Responsable 1"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </a>
+                          ) : null;
+                        })()}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSinglePdf(fam.activeSubmission)}
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          title="Descargar Contrato Marco Vigente (PDF)"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          PDF Vigente
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandFamily(fam.familyKey)}
+                          className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer"
+                          title={isExpanded ? "Ocultar detalles" : "Ver detalles completos"}
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Body */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 p-4 sm:p-5 bg-slate-50/50 space-y-4 animate-in fade-in duration-150">
+                        {/* Discrepancies Alert */}
+                        {fam.hasDiscrepancies && (
+                          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3.5 space-y-1.5">
+                            <span className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
+                              <AlertOctagon className="w-4 h-4 text-amber-600" />
+                              Discrepancias entre las {fam.totalSubmissions} presentaciones registradas para esta familia:
+                            </span>
+                            <ul className="list-disc list-inside text-xs text-amber-800 space-y-0.5 pl-1 font-medium">
+                              {fam.discrepancies.map((d, i) => (
+                                <li key={i}>{d.description}</li>
+                              ))}
+                            </ul>
+                            <p className="text-[11px] text-amber-900/80 italic pt-1 border-t border-amber-200">
+                              * Criterio oficial FEE: La administración toma como vinculante la última presentación ({fam.activeTrackingNumber}).
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Hijos de la familia */}
+                        <div className="space-y-2">
+                          <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider block">
+                            Estudiantes Reinscriptos de la Familia ({fam.children.length}):
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {fam.children.map((ch, idx) => (
+                              <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <strong className="text-sm font-bold text-slate-900 block">
+                                    <HighlightText text={ch.name} highlight={familySearchQuery} />
+                                  </strong>
+                                  <span className="bg-indigo-50 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                    DNI: <HighlightText text={ch.dni} highlight={familySearchQuery} />
+                                  </span>
+                                </div>
+                                <div className="text-xs text-slate-600 font-medium">
+                                  {ch.level} — <span className="font-bold text-slate-800">{ch.grade}</span>
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {ch.school}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Datos de Contacto y Facturación Vigentes */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                          <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1 text-xs">
+                            <span className="font-bold text-slate-900 uppercase tracking-wider block text-[11px] mb-1">
+                              Responsables Parentales (Vigente)
+                            </span>
+                            <div><strong>Resp 1:</strong> {fam.parent1Name} (DNI {fam.parent1Dni}) • {fam.parent1Phone}</div>
+                            <div><strong>Email Resp 1:</strong> {fam.parent1Email}</div>
+                            <div><strong>Domicilio:</strong> {fam.parent1Address}</div>
+                            <div><strong>Resp 2:</strong> {fam.parent2Name} {fam.parent2Dni !== "N/A" ? `(DNI ${fam.parent2Dni})` : ""}</div>
+                          </div>
+
+                          <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1 text-xs">
+                            <span className="font-bold text-slate-900 uppercase tracking-wider block text-[11px] mb-1">
+                              Datos de Facturación (Vigente)
+                            </span>
+                            <div><strong>Titular:</strong> {fam.billingName}</div>
+                            <div><strong>CUIT / DNI:</strong> {fam.billingCuit}</div>
+                            <div><strong>Condición IVA:</strong> {fam.billingTaxCondition}</div>
+                            <div><strong>Email Facturas:</strong> {fam.billingEmail}</div>
+                          </div>
+                        </div>
+
+                        {/* Historial de Presentaciones */}
+                        {fam.allSubmissions.length > 1 && (
+                          <div className="pt-2">
+                            <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block mb-2">
+                              Historial de Trámites Presentados ({fam.allSubmissions.length}):
+                            </span>
+                            <div className="space-y-1.5">
+                              {fam.allSubmissions.map((sub, i) => {
+                                const isWinning = sub.id === fam.activeSubmission.id;
+                                return (
+                                  <div
+                                    key={sub.id || i}
+                                    className={cn(
+                                      "p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2",
+                                      isWinning ? "bg-emerald-50 border-emerald-300 font-medium" : "bg-slate-100/70 border-slate-200 text-slate-500"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className={cn(
+                                        "px-2 py-0.5 rounded-md text-[10px] font-black uppercase",
+                                        isWinning ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-700"
+                                      )}>
+                                        {isWinning ? "Vigente Oficial" : `Presentación #${fam.allSubmissions.length - i}`}
+                                      </span>
+                                      <span className="font-mono font-bold text-slate-800">{sub.trackingNumber || sub.id}</span>
+                                      <span>•</span>
+                                      <span>Alumno en cabecera: <strong>{sub.studentName}</strong></span>
+                                      <span>•</span>
+                                      <span>{new Date(sub.createdAt).toLocaleString("es-AR")}</span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadSinglePdf(sub)}
+                                      className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Download className="w-3 h-3" /> PDF
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredFamilies.length === 0 && (
+                <div className="p-12 text-center text-slate-400 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                  No se encontraron familias con el criterio de búsqueda seleccionado.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 2: BASE LIMPIA Y DEPURADA (PARA ADMINISTRACIÓN) */}
+        {/* ======================================================== */}
+        {hasEnrollmentsPerm && activeTab === "base_limpia" && (
+          <div>
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-2xl font-black text-emerald-950">Base Limpia y Depurada FEE 2027</h2>
+                  <span className="bg-emerald-100 text-emerald-900 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-300">
+                    Padrón Administrativo Oficial
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Base de datos unificada sin registros duplicados ni sobre-envíos. Lista para gestión contable y administrativa.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => exportCleanBaseToCSV(filteredCleanStudents)}
+                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl font-extrabold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Exportar Padrón Limpio (Excel / CSV)
+              </button>
+            </div>
+
+            {/* Explicación de Criterios de Depuración Aplicados */}
+            <div className="bg-linear-to-br from-emerald-50 via-teal-50/50 to-white border-2 border-emerald-400/80 rounded-3xl p-6 mb-8 shadow-sm space-y-4">
+              <div className="flex items-center gap-2.5 text-emerald-950 font-black text-sm uppercase tracking-wider border-b border-emerald-200 pb-2">
+                <Info className="w-5 h-5 text-emerald-700" />
+                Criterios de Depuración Aplicados por la Dirección Administrativa
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-emerald-950">
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+                  <strong className="text-emerald-900 block text-xs font-black">1. Unificación Familiar</strong>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    Las 52 familias que cargaron un trámite por cada hijo quedaron consolidadas bajo un único grupo familiar, con el mismo titular de facturación y contrato.
+                  </p>
+                </div>
+
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+                  <strong className="text-emerald-900 block text-xs font-black">2. Criterio de Vigencia</strong>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    En re-envíos o correcciones (5 familias), se tomó de forma automática la <strong>última presentación registrada</strong> como la versión oficial y vinculante.
+                  </p>
+                </div>
+
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+                  <strong className="text-emerald-900 block text-xs font-black">3. Absorción de Sobrantes</strong>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    Los <strong>63 trámites duplicados</strong> fueron absorbidos sin pérdida de información, unificando a los 269 alumnos únicos en 206 familias.
+                  </p>
+                </div>
+
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
+                  <strong className="text-emerald-900 block text-xs font-black">4. Padrón Escolar Único</strong>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    Cada estudiante figura exactamente 1 vez con su curso/sala 2027 definitivo, vinculado a su titular de facturación y contrato firmado.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+              <div className="bg-slate-900 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">Trámites Brutos</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.totalRawSubmissions}</span>
+              </div>
+              <div className="bg-emerald-600 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-wider block">Alumnos Únicos</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.totalUniqueStudents}</span>
+              </div>
+              <div className="bg-indigo-600 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-indigo-100 uppercase tracking-wider block">Familias Reales</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.totalFamilies}</span>
+              </div>
+              <div className="bg-amber-500 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-amber-100 uppercase tracking-wider block">Duplicados Absorbidos</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.duplicateSubmissionsAbsorbed}</span>
+              </div>
+              <div className="bg-blue-600 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-blue-100 uppercase tracking-wider block">Escuela N.º 1030</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.escuela1030Count}</span>
+              </div>
+              <div className="bg-purple-600 text-white rounded-2xl p-3.5 shadow-2xs">
+                <span className="text-[10px] font-bold text-purple-100 uppercase tracking-wider block">Escuela N.º 1739</span>
+                <span className="text-2xl font-black">{consolidatedFamiliesData.metrics.escuela1739Count}</span>
+              </div>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-6 space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={cleanBaseSearchQuery}
+                    onChange={e => setCleanBaseSearchQuery(e.target.value)}
+                    placeholder="Buscar por nombre de alumno, DNI, tutor, CUIT, curso..."
+                    className="w-full pl-9 pr-4 py-2 text-xs border rounded-xl bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={cleanBaseSchoolFilter}
+                    onChange={e => setCleanBaseSchoolFilter(e.target.value as any)}
+                    className="px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="all">Todas las Escuelas</option>
+                    <option value="Escuela N.º 1030">Escuela N.º 1030 (Inicial y Primario)</option>
+                    <option value="Escuela N.º 1739">Escuela N.º 1739 (Secundario)</option>
+                  </select>
+
+                  <select
+                    value={cleanBaseLevelFilter}
+                    onChange={e => setCleanBaseLevelFilter(e.target.value as any)}
+                    className="px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value="all">Todos los Niveles</option>
+                    <option value="inicial">Nivel Inicial</option>
+                    <option value="primario">Nivel Primario</option>
+                    <option value="secundario">Nivel Secundario</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Table Base Limpia */}
+            <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm mb-8">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-700 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                    <th className="p-3.5">N° Trámite</th>
+                    <th className="p-3.5">Estudiante</th>
+                    <th className="p-3.5">Curso / Sala 2027</th>
+                    <th className="p-3.5">Escuela</th>
+                    <th className="p-3.5">Responsable 1</th>
+                    <th className="p-3.5">Facturación (CUIT)</th>
+                    <th className="p-3.5">Hermanos</th>
+                    <th className="p-3.5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs divide-y divide-slate-100">
+                  {filteredCleanStudents.map((s: CleanBaseStudent) => (
+                    <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                        <HighlightText text={s.trackingNumber} highlight={cleanBaseSearchQuery} />
+                      </td>
+                      <td className="p-3.5 font-bold text-slate-900 whitespace-nowrap">
+                        <div><HighlightText text={s.studentName} highlight={cleanBaseSearchQuery} /></div>
+                        <div className="text-[11px] text-slate-400 font-normal">DNI: <HighlightText text={s.studentDni} highlight={cleanBaseSearchQuery} /></div>
+                      </td>
+                      <td className="p-3.5 whitespace-nowrap">
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[11px]">
+                          <HighlightText text={s.studentGrade} highlight={cleanBaseSearchQuery} />
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{s.studentLevel}</span>
+                      </td>
+                      <td className="p-3.5 text-slate-600 whitespace-nowrap font-medium">
+                        {s.school}
+                      </td>
+                      <td className="p-3.5 whitespace-nowrap">
+                        <div className="font-semibold text-slate-800"><HighlightText text={s.parent1Name} highlight={cleanBaseSearchQuery} /></div>
+                        <div className="text-[10px] text-slate-400">Tel: <HighlightText text={s.parent1Phone} highlight={cleanBaseSearchQuery} /></div>
+                      </td>
+                      <td className="p-3.5 whitespace-nowrap">
+                        <div className="font-semibold text-slate-800"><HighlightText text={s.billingName} highlight={cleanBaseSearchQuery} /></div>
+                        <div className="text-[10px] text-slate-400">CUIT/DNI: <HighlightText text={s.billingCuit} highlight={cleanBaseSearchQuery} /> ({s.billingTaxCondition})</div>
+                      </td>
+                      <td className="p-3.5 whitespace-nowrap">
+                        {s.hasSiblings ? (
+                          <span className="bg-blue-50 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded-md text-[10px]" title={s.siblingsSummary}>
+                            {s.totalSiblingsInFamily} hermanos
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">Único</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {(() => {
+                            const wa = getWhatsAppUrl(s.parent1Phone, s.studentName, s.trackingNumber, true);
+                            return wa ? (
+                              <a
+                                href={wa}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-200 cursor-pointer"
+                                title="Enviar WhatsApp"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </a>
+                            ) : null;
+                          })()}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredCleanStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
+                        No se encontraron estudiantes con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
