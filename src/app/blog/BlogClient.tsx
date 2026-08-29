@@ -36,8 +36,9 @@ export function BlogClient({ initialPosts }: { initialPosts: PostItem[] }) {
       <section className="py-16 md:py-24">
         <div className="container mx-auto px-6 lg:px-12">
           {posts.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-3xl border border-dashed p-8 max-w-lg mx-auto">
-              <p className="text-brand-foreground/60 font-semibold">No hay novedades publicadas actualmente.</p>
+            <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-brand-gray/30 p-8 max-w-xl mx-auto">
+              <p className="text-brand-foreground/70 font-semibold text-base">No hay novedades publicadas actualmente.</p>
+              <p className="text-brand-foreground/50 text-xs mt-1">Pronto compartiremos nuevos eventos y comunicados institucionales.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
