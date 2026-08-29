@@ -122,6 +122,64 @@ if (($_GET['action'] ?? '') === 'get_gallery') {
     exit;
 }
 
+// Endpoint público para obtener noticias / posts del Blog (visibles en Home y /blog sin requerir login)
+if (($_GET['action'] ?? '') === 'get_posts') {
+    $posts = [];
+    $pdo = getPDO();
+    if ($pdo) {
+        try {
+            $reqSlug = trim($_GET['slug'] ?? '');
+            if (!empty($reqSlug)) {
+                $stmt = $pdo->prepare("SELECT * FROM `Post` WHERE `slug` = :slug LIMIT 1");
+                $stmt->execute([':slug' => $reqSlug]);
+                $foundPost = $stmt->fetch();
+                if ($foundPost) {
+                    echo json_encode(["success" => true, "post" => $foundPost]);
+                    exit;
+                }
+            } else {
+                $stmt = $pdo->query("SELECT * FROM `Post` WHERE `published` = 1 ORDER BY `createdAt` DESC");
+                $posts = $stmt->fetchAll() ?: [];
+            }
+        } catch (Exception $e) {
+            error_log("Public get_posts DB error: " . $e->getMessage());
+        }
+    }
+
+    // Si la base de datos no arrojó resultados o falló, consultar archivo JSON de respaldo
+    if (empty($posts)) {
+        $postsFile = __DIR__ . '/data/posts.json';
+        if (file_exists($postsFile)) {
+            $jsonPosts = json_decode(file_get_contents($postsFile), true);
+            if (is_array($jsonPosts)) {
+                $reqSlug = trim($_GET['slug'] ?? '');
+                if (!empty($reqSlug)) {
+                    foreach ($jsonPosts as $p) {
+                        if (($p['slug'] ?? '') === $reqSlug) {
+                            echo json_encode(["success" => true, "post" => $p]);
+                            exit;
+                        }
+                    }
+                } else {
+                    $posts = array_values(array_filter($jsonPosts, function($p) {
+                        return !isset($p['published']) || !empty($p['published']);
+                    }));
+                }
+            }
+        }
+    }
+
+    // Si se pidió un slug específico y no se encontró
+    $reqSlug = trim($_GET['slug'] ?? '');
+    if (!empty($reqSlug)) {
+        echo json_encode(["success" => false, "error" => "Post no encontrado"]);
+        exit;
+    }
+
+    echo json_encode(["success" => true, "posts" => $posts]);
+    exit;
+}
+
 // Permitir logout directo aún si el token estuviera expirado
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
@@ -495,8 +553,45 @@ switch ($action) {
                 }
             }
         } catch (Exception $e) {
-            error_log("Save post error: " . $e->getMessage());
+            error_log("Save post DB error: " . $e->getMessage());
         }
+
+        // Sincronizar también con archivo JSON de respaldo
+        $postsFile = __DIR__ . '/data/posts.json';
+        $jsonPosts = [];
+        if (file_exists($postsFile)) {
+            $jsonPosts = json_decode(file_get_contents($postsFile), true);
+            if (!is_array($jsonPosts)) $jsonPosts = [];
+        }
+        $targetId = $id ?: ($newId ?? generateUUID());
+        $postRecord = [
+            'id'        => $targetId,
+            'title'     => $title,
+            'slug'      => $slug,
+            'content'   => $content,
+            'excerpt'   => $excerpt,
+            'imageUrl'  => $imageUrl,
+            'category'  => $category,
+            'published' => $published,
+            'createdAt' => date('Y-m-d H:i:s'),
+            'updatedAt' => date('Y-m-d H:i:s')
+        ];
+        $found = false;
+        foreach ($jsonPosts as &$jp) {
+            if (($jp['id'] ?? '') === $targetId || ($jp['slug'] ?? '') === $slug) {
+                $postRecord['createdAt'] = $jp['createdAt'] ?? $postRecord['createdAt'];
+                $jp = $postRecord;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            array_unshift($jsonPosts, $postRecord);
+        }
+        if (!is_dir(__DIR__ . '/data')) {
+            @mkdir(__DIR__ . '/data', 0755, true);
+        }
+        @file_put_contents($postsFile, json_encode($jsonPosts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         echo json_encode(["success" => true]);
         break;
@@ -517,7 +612,19 @@ switch ($action) {
                 $stmt->execute([':id' => $id]);
             }
         } catch (Exception $e) {
-            error_log("Delete post error: " . $e->getMessage());
+            error_log("Delete post DB error: " . $e->getMessage());
+        }
+
+        // Sincronizar eliminación en archivo JSON
+        $postsFile = __DIR__ . '/data/posts.json';
+        if (file_exists($postsFile)) {
+            $jsonPosts = json_decode(file_get_contents($postsFile), true);
+            if (is_array($jsonPosts)) {
+                $jsonPosts = array_values(array_filter($jsonPosts, function($p) use ($id) {
+                    return ($p['id'] ?? '') !== $id;
+                }));
+                @file_put_contents($postsFile, json_encode($jsonPosts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            }
         }
 
         echo json_encode(["success" => true]);
