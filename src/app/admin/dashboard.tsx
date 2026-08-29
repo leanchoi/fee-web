@@ -1165,44 +1165,6 @@ export function AdminDashboard({
 
           {hasEnrollmentsPerm && (
             <button 
-              onClick={() => setActiveTab("familias")}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
-                activeTab === "familias" ? "bg-indigo-700 text-white shadow-md" : "text-indigo-900 hover:bg-indigo-50"
-              )}
-            >
-              <Home className="w-4 h-4" />
-              <span>Grupos Familiares</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-black",
-                activeTab === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
-              )}>
-                {consolidatedFamiliesData.families.length}
-              </span>
-            </button>
-          )}
-
-          {hasEnrollmentsPerm && (
-            <button 
-              onClick={() => setActiveTab("base_limpia")}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer border",
-                activeTab === "base_limpia" ? "bg-emerald-900 text-white border-emerald-950 shadow-md font-extrabold" : "text-emerald-900 border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100"
-              )}
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Base Limpia</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-black",
-                activeTab === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
-              )}>
-                {consolidatedFamiliesData.cleanStudents.length} alumnos
-              </span>
-            </button>
-          )}
-
-          {hasEnrollmentsPerm && (
-            <button 
               onClick={() => setActiveTab("preinscripciones")}
               className={cn(
                 "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
@@ -1261,6 +1223,57 @@ export function AdminDashboard({
           Salir <LogOut className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Sub-barra exclusiva: Herramientas de Consolidación y Padrón Limpio */}
+      {hasEnrollmentsPerm && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b px-8 py-3 bg-linear-to-r from-slate-100 via-indigo-50/40 to-emerald-50/40">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+              Depuración & Padrón Administrativo:
+            </span>
+            <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
+              <button 
+                onClick={() => setActiveTab("familias")}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                  activeTab === "familias" ? "bg-indigo-700 text-white shadow-xs" : "text-indigo-900 hover:bg-indigo-50"
+                )}
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>Grupos Familiares</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  activeTab === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
+                )}>
+                  {consolidatedFamiliesData.families.length}
+                </span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab("base_limpia")}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer border",
+                  activeTab === "base_limpia" ? "bg-emerald-800 text-white border-emerald-900 shadow-xs" : "text-emerald-950 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
+                )}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Base Limpia</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  activeTab === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
+                )}>
+                  {consolidatedFamiliesData.cleanStudents.length} alumnos
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-500 font-semibold hidden lg:block">
+            Vistas segregadas sin duplicados para administración escolar
+          </div>
+        </div>
+      )}
 
       <div className="p-8 md:p-12">
         {hasBlogPerm && activeTab === "posts" && (
@@ -2555,7 +2568,7 @@ export function AdminDashboard({
             <div className="bg-linear-to-br from-emerald-50 via-teal-50/50 to-white border-2 border-emerald-400/80 rounded-3xl p-6 mb-8 shadow-sm space-y-4">
               <div className="flex items-center gap-2.5 text-emerald-950 font-black text-sm uppercase tracking-wider border-b border-emerald-200 pb-2">
                 <Info className="w-5 h-5 text-emerald-700" />
-                Criterios de Depuración Aplicados por la Dirección Administrativa
+                Criterios de Depuración Aplicados
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-emerald-950">
