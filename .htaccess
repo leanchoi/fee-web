@@ -39,7 +39,18 @@ Options -Indexes
 
   RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
   RewriteRule ^(.*)$ /$1/index.html [L]
+
+  # Fallback de metadatos de Next.js para cualquier slug dinámico de Blog
+  RewriteCond %{REQUEST_URI} ^/blog/[^/]+/__next.*$
+  RewriteRule ^blog/[^/]+/(.*)$ /blog/cambridge-english-acreditation/$1 [L]
+
+  # Fallback para posts dinámicos del blog creados desde el panel de control (/blog/mi-nuevo-slug/)
+  RewriteCond %{REQUEST_URI} ^/blog/([^/]+)/?$
+  RewriteRule ^blog/([^/]+)/?$ /blog/cambridge-english-acreditation/index.html [L]
 </IfModule>
+
+# 4. Error 404 Personalizado
+ErrorDocument 404 /404.html
 
 # 4. Cabeceras de Seguridad HTTP
 <IfModule mod_headers.c>

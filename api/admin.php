@@ -122,6 +122,36 @@ if (($_GET['action'] ?? '') === 'get_gallery') {
     exit;
 }
 
+// Función auxiliar para auto-generar la estructura estática del post para Apache/Hostinger
+function ensureBlogPostDirectory($slug) {
+    if (empty($slug) || preg_match('/[^a-zA-Z0-9_-]/', $slug)) return;
+    $rootDir = dirname(__DIR__);
+    $targetDir = $rootDir . '/blog/' . $slug;
+    $templateDir = $rootDir . '/blog/cambridge-english-acreditation';
+    if (!is_dir($templateDir)) {
+        $templateDir = $rootDir . '/blog/inicio-ciclo-lectivo-2026';
+    }
+    if (!is_dir($targetDir) && is_dir($templateDir)) {
+        @mkdir($targetDir, 0755, true);
+        $copyRecursive = function($src, $dst) use (&$copyRecursive) {
+            $dir = @opendir($src);
+            if (!$dir) return;
+            @mkdir($dst, 0755, true);
+            while (false !== ($file = readdir($dir))) {
+                if (($file != '.') && ($file != '..')) {
+                    if (is_dir($src . '/' . $file)) {
+                        $copyRecursive($src . '/' . $file, $dst . '/' . $file);
+                    } else {
+                        @copy($src . '/' . $file, $dst . '/' . $file);
+                    }
+                }
+            }
+            closedir($dir);
+        };
+        $copyRecursive($templateDir, $targetDir);
+    }
+}
+
 // Endpoint público para obtener noticias / posts del Blog (visibles en Home y /blog sin requerir login)
 if (($_GET['action'] ?? '') === 'get_posts') {
     $posts = [];
@@ -134,6 +164,7 @@ if (($_GET['action'] ?? '') === 'get_posts') {
                 $stmt->execute([':slug' => $reqSlug]);
                 $foundPost = $stmt->fetch();
                 if ($foundPost) {
+                    ensureBlogPostDirectory($foundPost['slug'] ?? '');
                     echo json_encode(["success" => true, "post" => $foundPost]);
                     exit;
                 }
@@ -156,6 +187,7 @@ if (($_GET['action'] ?? '') === 'get_posts') {
                 if (!empty($reqSlug)) {
                     foreach ($jsonPosts as $p) {
                         if (($p['slug'] ?? '') === $reqSlug) {
+                            ensureBlogPostDirectory($p['slug'] ?? '');
                             echo json_encode(["success" => true, "post" => $p]);
                             exit;
                         }
@@ -165,6 +197,15 @@ if (($_GET['action'] ?? '') === 'get_posts') {
                         return !isset($p['published']) || !empty($p['published']);
                     }));
                 }
+            }
+        }
+    }
+
+    // Asegurar carpetas para todos los posts publicados
+    if (!empty($posts)) {
+        foreach ($posts as $p) {
+            if (!empty($p['slug'])) {
+                ensureBlogPostDirectory($p['slug']);
             }
         }
     }
