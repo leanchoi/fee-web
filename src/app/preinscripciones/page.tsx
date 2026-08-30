@@ -1,7 +1,5 @@
 import { Metadata } from "next";
 import { PreinscripcionForm } from "./form";
-import Link from "next/link";
-import { ShieldCheck, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Preinscripciones Ciclo Lectivo 2027 | Fundación Educativa Esquel",
@@ -29,21 +27,6 @@ export default function PreinscripcionesPage() {
       {/* Notice & Form */}
       <section className="-mt-6 relative z-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-3xl">
-          
-          {/* Banner para alumnos actuales */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-            <div className="flex items-center gap-2 text-xs text-emerald-950 font-medium">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>¿Su hijo/a ya es alumno/a regular de la institución?</span>
-            </div>
-            <Link 
-              href="/reinscripciones"
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1 shrink-0"
-            >
-              Ir a Reinscripciones 2027 <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
           <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-xl border border-slate-200/80">
             <PreinscripcionForm />
           </div>
