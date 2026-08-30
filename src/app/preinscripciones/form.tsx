@@ -288,18 +288,25 @@ export function PreinscripcionForm() {
         })
       });
 
-      const json = await res.json();
-      if (res.ok && json.success) {
+      let json: any = null;
+      try {
+        const text = await res.text();
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+
+      if (res.ok && json && json.success) {
         setSuccessData({
           id: json.id,
           trackingNumber: json.trackingNumber
         });
         localStorage.removeItem("fee_preinscripcion_draft_2027");
       } else {
-        setErrorMessage(json.error || "Ocurrió un error al procesar la preinscripción.");
+        setErrorMessage(json?.error || "Ocurrió un error al procesar la preinscripción.");
       }
     } catch (err: any) {
-      setErrorMessage(err.message || "Error al conectar con el servidor.");
+      setErrorMessage(err?.message || "Error al conectar con el servidor.");
     } finally {
       setIsSubmitting(false);
     }

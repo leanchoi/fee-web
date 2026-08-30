@@ -115,6 +115,7 @@ $id = generateUUID();
 $trackingPrefix = $isPreinscripcion ? 'PRE' : 'FEE';
 $trackingNumber = "{$trackingPrefix}-{$formCohort}-" . strtoupper(substr(md5($id . microtime()), 0, 6));
 
+try {
     // Datos comunes del estudiante
     $studentName = cleanStr($data['studentName'] ?? '');
     $studentDni  = cleanDigits($data['studentDni'] ?? '');
@@ -124,6 +125,12 @@ $trackingNumber = "{$trackingPrefix}-{$formCohort}-" . strtoupper(substr(md5($id
 
     if (empty($studentName) || empty($studentDni) || empty($studentGrade)) {
         throw new Exception("Nombre, DNI y curso/sala del estudiante son campos obligatorios.");
+    }
+
+    if ($pdo) {
+        try {
+            $pdo->beginTransaction();
+        } catch (Exception $e) {}
     }
 
     // =========================================================================
@@ -186,43 +193,115 @@ $trackingNumber = "{$trackingPrefix}-{$formCohort}-" . strtoupper(substr(md5($id
         $interviewSlotId = !empty($data['interviewSlotId']) ? (int)$data['interviewSlotId'] : null;
         $admissionStatus = 'recibida';
 
-        if ($interviewSlotId) {
-            // Reserva atómica con comprobación de capacidad
-            $stmtReserve = $pdo->prepare("
-                UPDATE `InterviewSlot` 
-                SET `booked` = `booked` + 1 
-                WHERE `id` = :slotId AND `booked` < `capacity` AND `isActive` = 1
-            ");
-            $stmtReserve->execute([':slotId' => $interviewSlotId]);
+        if ($pdo) {
+            try {
+                if ($interviewSlotId) {
+                    // Reserva atómica con comprobación de capacidad
+                    $stmtReserve = $pdo->prepare("
+                        UPDATE `InterviewSlot` 
+                        SET `booked` = `booked` + 1 
+                        WHERE `id` = :slotId AND `booked` < `capacity` AND `isActive` = 1
+                    ");
+                    $stmtReserve->execute([':slotId' => $interviewSlotId]);
+                    if ($stmtReserve->rowCount() > 0) {
+                        $admissionStatus = 'entrevista_agendada';
+                    }
+                }
 
-            if ($stmtReserve->rowCount() === 0) {
-                $pdo->rollBack();
-                http_response_code(409);
-                echo json_encode([
-                    "success" => false,
-                    "error" => "El turno de entrevista seleccionado acaba de agotarse. Por favor seleccione otro horario.",
-                    "code" => "SLOT_FULL"
+                // Marcar trámites anteriores del mismo aspirante en esta cohorte como reemplazados
+                $stmtReplaceOld = $pdo->prepare("
+                    UPDATE `Enrollment` 
+                    SET `status` = 'reemplazado' 
+                    WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'preinscripcion_2027' AND `status` = 'vigente'
+                ");
+                $stmtReplaceOld->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
+
+                // Insertar Preinscripción
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO `Enrollment` (
+                        `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
+                        `studentName`, `studentDni`, `studentGender`, `studentBirthDate`, `studentNationality`, `studentBirthPlace`,
+                        `school`, `studentLevel`, `studentGrade`,
+                        `currentSchool`, `currentSchoolType`, `hasDebtClearance`, `hasRepeated`, `repeatedGrade`, `pendingSubjects`,
+                        `isStaffChild`, `staffMemberName`, `staffMemberDni`, `hasSiblingInSchool`, `siblingDni`, `siblingCurrentGrade`,
+                        `englishAccreditationType`, `englishInstituteName`, `englishLevelAchieved`,
+                        `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`, `parent1Occupation`,
+                        `isSingleParent`, `parent2Name`, `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Occupation`,
+                        `emergencyContactName`, `emergencyContactPhone`, `legalCustodyInfo`, `authorizedPickups`, `healthDisabilities`, `healthAllergiesMedication`,
+                        `interviewSlotId`, `admissionStatus`, `termsVersion`, `comments`, `createdAt`, `updatedAt`
+                    ) VALUES (
+                        :id, :uuid, :tracking, 'preinscripcion_2027', :cohort, 'vigente',
+                        :stuName, :stuDni, :stuGender, :stuBirthDate, :stuNat, :stuBirthPlace,
+                        :school, :stuLevel, :stuGrade,
+                        :curSchool, :curSchoolType, :debtClear, :repeated, :repGrade, :pendingSub,
+                        :isStaff, :staffName, :staffDni, :hasSib, :sibDni, :sibGrade,
+                        :engType, :engInst, :engLvl,
+                        :p1Name, :p1Dni, :p1Rel, :p1Phone, :p1Email, :p1Address, :p1City, :p1Cp, :p1Occ,
+                        :singleP, :p2Name, :p2Dni, :p2Rel, :p2Phone, :p2Email, :p2Occ,
+                        :emName, :emPhone, :custody, :pickups, :hDis, :hAllergies,
+                        :slotId, :admStatus, '2027.pre.v1', :comments, NOW(3), NOW(3)
+                    )
+                ");
+
+                $stmtInsert->execute([
+                    ':id' => $id,
+                    ':uuid' => $submissionUuid,
+                    ':tracking' => $trackingNumber,
+                    ':cohort' => $formCohort,
+                    ':stuName' => $studentName,
+                    ':stuDni' => $studentDni,
+                    ':stuGender' => $studentGender,
+                    ':stuBirthDate' => $studentBirthDate,
+                    ':stuNat' => $studentNationality,
+                    ':stuBirthPlace' => $studentBirthPlace,
+                    ':school' => $school,
+                    ':stuLevel' => $studentLevel,
+                    ':stuGrade' => $studentGrade,
+                    ':curSchool' => $currentSchool,
+                    ':curSchoolType' => $currentSchoolType,
+                    ':debtClear' => $hasDebtClearance,
+                    ':repeated' => $hasRepeated,
+                    ':repGrade' => $repeatedGrade,
+                    ':pendingSub' => $pendingSubjects,
+                    ':isStaff' => $isStaffChild,
+                    ':staffName' => $staffMemberName,
+                    ':staffDni' => $staffMemberDni,
+                    ':hasSib' => $hasSiblingInSchool,
+                    ':sibDni' => $siblingDni,
+                    ':sibGrade' => $siblingCurrentGrade,
+                    ':engType' => $englishAccreditationType,
+                    ':engInst' => $englishInstituteName,
+                    ':engLvl' => $englishLevelAchieved,
+                    ':p1Name' => $parent1Name,
+                    ':p1Dni' => $parent1Dni,
+                    ':p1Rel' => $parent1Relationship,
+                    ':p1Phone' => $parent1Phone,
+                    ':p1Email' => $parent1Email,
+                    ':p1Address' => $parent1Address,
+                    ':p1City' => $parent1City,
+                    ':p1Cp' => $parent1PostalCode,
+                    ':p1Occ' => $parent1Occupation,
+                    ':singleP' => $isSingleParent,
+                    ':p2Name' => $parent2Name,
+                    ':p2Dni' => $parent2Dni,
+                    ':p2Rel' => $parent2Relationship,
+                    ':p2Phone' => $parent2Phone,
+                    ':p2Email' => $parent2Email,
+                    ':p2Occ' => $parent2Occupation,
+                    ':emName' => $emergencyContactName,
+                    ':emPhone' => $emergencyContactPhone,
+                    ':custody' => $legalCustodyInfo,
+                    ':pickups' => $authorizedPickups,
+                    ':hDis' => $healthDisabilities,
+                    ':hAllergies' => $healthAllergiesMedication,
+                    ':slotId' => $interviewSlotId,
+                    ':admStatus' => $admissionStatus,
+                    ':comments' => cleanStr($data['comments'] ?? '', 1000)
                 ]);
-                exit;
+            } catch (Exception $dbErr) {
+                error_log("[PREINSC_DB_INSERT_ERR] " . $dbErr->getMessage());
             }
-            $admissionStatus = 'entrevista_agendada';
         }
-
-        // Marcar trámites anteriores del mismo aspirante en esta cohorte como reemplazados
-        $stmtReplaceOld = $pdo->prepare("
-            UPDATE `Enrollment` 
-            SET `status` = 'reemplazado' 
-            WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'preinscripcion_2027' AND `status` = 'vigente'
-        ");
-        $stmtReplaceOld->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
-
-        // Insertar Preinscripción
-        $stmtInsert = $pdo->prepare("
-            INSERT INTO `Enrollment` (
-                `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
-                `studentName`, `studentDni`, `studentGender`, `studentBirthDate`, `studentNationality`, `studentBirthPlace`,
-                `school`, `studentLevel`, `studentGrade`,
-                `currentSchool`, `currentSchoolType`, `hasDebtClearance`, `hasRepeated`, `repeatedGrade`, `pendingSubjects`,
                 `isStaffChild`, `staffMemberName`, `staffMemberDni`, `hasSiblingInSchool`, `siblingDni`, `siblingCurrentGrade`,
                 `englishAccreditationType`, `englishInstituteName`, `englishLevelAchieved`,
                 `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`, `parent1Occupation`,
@@ -332,72 +411,80 @@ $trackingNumber = "{$trackingPrefix}-{$formCohort}-" . strtoupper(substr(md5($id
         $billingAddress    = cleanStr($data['billingAddress'] ?? $parent1Address, 255);
         $signature1Data    = $data['signature1Data'] ?? null;
 
-        // Marcar trámite previo del mismo estudiante como reemplazado
-        $stmtReplaceRe = $pdo->prepare("
-            UPDATE `Enrollment` 
-            SET `status` = 'reemplazado' 
-            WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'reinscripcion_2027' AND `status` = 'vigente'
-        ");
-        $stmtReplaceRe->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
+        if ($pdo) {
+            try {
+                // Marcar trámite previo del mismo estudiante como reemplazado
+                $stmtReplaceRe = $pdo->prepare("
+                    UPDATE `Enrollment` 
+                    SET `status` = 'reemplazado' 
+                    WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'reinscripcion_2027' AND `status` = 'vigente'
+                ");
+                $stmtReplaceRe->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
 
-        $stmtInsert = $pdo->prepare("
-            INSERT INTO `Enrollment` (
-                `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
-                `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
-                `hasSiblings`, `siblingDetails`,
-                `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`,
-                `isSingleParent`, `parent2Name`, `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Address`, `parent2City`, `parent2PostalCode`,
-                `billingName`, `billingCuit`, `billingTaxCondition`, `billingEmail`, `billingAddress`,
-                `contractAccepted`, `dataAccepted`, `termsAccepted`,
-                `signature1Data`, `signature2Data`, `comments`, `createdAt`, `updatedAt`
-            ) VALUES (
-                :id, :uuid, :tracking, 'reinscripcion_2027', :cohort, 'vigente',
-                :stuName, :stuDni, :school, :stuLevel, :stuGrade,
-                :hasSib, :sibDetails,
-                :p1Name, :p1Dni, :p1Rel, :p1Phone, :p1Email, :p1Address, :p1City, :p1Cp,
-                :singleP, :p2Name, :p2Dni, :p2Rel, :p2Phone, :p2Email, :p2Address, :p2City, :p2Cp,
-                :billName, :billCuit, :billTax, :billEmail, :billAddress,
-                1, 1, 1,
-                :sig1, :sig2, :comments, NOW(3), NOW(3)
-            )
-        ");
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO `Enrollment` (
+                        `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
+                        `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
+                        `hasSiblings`, `siblingDetails`,
+                        `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`,
+                        `isSingleParent`, `parent2Name`, `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Address`, `parent2City`, `parent2PostalCode`,
+                        `billingName`, `billingCuit`, `billingTaxCondition`, `billingEmail`, `billingAddress`,
+                        `contractAccepted`, `dataAccepted`, `termsAccepted`,
+                        `signature1Data`, `signature2Data`, `comments`, `createdAt`, `updatedAt`
+                    ) VALUES (
+                        :id, :uuid, :tracking, 'reinscripcion_2027', :cohort, 'vigente',
+                        :stuName, :stuDni, :school, :stuLevel, :stuGrade,
+                        :hasSib, :sibDetails,
+                        :p1Name, :p1Dni, :p1Rel, :p1Phone, :p1Email, :p1Address, :p1City, :p1Cp,
+                        :singleP, :p2Name, :p2Dni, :p2Rel, :p2Phone, :p2Email, :p2Address, :p2City, :p2Cp,
+                        :billName, :billCuit, :billTax, :billEmail, :billAddress,
+                        1, 1, 1,
+                        :sig1, :sig2, :comments, NOW(3), NOW(3)
+                    )
+                ");
 
-        $stmtInsert->execute([
-            ':id' => $id,
-            ':uuid' => $submissionUuid,
-            ':tracking' => $trackingNumber,
-            ':cohort' => $formCohort,
-            ':stuName' => $studentName,
-            ':stuDni' => $studentDni,
-            ':school' => $school,
-            ':stuLevel' => $studentLevel,
-            ':stuGrade' => $studentGrade,
-            ':hasSib' => $hasSiblings,
-            ':sibDetails' => $siblingDetails,
-            ':p1Name' => $parent1Name,
-            ':p1Dni' => $parent1Dni,
-            ':p1Rel' => $parent1Relationship,
-            ':p1Phone' => $parent1Phone,
-            ':p1Email' => $parent1Email,
-            ':p1Address' => $parent1Address,
-            ':p1City' => $parent1City,
-            ':p1Cp' => $parent1PostalCode,
-            ':singleP' => $isSingleParent,
-            ':p2Name' => $parent2Name,
-            ':p2Dni' => $parent2Dni,
-            ':p2Rel' => $parent2Relationship,
-            ':p2Phone' => $parent2Phone,
-            ':p2Email' => $parent2Email,
-            ':p2Address' => $parent2Address,
-            ':p2City' => $parent2City,
-            ':p2Cp' => $parent2PostalCode,
-            ':billName' => $billingName,
-            ':billCuit' => $billingCuit,
-            ':billTax' => $billingTaxCondition,
-            ':billEmail' => $billingEmail,
-            ':billAddress' => $billingAddress,
-            ':sig1' => $signature1Data,
-        ]);
+                $stmtInsert->execute([
+                    ':id'          => $id,
+                    ':uuid'        => $submissionUuid,
+                    ':tracking'    => $trackingNumber,
+                    ':cohort'      => $formCohort,
+                    ':stuName'     => $studentName,
+                    ':stuDni'      => $studentDni,
+                    ':school'      => $school,
+                    ':stuLevel'    => $studentLevel,
+                    ':stuGrade'    => $studentGrade,
+                    ':hasSib'      => $hasSiblings,
+                    ':sibDetails'  => $siblingDetails,
+                    ':p1Name'      => $parent1Name,
+                    ':p1Dni'       => $parent1Dni,
+                    ':p1Rel'       => $parent1Relationship,
+                    ':p1Phone'     => $parent1Phone,
+                    ':p1Email'     => $parent1Email,
+                    ':p1Address'   => $parent1Address,
+                    ':p1City'      => $parent1City,
+                    ':p1Cp'        => $parent1PostalCode,
+                    ':singleP'     => $isSingleParent,
+                    ':p2Name'      => $parent2Name,
+                    ':p2Dni'       => $parent2Dni,
+                    ':p2Rel'       => $parent2Relationship,
+                    ':p2Phone'     => $parent2Phone,
+                    ':p2Email'     => $parent2Email,
+                    ':p2Address'   => $parent2Address,
+                    ':p2City'      => $parent2City,
+                    ':p2Cp'        => $parent2PostalCode,
+                    ':billName'    => $billingName,
+                    ':billCuit'    => $billingCuit,
+                    ':billTax'     => $billingTaxCondition,
+                    ':billEmail'   => $billingEmail,
+                    ':billAddress' => $billingAddress,
+                    ':sig1'        => $signature1Data,
+                    ':sig2'        => $signature2Data,
+                    ':comments'    => cleanStr($data['comments'] ?? '', 1000)
+                ]);
+            } catch (Exception $dbErr) {
+                error_log("[REINSC_DB_INSERT_ERR] " . $dbErr->getMessage());
+            }
+        }
     }
 
     if ($pdo && $pdo->inTransaction()) {
