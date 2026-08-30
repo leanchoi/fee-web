@@ -446,21 +446,28 @@ export function AdminDashboard({
   }, [contactMessages]);
 
   // Partition between Reinscripciones 2027 and Preinscripciones Generales
-  const preinscripcionesList = useMemo(() => {
-    return enrollmentList.filter((e: any) => {
-      const t = String(e.type || "").toLowerCase();
-      const tr = String(e.trackingNumber || "").toUpperCase();
-      return t.includes("preinscripcion") || tr.startsWith("PRE-") || (e.admissionStatus && !e.contractAccepted);
-    });
-  }, [enrollmentList]);
+  const isReinscripcionRecord = (e: any) => {
+    // Si tiene firmas digitales, aceptación de contrato, datos de facturación o hermanos tabulados, es indiscutiblemente una reinscripción
+    if (e.signature1Data || e.signature2Data || e.contractAccepted || e.billingCuit || e.billingName) {
+      return true;
+    }
+    const t = String(e.type || "").toLowerCase();
+    const tr = String(e.trackingNumber || "").toUpperCase();
+    if (t.includes("reinscripcion") || tr.startsWith("FEE-")) {
+      return true;
+    }
+    if (t.includes("preinscripcion") || tr.startsWith("PRE-") || e.admissionStatus) {
+      return false;
+    }
+    return true;
+  };
 
   const reinscripcionesList = useMemo(() => {
-    return enrollmentList.filter((e: any) => {
-      const t = String(e.type || "").toLowerCase();
-      const tr = String(e.trackingNumber || "").toUpperCase();
-      if (t.includes("preinscripcion") || tr.startsWith("PRE-") || (e.admissionStatus && !e.contractAccepted)) return false;
-      return true; // Todos los de reinscripción regular
-    });
+    return enrollmentList.filter(isReinscripcionRecord);
+  }, [enrollmentList]);
+
+  const preinscripcionesList = useMemo(() => {
+    return enrollmentList.filter((e: any) => !isReinscripcionRecord(e));
   }, [enrollmentList]);
 
   // Enrollments Filtering, Selection & ZIP Export State

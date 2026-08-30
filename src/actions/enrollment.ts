@@ -52,7 +52,17 @@ export async function submitEnrollment(data: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    return await res.json();
+    const rawText = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(rawText);
+    } catch {
+      return { 
+        success: false, 
+        error: `Error del servidor (${res.status}): ${rawText.substring(0, 200)}` 
+      };
+    }
+    return json;
   } catch (error: any) {
     return { success: false, error: error.message || "Ocurrió un error al procesar tu solicitud." };
   }

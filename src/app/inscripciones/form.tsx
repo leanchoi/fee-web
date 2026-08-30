@@ -364,6 +364,11 @@ export function EnrollmentForm() {
     try {
       const result = await submitEnrollment({
         ...formData,
+        type: "reinscripcion_2027",
+        cohortYear: 2027,
+        contractAccepted: true,
+        dataAccepted: true,
+        termsAccepted: true,
         studentLevel: formData.studentLevel || determineLevel(formData.studentGrade, formData.school),
         school: formData.school || determineSchool(formData.studentLevel || "Nivel Primario")
       });

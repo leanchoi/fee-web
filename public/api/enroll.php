@@ -73,8 +73,18 @@ if (empty($submissionUuid)) {
     $submissionUuid = generateUUID();
 }
 
-$enrollmentType = cleanStr($data['type'] ?? 'preinscripcion_2027');
-$isPreinscripcion = ($enrollmentType === 'preinscripcion_general' || $enrollmentType === 'preinscripcion_2027' || $enrollmentType === 'preinscripcion');
+$enrollmentType = cleanStr($data['type'] ?? '');
+if (empty($enrollmentType)) {
+    if (!empty($data['signature1Data']) || !empty($data['contractAccepted']) || !empty($data['billingName']) || !empty($data['billingCuit'])) {
+        $enrollmentType = 'reinscripcion_2027';
+    } else {
+        $enrollmentType = 'preinscripcion_2027';
+    }
+}
+
+// Es preinscripción si NO tiene firma/contrato y su tipo es preinscripción
+$hasContractOrSignatures = (!empty($data['signature1Data']) || !empty($data['contractAccepted']) || !empty($data['billingCuit']));
+$isPreinscripcion = !$hasContractOrSignatures && (strpos($enrollmentType, 'preinscripcion') !== false);
 $formCohort = (int)($data['cohortYear'] ?? 2027);
 
 // 3. Idempotencia: Verificar si este UUID ya fue procesado
