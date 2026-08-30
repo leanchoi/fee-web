@@ -182,7 +182,191 @@ function ensureUserTableSchema($pdo) {
         return false;
     }
 }
-function ensureEnrollmentTableSchema($pdo) { return true; }
+function ensureEnrollmentTableSchema($pdo) {
+    if (!$pdo) return false;
+    try {
+        // 1. Tabla Cohort
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `Cohort` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `year` INT NOT NULL,
+                `type` ENUM('reinscripcion', 'preinscripcion') NOT NULL,
+                `status` ENUM('borrador', 'abierta', 'cerrada', 'archivada') NOT NULL DEFAULT 'borrador',
+                `opensAt` DATETIME NULL,
+                `closesAt` DATETIME NULL,
+                `closedAt` DATETIME(3) NULL,
+                `closedBy` VARCHAR(100) NULL,
+                `reopenedAt` DATETIME(3) NULL,
+                `reopenedBy` VARCHAR(100) NULL,
+                `notes` TEXT NULL,
+                UNIQUE KEY `uq_year_type` (`year`, `type`),
+                INDEX `idx_cohort_status` (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        $pdo->exec("
+            INSERT IGNORE INTO `Cohort` (`year`, `type`, `status`, `notes`) VALUES
+            (2027, 'reinscripcion', 'abierta', 'Reinscripción Ciclo Lectivo 2027'),
+            (2027, 'preinscripcion', 'abierta', 'Preinscripción Ingresantes 2027')
+        ");
+
+        // 2. Tabla InterviewSlot
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `InterviewSlot` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `cohortYear` INT NOT NULL DEFAULT 2027,
+                `schoolId` VARCHAR(10) NOT NULL DEFAULT '1030',
+                `slotDate` DATE NOT NULL,
+                `startTime` TIME NOT NULL,
+                `endTime` TIME NOT NULL,
+                `capacity` SMALLINT NOT NULL DEFAULT 8,
+                `booked` SMALLINT NOT NULL DEFAULT 0,
+                `isActive` TINYINT(1) NOT NULL DEFAULT 1,
+                UNIQUE KEY `uq_slot` (`cohortYear`, `schoolId`, `slotDate`, `startTime`),
+                INDEX `idx_slot_lookup` (`cohortYear`, `slotDate`, `isActive`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // 3. Tabla Enrollment
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `Enrollment` (
+                `id` VARCHAR(191) PRIMARY KEY,
+                `submissionUuid` CHAR(36) NULL,
+                `trackingNumber` VARCHAR(100) UNIQUE NOT NULL,
+                `type` VARCHAR(50) NOT NULL DEFAULT 'reinscripcion_2027',
+                `cohortYear` INT NOT NULL DEFAULT 2027,
+                `status` VARCHAR(50) NOT NULL DEFAULT 'vigente',
+                `studentName` VARCHAR(191) NOT NULL,
+                `studentDni` VARCHAR(50) NOT NULL,
+                `studentGender` VARCHAR(20) NULL,
+                `studentBirthDate` DATE NULL,
+                `studentNationality` VARCHAR(60) NULL,
+                `studentBirthPlace` VARCHAR(100) NULL,
+                `school` VARCHAR(100) NOT NULL,
+                `studentLevel` VARCHAR(50) NOT NULL,
+                `studentGrade` VARCHAR(100) NOT NULL,
+                `currentSchool` VARCHAR(191) NULL,
+                `currentSchoolType` VARCHAR(50) DEFAULT 'publica',
+                `hasDebtClearance` TINYINT(1) DEFAULT 0,
+                `hasRepeated` TINYINT(1) DEFAULT 0,
+                `repeatedGrade` VARCHAR(60) NULL,
+                `pendingSubjects` TEXT NULL,
+                `hasSiblings` TINYINT(1) DEFAULT 0,
+                `siblingDetails` TEXT NULL,
+                `isStaffChild` TINYINT(1) DEFAULT 0,
+                `staffMemberName` VARCHAR(191) NULL,
+                `staffMemberDni` VARCHAR(20) NULL,
+                `hasSiblingInSchool` TINYINT(1) DEFAULT 0,
+                `siblingDni` VARCHAR(20) NULL,
+                `siblingCurrentGrade` VARCHAR(191) NULL,
+                `englishAccreditationType` VARCHAR(50) DEFAULT 'ninguno',
+                `englishInstituteName` VARCHAR(191) NULL,
+                `englishLevelAchieved` VARCHAR(100) NULL,
+                `parent1Name` VARCHAR(191) NOT NULL,
+                `parent1Dni` VARCHAR(50) NOT NULL,
+                `parent1Relationship` VARCHAR(100) NOT NULL,
+                `parent1Occupation` VARCHAR(191) NULL,
+                `parent1Phone` VARCHAR(50) NOT NULL,
+                `parent1Email` VARCHAR(191) NOT NULL,
+                `parent1Address` VARCHAR(255) NOT NULL,
+                `parent1City` VARCHAR(100) NOT NULL,
+                `parent1PostalCode` VARCHAR(50) NOT NULL,
+                `isSingleParent` TINYINT(1) DEFAULT 0,
+                `parent2Name` VARCHAR(191) NULL,
+                `parent2Dni` VARCHAR(50) NULL,
+                `parent2Relationship` VARCHAR(100) NULL,
+                `parent2Occupation` VARCHAR(191) NULL,
+                `parent2Phone` VARCHAR(50) NULL,
+                `parent2Email` VARCHAR(191) NULL,
+                `parent2Address` VARCHAR(255) NULL,
+                `parent2City` VARCHAR(100) NULL,
+                `parent2PostalCode` VARCHAR(50) NULL,
+                `billingName` VARCHAR(191) NULL,
+                `billingCuit` VARCHAR(50) NULL,
+                `billingTaxCondition` VARCHAR(100) NULL,
+                `billingEmail` VARCHAR(191) NULL,
+                `billingAddress` VARCHAR(255) NULL,
+                `signature1Data` LONGTEXT NULL,
+                `signature2Data` LONGTEXT NULL,
+                `emergencyContactName` VARCHAR(191) NULL,
+                `emergencyContactPhone` VARCHAR(50) NULL,
+                `legalCustodyInfo` TEXT NULL,
+                `authorizedPickups` TEXT NULL,
+                `healthDisabilities` TEXT NULL,
+                `healthAllergiesMedication` TEXT NULL,
+                `interviewSlotId` INT NULL,
+                `termsVersion` VARCHAR(20) DEFAULT '2027.1',
+                `admissionStatus` VARCHAR(50) NOT NULL DEFAULT 'recibida',
+                `priorityVerified` TINYINT(1) NOT NULL DEFAULT 0,
+                `admissionNotes` TEXT NULL,
+                `decidedBy` VARCHAR(100) NULL,
+                `decidedAt` DATETIME(3) NULL,
+                `isArchived` TINYINT(1) DEFAULT 0,
+                `comments` TEXT NULL,
+                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+                INDEX `idx_enr_dni` (`studentDni`),
+                INDEX `idx_enr_cohort` (`cohortYear`, `type`),
+                INDEX `idx_enr_status` (`status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // Si la tabla ya existía, agregar columnas faltantes de forma segura
+        $columns = [
+            'submissionUuid'            => 'CHAR(36) NULL',
+            'cohortYear'                => 'INT NOT NULL DEFAULT 2027',
+            'status'                    => 'VARCHAR(50) NOT NULL DEFAULT \'vigente\'',
+            'studentGender'             => 'VARCHAR(20) NULL',
+            'studentBirthDate'          => 'DATE NULL',
+            'studentNationality'        => 'VARCHAR(60) NULL',
+            'studentBirthPlace'         => 'VARCHAR(100) NULL',
+            'currentSchool'             => 'VARCHAR(191) NULL',
+            'currentSchoolType'         => 'VARCHAR(50) DEFAULT \'publica\'',
+            'hasDebtClearance'          => 'TINYINT(1) DEFAULT 0',
+            'hasRepeated'               => 'TINYINT(1) DEFAULT 0',
+            'repeatedGrade'             => 'VARCHAR(60) NULL',
+            'pendingSubjects'           => 'TEXT NULL',
+            'isStaffChild'              => 'TINYINT(1) DEFAULT 0',
+            'staffMemberName'           => 'VARCHAR(191) NULL',
+            'staffMemberDni'            => 'VARCHAR(20) NULL',
+            'hasSiblingInSchool'        => 'TINYINT(1) DEFAULT 0',
+            'siblingDni'                => 'VARCHAR(20) NULL',
+            'siblingCurrentGrade'       => 'VARCHAR(191) NULL',
+            'englishAccreditationType'  => 'VARCHAR(50) DEFAULT \'ninguno\'',
+            'englishInstituteName'      => 'VARCHAR(191) NULL',
+            'englishLevelAchieved'      => 'VARCHAR(100) NULL',
+            'parent1Occupation'         => 'VARCHAR(191) NULL',
+            'parent2Occupation'         => 'VARCHAR(191) NULL',
+            'emergencyContactName'      => 'VARCHAR(191) NULL',
+            'emergencyContactPhone'     => 'VARCHAR(50) NULL',
+            'legalCustodyInfo'          => 'TEXT NULL',
+            'authorizedPickups'         => 'TEXT NULL',
+            'healthDisabilities'        => 'TEXT NULL',
+            'healthAllergiesMedication' => 'TEXT NULL',
+            'interviewSlotId'           => 'INT NULL',
+            'termsVersion'              => 'VARCHAR(20) DEFAULT \'2027.1\'',
+            'admissionStatus'           => 'VARCHAR(50) NOT NULL DEFAULT \'recibida\'',
+            'priorityVerified'          => 'TINYINT(1) NOT NULL DEFAULT 0',
+            'admissionNotes'            => 'TEXT NULL',
+            'decidedBy'                 => 'VARCHAR(100) NULL',
+            'decidedAt'                 => 'DATETIME(3) NULL',
+            'isArchived'                => 'TINYINT(1) DEFAULT 0'
+        ];
+
+        foreach ($columns as $col => $type) {
+            try {
+                $pdo->exec("ALTER TABLE `Enrollment` ADD COLUMN `$col` $type");
+            } catch (Exception $e) {
+                // Columna ya existe
+            }
+        }
+
+        return true;
+    } catch (Exception $e) {
+        error_log('[ENSURE_ENROLLMENT_SCHEMA] ' . $e->getMessage());
+        return false;
+    }
+}
 
 /* ═══════════════════════════════════════════════════════════════
 JWT — base64url real (RFC 7515)
