@@ -47,7 +47,21 @@ function jsonResponse(int $status, array $payload): void {
         header('Pragma: no-cache');
         header('X-Content-Type-Options: nosniff');
     }
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($json === false) {
+        error_log('[JSON_ENCODE_ERROR] ' . json_last_error_msg());
+        array_walk_recursive($payload, function(&$item) {
+            if (is_string($item)) {
+                $item = mb_convert_encoding($item, 'UTF-8', 'UTF-8');
+            }
+        });
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false) {
+            $json = json_encode(['success' => false, 'error' => 'Error de serialización JSON en servidor: ' . json_last_error_msg()]);
+        }
+    }
+    echo $json;
     exit;
 }
 
@@ -67,7 +81,7 @@ register_shutdown_function(static function (): void {
             }
             http_response_code(500);
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['success' => false, 'error' => 'Error interno del servidor.']);
+            echo json_encode(['success' => false, 'error' => 'Error interno del servidor: ' . $e['message']]);
         }
     }
 });

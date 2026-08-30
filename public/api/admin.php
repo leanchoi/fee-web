@@ -118,8 +118,7 @@ if (($_GET['action'] ?? '') === 'get_gallery') {
         }
         @file_put_contents($galleryFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
-    echo json_encode(["success" => true, "gallery" => $items]);
-    exit;
+    jsonResponse(200, ["success" => true, "gallery" => $items]);
 }
 
 // Función auxiliar para auto-generar la estructura estática del post para Apache/Hostinger
@@ -168,8 +167,7 @@ if (($_GET['action'] ?? '') === 'get_posts') {
                 $foundPost = $stmt->fetch();
                 if ($foundPost) {
                     ensureBlogPostDirectory($foundPost['slug'] ?? '');
-                    echo json_encode(["success" => true, "post" => $foundPost]);
-                    exit;
+                    jsonResponse(200, ["success" => true, "post" => $foundPost]);
                 }
             } else {
                 $stmt = $pdo->query("SELECT * FROM `Post` WHERE `published` = 1 ORDER BY `createdAt` DESC");
@@ -191,8 +189,7 @@ if (($_GET['action'] ?? '') === 'get_posts') {
                     foreach ($jsonPosts as $p) {
                         if (($p['slug'] ?? '') === $reqSlug) {
                             ensureBlogPostDirectory($p['slug'] ?? '');
-                            echo json_encode(["success" => true, "post" => $p]);
-                            exit;
+                            jsonResponse(200, ["success" => true, "post" => $p]);
                         }
                     }
                 } else {
@@ -216,27 +213,16 @@ if (($_GET['action'] ?? '') === 'get_posts') {
     // Si se pidió un slug específico y no se encontró
     $reqSlug = trim($_GET['slug'] ?? '');
     if (!empty($reqSlug)) {
-        echo json_encode(["success" => false, "error" => "Post no encontrado"]);
-        exit;
+        jsonResponse(404, ["success" => false, "error" => "Post no encontrado"]);
     }
 
-    echo json_encode(["success" => true, "posts" => $posts]);
-    exit;
+    jsonResponse(200, ["success" => true, "posts" => $posts]);
 }
 
 // Permitir logout directo aún si el token estuviera expirado
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-    setcookie('admin_session', '', [
-        'expires'  => time() - 86400,
-        'path'     => '/',
-        'httponly' => true,
-        'secure'   => $isSecure,
-        'samesite' => 'Lax'
-    ]);
-    header("Set-Cookie: admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax", false);
-    echo json_encode(["success" => true, "message" => "Sesión cerrada"]);
-    exit;
+    clearSessionCookie();
+    jsonResponse(200, ["success" => true, "message" => "Sesión cerrada"]);
 }
 
 $session = requireAuth();
@@ -374,6 +360,15 @@ switch ($action) {
             }
         }
 
+        // Cargar galería de fotos
+        $galleryFile = $dataDir . '/gallery.json';
+        if (file_exists($galleryFile)) {
+            $gallery = json_decode(file_get_contents($galleryFile), true) ?: [];
+        }
+        if (empty($gallery)) {
+            $gallery = $initialGallery;
+        }
+
         $sessionPayload = [
             "userId"             => $session['userId'] ?? '',
             "username"           => $session['username'] ?? '',
@@ -399,9 +394,7 @@ switch ($action) {
     // 2. Actualizar estado de admisión (individual o masivo)
     case 'update_admission_status':
         if (!checkPermission($session, 'enrollments')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $ids = $bodyData['ids'] ?? (!empty($bodyData['id']) ? [$bodyData['id']] : []);
@@ -411,9 +404,7 @@ switch ($action) {
 
         $allowedStatuses = ['recibida', 'entrevista_agendada', 'entrevista_realizada', 'admitida', 'lista_espera', 'no_admitida', 'desistida'];
         if (empty($ids) || !in_array($admissionStatus, $allowedStatuses, true)) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Parámetros inválidos o estado de admisión no permitido"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "Parámetros inválidos o estado de admisión no permitido"]);
         }
 
         try {
@@ -432,29 +423,22 @@ switch ($action) {
                 $stmt->execute($params);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            exit;
+            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
         }
 
-        echo json_encode(["success" => true, "updatedCount" => count($ids)]);
-        break;
+        jsonResponse(200, ["success" => true, "updatedCount" => count($ids)]);
 
     // 2b. Verificar prioridad de aspirante
     case 'verify_priority':
         if (!checkPermission($session, 'enrollments')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id = trim($bodyData['id'] ?? '');
         $priorityVerified = !empty($bodyData['priorityVerified']) ? 1 : 0;
 
         if (empty($id)) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "ID de trámite requerido"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "ID de trámite requerido"]);
         }
 
         try {
@@ -464,59 +448,13 @@ switch ($action) {
                 $stmt->execute([':v' => $priorityVerified, ':id' => $id]);
             }
         } catch (Exception $e) {
-            http_response_code(500);
-            echo json_encode(["success" => false, "error" => $e->getMessage()]);
-            exit;
+            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
         }
 
-        echo json_encode(["success" => true]);
-        break;
-
-    // 2c. Actualizar estado genérico
-    case 'update_enrollment_status':
-            $usersFile = $dataDir . '/users.json';
-            if (file_exists($usersFile)) {
-                $jsonUsers = json_decode(file_get_contents($usersFile), true) ?: [];
-                $existingIds = array_column($users, 'id');
-                foreach ($jsonUsers as $item) {
-                    if (!in_array($item['id'], $existingIds, true)) {
-                        unset($item['password']);
-                        $users[] = $item;
-                    }
-                }
-            }
-        }
-
-        // Cargar galería de fotos (con auto-inicialización persistente de las 12 fotos preexistentes)
-        $galleryFile = $dataDir . '/gallery.json';
-        if (file_exists($galleryFile)) {
-            $gallery = json_decode(file_get_contents($galleryFile), true) ?: [];
-        }
-        if (empty($gallery)) {
-            $gallery = $initialGallery;
-            if (!is_dir($dataDir)) {
-                @mkdir($dataDir, 0755, true);
-            }
-            @file_put_contents($galleryFile, json_encode($gallery, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        }
-
-        echo json_encode([
-            "success"     => true,
-            "user"        => $session,
-            "enrollments" => $enrollments,
-            "contacts"    => $contacts,
-            "posts"       => $posts,
-            "users"       => $users,
-            "gallery"     => $gallery
-        ]);
-        break;
-
-    // 2. Actualizar estado de inscripción
+        jsonResponse(200, ["success" => true]);
     case 'update_enrollment_status':
         if (!checkPermission($session, 'enrollments')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id     = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
@@ -524,9 +462,7 @@ switch ($action) {
         
         $allowedStatuses = ['PENDING', 'REVIEWED', 'CONTACTED'];
         if (!$id || !in_array($status, $allowedStatuses, true)) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Parámetros inválidos o estado no permitido"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "Parámetros inválidos o estado no permitido"]);
         }
 
         $enrollFile = __DIR__ . '/data/enrollments.json';
@@ -550,22 +486,17 @@ switch ($action) {
             error_log("Update enrollment error: " . $e->getMessage());
         }
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
     // 3. Eliminar inscripción
     case 'delete_enrollment':
         if (!checkPermission($session, 'enrollments')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
         if (!$id) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "ID requerido"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "ID requerido"]);
         }
 
         $enrollFile = __DIR__ . '/data/enrollments.json';
@@ -585,22 +516,17 @@ switch ($action) {
             error_log("Delete enrollment error: " . $e->getMessage());
         }
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
     // 4. Eliminar mensaje de contacto
     case 'delete_contact':
         if (!checkPermission($session, 'contacts')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
         if (!$id) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "ID requerido"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "ID requerido"]);
         }
 
         $contactFile = __DIR__ . '/data/contacts.json';
@@ -620,15 +546,12 @@ switch ($action) {
             error_log("Delete contact error: " . $e->getMessage());
         }
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
     // 5. Guardar / Editar Post de Blog
     case 'save_post':
         if (!checkPermission($session, 'blog')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $title     = trim($bodyData['title'] ?? '');
@@ -641,9 +564,7 @@ switch ($action) {
         $id        = $bodyData['id'] ?? '';
 
         if (empty($title) || empty($slug)) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Título y slug son obligatorios"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "Título y slug son obligatorios"]);
         }
 
         try {
@@ -725,15 +646,12 @@ switch ($action) {
         }
         @file_put_contents($postsFile, json_encode($jsonPosts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
     // 6. Eliminar Post
     case 'delete_post':
         if (!checkPermission($session, 'blog')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id = $bodyData['id'] ?? ($_POST['id'] ?? '');
@@ -759,15 +677,12 @@ switch ($action) {
             }
         }
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
     // 7. Guardar / Editar Item de Galería de Fotos
     case 'save_gallery_item':
         if (!checkPermission($session, 'blog')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $galleryFile = __DIR__ . '/data/gallery.json';
@@ -783,9 +698,7 @@ switch ($action) {
         $desc     = trim($bodyData['desc'] ?? '');
 
         if (empty($image) || empty($title)) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "Imagen y título son requeridos"]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "Imagen y título son requeridos"]);
         }
 
         $found = false;
@@ -814,15 +727,12 @@ switch ($action) {
         }
 
         @file_put_contents($galleryFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        echo json_encode(["success" => true, "gallery" => $items]);
-        break;
+        jsonResponse(200, ["success" => true, "gallery" => $items]);
 
     // 8. Eliminar Item de Galería de Fotos
     case 'delete_gallery_item':
         if (!checkPermission($session, 'blog')) {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
         }
 
         $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
@@ -834,15 +744,12 @@ switch ($action) {
             @file_put_contents($galleryFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
-        echo json_encode(["success" => true, "gallery" => $items]);
-        break;
+        jsonResponse(200, ["success" => true, "gallery" => $items]);
 
-    // 9. Crear Usuario Gestor (Sin email requerido, case-insensitive, con primer login obligatorio de cambio de clave)
+    // 9. Crear Usuario Gestor
     case 'create_user':
         if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden crear usuarios."]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Solo los Super Administradores pueden crear usuarios."]);
         }
 
         $rawUsername = trim($bodyData['username'] ?? '');
@@ -853,14 +760,10 @@ switch ($action) {
         $permissions = trim($bodyData['permissions'] ?? 'blog');
 
         if (empty($username) || strlen($username) < 3) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "El nombre de usuario debe tener al menos 3 caracteres alfanuméricos (sin espacios ni @)."]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "El nombre de usuario debe tener al menos 3 caracteres alfanuméricos."]);
         }
         if (empty($password) || strlen($password) < 6) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "La contraseña provisoria debe tener al menos 6 caracteres."]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "La contraseña provisoria debe tener al menos 6 caracteres."]);
         }
 
         $newId = generateUUID();
@@ -871,14 +774,10 @@ switch ($action) {
             $pdo = getPDO();
             if ($pdo) {
                 ensureUserTableSchema($pdo);
-
-                // Chequear si el usuario ya existe (case-insensitive)
                 $check = $pdo->prepare("SELECT `id` FROM `User` WHERE LOWER(COALESCE(username, '')) = :u OR LOWER(email) = :u2 LIMIT 1");
                 $check->execute([':u' => $username, ':u2' => $internalEmail]);
                 if ($check->fetch()) {
-                    http_response_code(400);
-                    echo json_encode(["success" => false, "error" => "El nombre de usuario '$username' ya existe. Por favor elegí otro."]);
-                    exit;
+                    jsonResponse(400, ["success" => false, "error" => "El nombre de usuario '$username' ya existe."]);
                 }
 
                 $stmt = $pdo->prepare("
@@ -899,7 +798,6 @@ switch ($action) {
             error_log("Create user DB notice: " . $e->getMessage());
         }
 
-        // Guardar siempre en users.json como respaldo persistente
         $usersFile = __DIR__ . '/data/users.json';
         $localUsers = file_exists($usersFile) ? (json_decode(file_get_contents($usersFile), true) ?: []) : [];
         $localUsers = array_filter($localUsers, fn($u) => strtolower($u['username'] ?? '') !== $username && strtolower($u['email'] ?? '') !== $internalEmail);
@@ -918,22 +816,17 @@ switch ($action) {
         if (!is_dir(__DIR__ . '/data')) @mkdir(__DIR__ . '/data', 0755, true);
         @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        echo json_encode(["success" => true, "message" => "Usuario '$username' creado correctamente con solicitud de cambio de clave en el primer acceso."]);
-        break;
+        jsonResponse(200, ["success" => true, "message" => "Usuario '$username' creado correctamente."]);
 
     // 10. Eliminar Usuario
     case 'delete_user':
         if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden eliminar usuarios."]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Solo los Super Administradores pueden eliminar usuarios."]);
         }
 
         $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
         if ($id === 'fee-super-admin-01' || $id === ($session['userId'] ?? '')) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "No es posible eliminar el Administrador Principal o la cuenta activa."]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "No es posible eliminar el Administrador Principal o la cuenta activa."]);
         }
 
         try {
@@ -946,7 +839,6 @@ switch ($action) {
             error_log("Delete user DB notice: " . $e->getMessage());
         }
 
-        // Eliminar de users.json
         $usersFile = __DIR__ . '/data/users.json';
         if (file_exists($usersFile)) {
             $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
@@ -954,24 +846,19 @@ switch ($action) {
             @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
-        echo json_encode(["success" => true]);
-        break;
+        jsonResponse(200, ["success" => true]);
 
-    // 10b. Resetear Contraseña de Usuario (Solo Super Admin)
+    // 10b. Resetear Contraseña de Usuario
     case 'reset_user_password':
         if (($session['role'] ?? '') !== 'SUPER_ADMIN') {
-            http_response_code(403);
-            echo json_encode(["success" => false, "error" => "Solo los Super Administradores pueden resetear contraseñas."]);
-            exit;
+            jsonResponse(403, ["success" => false, "error" => "Solo los Super Administradores pueden resetear contraseñas."]);
         }
 
         $targetUserId = trim($bodyData['userId'] ?? '');
         $newPassword  = trim($bodyData['password'] ?? '');
 
         if (empty($targetUserId) || strlen($newPassword) < 6) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "ID de usuario y contraseña de al menos 6 caracteres requeridos."]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "ID de usuario y contraseña de al menos 6 caracteres requeridos."]);
         }
 
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -993,7 +880,6 @@ switch ($action) {
             error_log("Reset user password DB notice: " . $e->getMessage());
         }
 
-        // Actualizar en users.json
         $usersFile = __DIR__ . '/data/users.json';
         if (file_exists($usersFile)) {
             $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
@@ -1007,23 +893,18 @@ switch ($action) {
             @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
-        echo json_encode(["success" => true, "message" => "Contraseña restablecida exitosamente. Se solicitará cambio en el próximo ingreso."]);
-        break;
+        jsonResponse(200, ["success" => true, "message" => "Contraseña restablecida exitosamente."]);
 
-    // 11. Cambiar Contraseña (Por primer ingreso obligatorio o perfil)
+    // 11. Cambiar Contraseña
     case 'change_password':
         $userId = $session['userId'] ?? '';
-        $newPassword = trim($bodyData['newPassword'] ?? ($bodyData['password'] ?? ''));
+        $newPassword = (string)($bodyData['newPassword'] ?? ($bodyData['password'] ?? ''));
 
         if (empty($userId)) {
-            http_response_code(401);
-            echo json_encode(["success" => false, "error" => "Sesión no válida"]);
-            exit;
+            jsonResponse(401, ["success" => false, "error" => "Sesión no válida"]);
         }
         if (strlen($newPassword) < 6) {
-            http_response_code(400);
-            echo json_encode(["success" => false, "error" => "La nueva contraseña debe contener al menos 6 caracteres."]);
-            exit;
+            jsonResponse(400, ["success" => false, "error" => "La nueva contraseña debe contener al menos 6 caracteres."]);
         }
 
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -1044,7 +925,6 @@ switch ($action) {
             error_log("Change password DB notice: " . $e->getMessage());
         }
 
-        // Actualizar en users.json
         $usersFile = __DIR__ . '/data/users.json';
         if (file_exists($usersFile)) {
             $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
@@ -1058,42 +938,22 @@ switch ($action) {
             @file_put_contents($usersFile, json_encode(array_values($localUsers), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         }
 
-        // Actualizar sesión y renovar token sin flag de cambio de clave
         $session['mustChangePassword'] = false;
         $newToken = generateToken($session);
+        setSessionCookie($newToken);
 
-        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-        setcookie('admin_session', $newToken, [
-            'expires'  => time() + (60 * 60 * 24),
-            'path'     => '/',
-            'httponly' => true,
-            'secure'   => $isSecure,
-            'samesite' => 'Lax'
-        ]);
-
-        echo json_encode([
+        jsonResponse(200, [
             "success" => true,
             "message" => "Contraseña actualizada exitosamente.",
             "token"   => $newToken,
             "user"    => $session
         ]);
-        break;
 
     // 12. Cerrar Sesión
     case 'logout':
-        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
-        setcookie('admin_session', '', [
-            'expires'  => time() - 3600,
-            'path'     => '/',
-            'httponly' => true,
-            'secure'   => $isSecure,
-            'samesite' => 'Lax'
-        ]);
-        echo json_encode(["success" => true]);
-        break;
+        clearSessionCookie();
+        jsonResponse(200, ["success" => true]);
 
     default:
-        http_response_code(400);
-        echo json_encode(["success" => false, "error" => "Acción no reconocida"]);
-        break;
+        jsonResponse(400, ["success" => false, "error" => "Acción no reconocida"]);
 }
