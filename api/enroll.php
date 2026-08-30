@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 // ==============================================================================
-// FORMULARIO DE INSCRIPCIÓN SEGURO - FUNDACIÓN EDUCATIVA ESQUEL
+// MOTOR UNIFICADO DE ADMISIONES - FUNDACIÓN EDUCATIVA ESQUEL
 // ==============================================================================
 require_once __DIR__ . '/config.php';
 
@@ -27,7 +27,7 @@ if (time() - $attemptData['start'] > 60) {
     $attemptData = ['count' => 0, 'start' => time()];
 }
 
-if ($attemptData['count'] >= 10) {
+if ($attemptData['count'] >= 15) {
     http_response_code(429);
     echo json_encode(["success" => false, "error" => "Demasiadas solicitudes. Por favor espere un momento."]);
     exit;
@@ -46,303 +46,403 @@ if (!$data) {
 }
 
 // 2. Honeypot check para bots automatizados
-if (!empty($data['website_url']) || !empty($data['bot_check'])) {
-    // Responder con éxito falso para no alertar a los spammers
-    echo json_encode(["success" => true, "id" => "fake-" . time()]);
+if (!empty($data['website_url']) || !empty($data['bot_check']) || !empty($data['hp_field'])) {
+    echo json_encode(["success" => true, "id" => "sub-" . time()]);
     exit;
 }
 
-// Extraer campos de Reinscripción 2027
-$studentName  = htmlspecialchars(trim($data['studentName'] ?? ''), ENT_QUOTES, 'UTF-8');
-$studentDni   = preg_replace('/[^0-9]/', '', (string)($data['studentDni'] ?? ''));
-$school       = htmlspecialchars(trim($data['school'] ?? 'Escuela N.º 1030'), ENT_QUOTES, 'UTF-8');
-$studentGrade = htmlspecialchars(trim($data['studentGrade'] ?? ''), ENT_QUOTES, 'UTF-8');
-$studentLevel = htmlspecialchars(trim($data['studentLevel'] ?? ''), ENT_QUOTES, 'UTF-8');
-$hasSiblings  = !empty($data['hasSiblings']) ? 1 : 0;
-$siblingDetails = htmlspecialchars(trim($data['siblingDetails'] ?? ''), ENT_QUOTES, 'UTF-8');
-
-// Responsable 1
-$parent1Name         = htmlspecialchars(trim($data['parent1Name'] ?? ($data['tutorName'] ?? '')), ENT_QUOTES, 'UTF-8');
-$parent1Dni          = preg_replace('/[^0-9]/', '', (string)($data['parent1Dni'] ?? ''));
-$parent1Relationship = htmlspecialchars(trim($data['parent1Relationship'] ?? 'Madre/Padre/Tutor'), ENT_QUOTES, 'UTF-8');
-$parent1Phone        = htmlspecialchars(trim($data['parent1Phone'] ?? ($data['tutorPhone'] ?? '')), ENT_QUOTES, 'UTF-8');
-$parent1Email        = trim($data['parent1Email'] ?? ($data['tutorEmail'] ?? ''));
-$parent1Address      = htmlspecialchars(trim($data['parent1Address'] ?? ''), ENT_QUOTES, 'UTF-8');
-$parent1City         = htmlspecialchars(trim($data['parent1City'] ?? 'Esquel'), ENT_QUOTES, 'UTF-8');
-$parent1PostalCode   = htmlspecialchars(trim($data['parent1PostalCode'] ?? '9200'), ENT_QUOTES, 'UTF-8');
-
-// Responsable 2
-$isSingleParent      = !empty($data['isSingleParent']) ? 1 : 0;
-if ($isSingleParent) {
-    // Si declaró ser único responsable, limpiar cualquier dato residual
-    $parent2Name         = '';
-    $parent2Dni          = '';
-    $parent2Relationship = '';
-    $parent2Phone        = '';
-    $parent2Email        = '';
-    $parent2Address      = '';
-    $parent2City         = '';
-    $parent2PostalCode   = '';
-    $signature2Data      = null;
-} else {
-    $parent2Name         = htmlspecialchars(trim($data['parent2Name'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $parent2Dni          = preg_replace('/[^0-9]/', '', (string)($data['parent2Dni'] ?? ''));
-    $parent2Relationship = htmlspecialchars(trim($data['parent2Relationship'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $parent2Phone        = htmlspecialchars(trim($data['parent2Phone'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $parent2Email        = trim($data['parent2Email'] ?? '');
-    $parent2Address      = htmlspecialchars(trim($data['parent2Address'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $parent2City         = htmlspecialchars(trim($data['parent2City'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $parent2PostalCode   = htmlspecialchars(trim($data['parent2PostalCode'] ?? ''), ENT_QUOTES, 'UTF-8');
-    $signature2Data      = $data['signature2Data'] ?? null;
-}
-
-// Facturación
-$billingName         = htmlspecialchars(trim($data['billingName'] ?? $parent1Name), ENT_QUOTES, 'UTF-8');
-$billingCuit         = preg_replace('/[^0-9]/', '', (string)($data['billingCuit'] ?? $parent1Dni));
-$billingTaxCondition = htmlspecialchars(trim($data['billingTaxCondition'] ?? 'Consumidor Final'), ENT_QUOTES, 'UTF-8');
-$billingEmail        = trim($data['billingEmail'] ?? $parent1Email);
-$billingAddress      = htmlspecialchars(trim($data['billingAddress'] ?? $parent1Address), ENT_QUOTES, 'UTF-8');
-
-// Firmas y aceptación
-$contractAccepted    = !empty($data['contractAccepted']) ? 1 : 0;
-$dataAccepted        = !empty($data['dataAccepted']) ? 1 : 0;
-$termsAccepted       = !empty($data['termsAccepted']) ? 1 : 0;
-$signature1Data      = $data['signature1Data'] ?? null;
-$comments            = htmlspecialchars(trim($data['comments'] ?? ''), ENT_QUOTES, 'UTF-8');
-
-$enrollmentType = htmlspecialchars(trim($data['type'] ?? ''), ENT_QUOTES, 'UTF-8');
-if (empty($enrollmentType)) {
-    $enrollmentType = (!empty($data['signature1Data']) || !empty($studentDni)) ? 'reinscripcion_2027' : 'preinscripcion_general';
-}
-
-if ($enrollmentType === 'reinscripcion_2027') {
-    if (empty($studentName) || empty($studentDni) || empty($studentGrade) || empty($parent1Name) || empty($parent1Dni) || empty($parent1Email) || empty($parent1Phone)) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "Por favor complete todos los campos obligatorios del estudiante y responsable principal."]);
-        exit;
-    }
-
-    // Validar DNI (7 u 8 dígitos)
-    if (strlen($studentDni) < 7 || strlen($studentDni) > 8) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "El DNI del estudiante debe tener 7 u 8 dígitos numéricos válidos."]);
-        exit;
-    }
-    if (strlen($parent1Dni) < 7 || strlen($parent1Dni) > 8) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "El DNI del Responsable 1 debe tener 7 u 8 dígitos numéricos válidos."]);
-        exit;
-    }
-    if (!$isSingleParent && !empty($parent2Dni) && (strlen($parent2Dni) < 7 || strlen($parent2Dni) > 8)) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "El DNI del Responsable 2 debe tener 7 u 8 dígitos numéricos válidos."]);
-        exit;
-    }
-
-    // Validar CUIT (8 u 11 dígitos)
-    if (strlen($billingCuit) !== 8 && strlen($billingCuit) !== 11) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "El CUIT / DNI de facturación debe contener 8 u 11 dígitos numéricos."]);
-        exit;
-    }
-
-    // Validar Domicilio no sea únicamente numérico
-    if (!empty($parent1Address) && preg_match('/^[\d\s\-\+\(\)\.\,\/]+$/', $parent1Address)) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "El domicilio debe incluir calle y número (no puede ser un número de teléfono)."]);
-        exit;
-    }
-} else {
-    // Preinscripción general (Aspirantes nuevos)
-    if (empty($studentName) || empty($parent1Name) || empty($parent1Email) || empty($parent1Phone)) {
-        http_response_code(422);
-        echo json_encode(["success" => false, "error" => "Por favor complete los campos obligatorios (Nombre del aspirante, Tutor, Email y Teléfono)."]);
-        exit;
-    }
-}
-
-if (!filter_var($parent1Email, FILTER_VALIDATE_EMAIL)) {
-    http_response_code(422);
-    echo json_encode(["success" => false, "error" => "El correo electrónico del contacto no es válido."]);
+$pdo = getPDO();
+if (!$pdo) {
+    http_response_code(500);
+    echo json_encode(["success" => false, "error" => "Error de conexión a base de datos."]);
     exit;
 }
 
-$id = generateUUID();
-$trackingNumber = ($enrollmentType === 'reinscripcion_2027' ? 'FEE-2027-' : 'PRE-') . strtoupper(substr(md5(uniqid()), 0, 5));
-$now = date('Y-m-d H:i:s');
-
-$record = [
-    'id'                  => $id,
-    'type'                => $enrollmentType,
-    'trackingNumber'      => $trackingNumber,
-    'studentName'         => $studentName,
-    'studentDni'          => $studentDni,
-    'school'              => $school,
-    'studentLevel'        => $studentLevel,
-    'studentGrade'        => $studentGrade,
-    'hasSiblings'         => $hasSiblings,
-    'siblingDetails'      => $siblingDetails,
-    'parent1Name'         => $parent1Name,
-    'tutorName'           => $parent1Name,
-    'parent1Dni'          => $parent1Dni,
-    'parent1Relationship' => $parent1Relationship,
-    'parent1Phone'        => $parent1Phone,
-    'tutorPhone'          => $parent1Phone,
-    'parent1Email'        => $parent1Email,
-    'tutorEmail'          => $parent1Email,
-    'parent1Address'      => $parent1Address,
-    'parent1City'         => $parent1City,
-    'parent1PostalCode'   => $parent1PostalCode,
-    'isSingleParent'      => $isSingleParent,
-    'parent2Name'         => $parent2Name,
-    'parent2Dni'          => $parent2Dni,
-    'parent2Relationship' => $parent2Relationship,
-    'parent2Phone'        => $parent2Phone,
-    'parent2Email'        => $parent2Email,
-    'parent2Address'      => $parent2Address,
-    'parent2City'         => $parent2City,
-    'parent2PostalCode'   => $parent2PostalCode,
-    'billingName'         => $billingName,
-    'billingCuit'         => $billingCuit,
-    'billingTaxCondition' => $billingTaxCondition,
-    'billingEmail'        => $billingEmail,
-    'billingAddress'      => $billingAddress,
-    'contractAccepted'    => $contractAccepted,
-    'dataAccepted'        => $dataAccepted,
-    'termsAccepted'       => $termsAccepted,
-    'signature1Data'      => $signature1Data,
-    'signature2Data'      => $signature2Data,
-    'comments'            => $comments,
-    'status'              => 'PENDING',
-    'contractVersion'     => '2027.v1',
-    'createdAt'           => $now,
-];
-
-// 3. Guardar en almacenamiento protegido con flock y límite de tamaño
-$dataDir = __DIR__ . '/data';
-if (!is_dir($dataDir)) {
-    @mkdir($dataDir, 0750, true);
-}
-$dataFile = $dataDir . '/enrollments.json';
-$fp = @fopen($dataFile, 'c+');
-if ($fp) {
-    if (flock($fp, LOCK_EX)) {
-        $filesize = filesize($dataFile);
-        $existing = [];
-        if ($filesize > 0) {
-            $content = fread($fp, $filesize);
-            $existing = json_decode($content, true) ?: [];
-        }
-        array_unshift($existing, $record);
-        if (count($existing) > 1000) {
-            $existing = array_slice($existing, 0, 1000);
-        }
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        fflush($fp);
-        flock($fp, LOCK_UN);
-    }
-    fclose($fp);
+// Helper sanitizador
+function cleanStr($val, $maxLen = 191) {
+    if ($val === null) return '';
+    $clean = htmlspecialchars(trim((string)$val), ENT_QUOTES, 'UTF-8');
+    return mb_substr($clean, 0, $maxLen);
 }
 
-// 4. Sincronizar en tiempo real con Google Sheets
-$googlePayload = [
-    'type'           => 'reinscripcion_2027',
-    'id'             => $id,
-    'trackingNumber' => $trackingNumber,
-    'studentName'    => $studentName,
-    'studentDni'     => $studentDni,
-    'school'         => $school,
-    'studentGrade'   => $studentGrade,
-    'parent1Name'    => $parent1Name,
-    'parent1Phone'   => $parent1Phone,
-    'parent1Email'   => $parent1Email,
-    'parent2Name'    => $isSingleParent ? 'Único Responsable' : $parent2Name,
-    'billingName'    => $billingName,
-    'billingCuit'    => $billingCuit,
-    'contractVersion'=> '2027.v1',
-    'createdAt'      => $now
-];
-syncToGoogleSheets($googlePayload);
+function cleanDigits($val) {
+    if (!$val) return '';
+    return preg_replace('/[^0-9]/', '', (string)$val);
+}
 
-// 5. Guardar en MySQL
+$submissionUuid = cleanStr($data['submissionUuid'] ?? '', 36);
+if (empty($submissionUuid)) {
+    $submissionUuid = generateUUID();
+}
+
+// 3. Idempotencia: Verificar si este UUID ya fue procesado
+$stmtCheckUuid = $pdo->prepare("SELECT `id`, `trackingNumber` FROM `Enrollment` WHERE `submissionUuid` = :uuid LIMIT 1");
+$stmtCheckUuid->execute([':uuid' => $submissionUuid]);
+$existingSubmission = $stmtCheckUuid->fetch();
+if ($existingSubmission) {
+    echo json_encode([
+        "success" => true,
+        "id" => $existingSubmission['id'],
+        "trackingNumber" => $existingSubmission['trackingNumber'],
+        "message" => "Solicitud recuperada con éxito."
+    ]);
+    exit;
+}
+
+$enrollmentType = cleanStr($data['type'] ?? 'preinscripcion_2027');
+$isPreinscripcion = ($enrollmentType === 'preinscripcion_general' || $enrollmentType === 'preinscripcion_2027' || $enrollmentType === 'preinscripcion');
+$formCohort = (int)($data['cohortYear'] ?? 2027);
+
 try {
-    $pdo = getPDO();
-    if ($pdo) {
-        ensureEnrollmentTableSchema($pdo);
-        $stmt = $pdo->prepare("
+    $pdo->beginTransaction();
+
+    // 4. Validar estado de la Cohorte en el Servidor
+    $cohortType = $isPreinscripcion ? 'preinscripcion' : 'reinscripcion';
+    $stmtCohortCheck = $pdo->prepare("
+        SELECT `status`, `year` 
+        FROM `Cohort` 
+        WHERE `type` = :type AND `year` = :year 
+        FOR UPDATE
+    ");
+    $stmtCohortCheck->execute([':type' => $cohortType, ':year' => $formCohort]);
+    $activeCohort = $stmtCohortCheck->fetch();
+
+    if (!$activeCohort || $activeCohort['status'] !== 'abierta') {
+        $pdo->rollBack();
+        http_response_code(409);
+        $closedMsg = $isPreinscripcion 
+            ? "El período de Preinscripción para Ingresantes no se encuentra activo."
+            : "El período oficial de Reinscripción ha finalizado. Por favor comuníquese con la administración escolar.";
+        echo json_encode([
+            "success" => false,
+            "error" => $closedMsg,
+            "code" => "CONVOCATORIA_CERRADA"
+        ]);
+        exit;
+    }
+
+    $id = generateUUID();
+    $trackingPrefix = $isPreinscripcion ? 'PRE' : 'FEE';
+    $trackingNumber = "{$trackingPrefix}-{$formCohort}-" . strtoupper(substr(md5($id . microtime()), 0, 6));
+
+    // Datos comunes del estudiante
+    $studentName = cleanStr($data['studentName'] ?? '');
+    $studentDni  = cleanDigits($data['studentDni'] ?? '');
+    $school      = cleanStr($data['school'] ?? 'Escuela N.º 1030', 100);
+    $studentGrade = cleanStr($data['studentGrade'] ?? '', 100);
+    $studentLevel = cleanStr($data['studentLevel'] ?? '', 50);
+
+    if (empty($studentName) || empty($studentDni) || empty($studentGrade)) {
+        throw new Exception("Nombre, DNI y curso/sala del estudiante son campos obligatorios.");
+    }
+
+    // =========================================================================
+    // FLUJO PREINSCRIPCIÓN (NUEVOS INGRESANTES)
+    // =========================================================================
+    if ($isPreinscripcion) {
+        $studentGender     = cleanStr($data['studentGender'] ?? '', 20);
+        $studentBirthDate  = !empty($data['studentBirthDate']) ? cleanStr($data['studentBirthDate'], 10) : null;
+        $studentNationality = cleanStr($data['studentNationality'] ?? 'Argentina', 60);
+        $studentBirthPlace = cleanStr($data['studentBirthPlace'] ?? 'Esquel', 100);
+        
+        $currentSchool     = cleanStr($data['currentSchool'] ?? '');
+        $currentSchoolType = in_array($data['currentSchoolType'] ?? '', ['publica', 'privada', 'otra']) ? $data['currentSchoolType'] : 'publica';
+        $hasDebtClearance  = !empty($data['hasDebtClearance']) ? 1 : 0;
+        $hasRepeated       = !empty($data['hasRepeated']) ? 1 : 0;
+        $repeatedGrade     = cleanStr($data['repeatedGrade'] ?? '', 60);
+        $pendingSubjects   = cleanStr($data['pendingSubjects'] ?? '', 500);
+
+        // Prioridades
+        $isStaffChild      = !empty($data['isStaffChild']) ? 1 : 0;
+        $staffMemberName   = cleanStr($data['staffMemberName'] ?? '');
+        $staffMemberDni    = cleanDigits($data['staffMemberDni'] ?? '');
+        $hasSiblingInSchool = !empty($data['hasSiblingInSchool']) ? 1 : 0;
+        $siblingDni        = cleanDigits($data['siblingDni'] ?? '');
+        $siblingCurrentGrade = cleanStr($data['siblingCurrentGrade'] ?? '');
+
+        // Requisitos de Inglés
+        $englishAccreditationType = cleanStr($data['englishAccreditationType'] ?? 'ninguno', 30);
+        $englishInstituteName     = cleanStr($data['englishInstituteName'] ?? '');
+        $englishLevelAchieved     = cleanStr($data['englishLevelAchieved'] ?? '', 100);
+
+        // Progenitores
+        $parent1Name       = cleanStr($data['parent1Name'] ?? ($data['tutorName'] ?? ''));
+        $parent1Dni        = cleanDigits($data['parent1Dni'] ?? '');
+        $parent1Relationship = cleanStr($data['parent1Relationship'] ?? 'Padre/Madre/Tutor', 100);
+        $parent1Phone      = cleanStr($data['parent1Phone'] ?? ($data['tutorPhone'] ?? ''), 50);
+        $parent1Email      = cleanStr($data['parent1Email'] ?? ($data['tutorEmail'] ?? ''), 191);
+        $parent1Address    = cleanStr($data['parent1Address'] ?? '', 255);
+        $parent1City       = cleanStr($data['parent1City'] ?? 'Esquel', 100);
+        $parent1PostalCode = cleanStr($data['parent1PostalCode'] ?? '9200', 50);
+        $parent1Occupation = cleanStr($data['parent1Occupation'] ?? '');
+
+        $isSingleParent    = !empty($data['isSingleParent']) ? 1 : 0;
+        $parent2Name       = $isSingleParent ? '' : cleanStr($data['parent2Name'] ?? '');
+        $parent2Dni        = $isSingleParent ? '' : cleanDigits($data['parent2Dni'] ?? '');
+        $parent2Relationship = $isSingleParent ? '' : cleanStr($data['parent2Relationship'] ?? 'Madre/Padre/Tutora', 100);
+        $parent2Phone      = $isSingleParent ? '' : cleanStr($data['parent2Phone'] ?? '', 50);
+        $parent2Email      = $isSingleParent ? '' : cleanStr($data['parent2Email'] ?? '', 191);
+        $parent2Occupation = $isSingleParent ? '' : cleanStr($data['parent2Occupation'] ?? '');
+
+        // Contactos y Salud
+        $emergencyContactName  = cleanStr($data['emergencyContactName'] ?? '');
+        $emergencyContactPhone = cleanStr($data['emergencyContactPhone'] ?? '', 50);
+        $legalCustodyInfo      = cleanStr($data['legalCustodyInfo'] ?? '', 500);
+        $authorizedPickups     = cleanStr($data['authorizedPickups'] ?? '', 500);
+        $healthDisabilities    = cleanStr($data['healthDisabilities'] ?? '', 500);
+        $healthAllergiesMedication = cleanStr($data['healthAllergiesMedication'] ?? '', 500);
+
+        // Turno de Entrevista (InterviewSlot)
+        $interviewSlotId = !empty($data['interviewSlotId']) ? (int)$data['interviewSlotId'] : null;
+        $admissionStatus = 'recibida';
+
+        if ($interviewSlotId) {
+            // Reserva atómica con comprobación de capacidad
+            $stmtReserve = $pdo->prepare("
+                UPDATE `InterviewSlot` 
+                SET `booked` = `booked` + 1 
+                WHERE `id` = :slotId AND `booked` < `capacity` AND `isActive` = 1
+            ");
+            $stmtReserve->execute([':slotId' => $interviewSlotId]);
+
+            if ($stmtReserve->rowCount() === 0) {
+                $pdo->rollBack();
+                http_response_code(409);
+                echo json_encode([
+                    "success" => false,
+                    "error" => "El turno de entrevista seleccionado acaba de agotarse. Por favor seleccione otro horario.",
+                    "code" => "SLOT_FULL"
+                ]);
+                exit;
+            }
+            $admissionStatus = 'entrevista_agendada';
+        }
+
+        // Marcar trámites anteriores del mismo aspirante en esta cohorte como reemplazados
+        $stmtReplaceOld = $pdo->prepare("
+            UPDATE `Enrollment` 
+            SET `status` = 'reemplazado' 
+            WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'preinscripcion_2027' AND `status` = 'vigente'
+        ");
+        $stmtReplaceOld->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
+
+        // Insertar Preinscripción
+        $stmtInsert = $pdo->prepare("
             INSERT INTO `Enrollment` (
-                `id`, `type`, `trackingNumber`, `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
-                `hasSiblings`, `siblingDetails`, `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`,
-                `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`, `isSingleParent`, `parent2Name`,
-                `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Address`, `parent2City`,
-                `parent2PostalCode`, `billingName`, `billingCuit`, `billingTaxCondition`, `billingEmail`, `billingAddress`,
-                `contractAccepted`, `dataAccepted`, `termsAccepted`, `signature1Data`, `signature2Data`,
-                `tutorName`, `tutorEmail`, `tutorPhone`, `comments`, `status`, `contractVersion`, `createdAt`
-            )
-            VALUES (
-                :id, :type, :trackingNumber, :studentName, :studentDni, :school, :studentLevel, :studentGrade,
-                :hasSiblings, :siblingDetails, :parent1Name, :parent1Dni, :parent1Relationship, :parent1Phone,
-                :parent1Email, :parent1Address, :parent1City, :parent1PostalCode, :isSingleParent, :parent2Name,
-                :parent2Dni, :parent2Relationship, :parent2Phone, :parent2Email, :parent2Address, :parent2City,
-                :parent2PostalCode, :billingName, :billingCuit, :billingTaxCondition, :billingEmail, :billingAddress,
-                :contractAccepted, :dataAccepted, :termsAccepted, :signature1Data, :signature2Data,
-                :tutorName, :tutorEmail, :tutorPhone, :comments, 'PENDING', '2027.v1', NOW(3)
+                `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
+                `studentName`, `studentDni`, `studentGender`, `studentBirthDate`, `studentNationality`, `studentBirthPlace`,
+                `school`, `studentLevel`, `studentGrade`,
+                `currentSchool`, `currentSchoolType`, `hasDebtClearance`, `hasRepeated`, `repeatedGrade`, `pendingSubjects`,
+                `isStaffChild`, `staffMemberName`, `staffMemberDni`, `hasSiblingInSchool`, `siblingDni`, `siblingCurrentGrade`,
+                `englishAccreditationType`, `englishInstituteName`, `englishLevelAchieved`,
+                `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`, `parent1Occupation`,
+                `isSingleParent`, `parent2Name`, `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Occupation`,
+                `emergencyContactName`, `emergencyContactPhone`, `legalCustodyInfo`, `authorizedPickups`, `healthDisabilities`, `healthAllergiesMedication`,
+                `interviewSlotId`, `admissionStatus`, `termsVersion`, `comments`, `createdAt`, `updatedAt`
+            ) VALUES (
+                :id, :uuid, :tracking, 'preinscripcion_2027', :cohort, 'vigente',
+                :stuName, :stuDni, :stuGender, :stuBirthDate, :stuNat, :stuBirthPlace,
+                :school, :stuLevel, :stuGrade,
+                :curSchool, :curSchoolType, :debtClear, :repeated, :repGrade, :pendingSub,
+                :isStaff, :staffName, :staffDni, :hasSib, :sibDni, :sibGrade,
+                :engType, :engInst, :engLvl,
+                :p1Name, :p1Dni, :p1Rel, :p1Phone, :p1Email, :p1Address, :p1City, :p1Cp, :p1Occ,
+                :singleP, :p2Name, :p2Dni, :p2Rel, :p2Phone, :p2Email, :p2Occ,
+                :emName, :emPhone, :custody, :pickups, :hDis, :hAllergies,
+                :slotId, :admStatus, '2027.pre.v1', :comments, NOW(3), NOW(3)
             )
         ");
-        $stmt->execute([
-            ':id'                  => $id,
-            ':type'                => $enrollmentType,
-            ':trackingNumber'      => $trackingNumber,
-            ':studentName'         => $studentName,
-            ':studentDni'          => $studentDni,
-            ':school'              => $school,
-            ':studentLevel'        => $studentLevel,
-            ':studentGrade'        => $studentGrade,
-            ':hasSiblings'         => $hasSiblings,
-            ':siblingDetails'      => $siblingDetails,
-            ':parent1Name'         => $parent1Name,
-            ':parent1Dni'          => $parent1Dni,
-            ':parent1Relationship' => $parent1Relationship,
-            ':parent1Phone'        => $parent1Phone,
-            ':parent1Email'        => $parent1Email,
-            ':parent1Address'      => $parent1Address,
-            ':parent1City'         => $parent1City,
-            ':parent1PostalCode'   => $parent1PostalCode,
-            ':isSingleParent'      => $isSingleParent,
-            ':parent2Name'         => $parent2Name,
-            ':parent2Dni'          => $parent2Dni,
-            ':parent2Relationship' => $parent2Relationship,
-            ':parent2Phone'        => $parent2Phone,
-            ':parent2Email'        => $parent2Email,
-            ':parent2Address'      => $parent2Address,
-            ':parent2City'         => $parent2City,
-            ':parent2PostalCode'   => $parent2PostalCode,
-            ':billingName'         => $billingName,
-            ':billingCuit'         => $billingCuit,
-            ':billingTaxCondition' => $billingTaxCondition,
-            ':billingEmail'        => $billingEmail,
-            ':billingAddress'      => $billingAddress,
-            ':contractAccepted'    => $contractAccepted,
-            ':dataAccepted'        => $dataAccepted,
-            ':termsAccepted'       => $termsAccepted,
-            ':signature1Data'      => $signature1Data,
-            ':signature2Data'      => $signature2Data,
-            ':tutorName'           => $parent1Name,
-            ':tutorEmail'          => $parent1Email,
-            ':tutorPhone'          => $parent1Phone,
-            ':comments'            => $comments
+
+        $stmtInsert->execute([
+            ':id' => $id,
+            ':uuid' => $submissionUuid,
+            ':tracking' => $trackingNumber,
+            ':cohort' => $formCohort,
+            ':stuName' => $studentName,
+            ':stuDni' => $studentDni,
+            ':stuGender' => $studentGender,
+            ':stuBirthDate' => $studentBirthDate,
+            ':stuNat' => $studentNationality,
+            ':stuBirthPlace' => $studentBirthPlace,
+            ':school' => $school,
+            ':stuLevel' => $studentLevel,
+            ':stuGrade' => $studentGrade,
+            ':curSchool' => $currentSchool,
+            ':curSchoolType' => $currentSchoolType,
+            ':debtClear' => $hasDebtClearance,
+            ':repeated' => $hasRepeated,
+            ':repGrade' => $repeatedGrade,
+            ':pendingSub' => $pendingSubjects,
+            ':isStaff' => $isStaffChild,
+            ':staffName' => $staffMemberName,
+            ':staffDni' => $staffMemberDni,
+            ':hasSib' => $hasSiblingInSchool,
+            ':sibDni' => $siblingDni,
+            ':sibGrade' => $siblingCurrentGrade,
+            ':engType' => $englishAccreditationType,
+            ':engInst' => $englishInstituteName,
+            ':engLvl' => $englishLevelAchieved,
+            ':p1Name' => $parent1Name,
+            ':p1Dni' => $parent1Dni,
+            ':p1Rel' => $parent1Relationship,
+            ':p1Phone' => $parent1Phone,
+            ':p1Email' => $parent1Email,
+            ':p1Address' => $parent1Address,
+            ':p1City' => $parent1City,
+            ':p1Cp' => $parent1PostalCode,
+            ':p1Occ' => $parent1Occupation,
+            ':singleP' => $isSingleParent,
+            ':p2Name' => $parent2Name,
+            ':p2Dni' => $parent2Dni,
+            ':p2Rel' => $parent2Relationship,
+            ':p2Phone' => $parent2Phone,
+            ':p2Email' => $parent2Email,
+            ':p2Occ' => $parent2Occupation,
+            ':emName' => $emergencyContactName,
+            ':emPhone' => $emergencyContactPhone,
+            ':custody' => $legalCustodyInfo,
+            ':pickups' => $authorizedPickups,
+            ':hDis' => $healthDisabilities,
+            ':hAllergies' => $healthAllergiesMedication,
+            ':slotId' => $interviewSlotId,
+            ':admStatus' => $admissionStatus,
+            ':comments' => cleanStr($data['comments'] ?? '', 1000)
+        ]);
+
+    } else {
+        // =====================================================================
+        // FLUJO REINSCRIPCIÓN (ALUMNOS REGULARES CON CONTRATO Y FIRMAS)
+        // =========================================================================
+        $hasSiblings       = !empty($data['hasSiblings']) ? 1 : 0;
+        $siblingDetails    = cleanStr($data['siblingDetails'] ?? '', 500);
+        $parent1Name       = cleanStr($data['parent1Name'] ?? ($data['tutorName'] ?? ''));
+        $parent1Dni        = cleanDigits($data['parent1Dni'] ?? '');
+        $parent1Relationship = cleanStr($data['parent1Relationship'] ?? 'Madre/Padre/Tutor', 100);
+        $parent1Phone      = cleanStr($data['parent1Phone'] ?? ($data['tutorPhone'] ?? ''), 50);
+        $parent1Email      = cleanStr($data['parent1Email'] ?? ($data['tutorEmail'] ?? ''), 191);
+        $parent1Address    = cleanStr($data['parent1Address'] ?? '', 255);
+        $parent1City       = cleanStr($data['parent1City'] ?? 'Esquel', 100);
+        $parent1PostalCode = cleanStr($data['parent1PostalCode'] ?? '9200', 50);
+
+        $isSingleParent    = !empty($data['isSingleParent']) ? 1 : 0;
+        $parent2Name       = $isSingleParent ? '' : cleanStr($data['parent2Name'] ?? '');
+        $parent2Dni        = $isSingleParent ? '' : cleanDigits($data['parent2Dni'] ?? '');
+        $parent2Relationship = $isSingleParent ? '' : cleanStr($data['parent2Relationship'] ?? '', 100);
+        $parent2Phone      = $isSingleParent ? '' : cleanStr($data['parent2Phone'] ?? '', 50);
+        $parent2Email      = $isSingleParent ? '' : cleanStr($data['parent2Email'] ?? '', 191);
+        $parent2Address    = $isSingleParent ? '' : cleanStr($data['parent2Address'] ?? '', 255);
+        $parent2City       = $isSingleParent ? '' : cleanStr($data['parent2City'] ?? 'Esquel', 100);
+        $parent2PostalCode = $isSingleParent ? '' : cleanStr($data['parent2PostalCode'] ?? '9200', 50);
+        $signature2Data    = $isSingleParent ? null : ($data['signature2Data'] ?? null);
+
+        $billingName       = cleanStr($data['billingName'] ?? $parent1Name);
+        $billingCuit       = cleanDigits($data['billingCuit'] ?? $parent1Dni);
+        $billingTaxCondition = cleanStr($data['billingTaxCondition'] ?? 'Consumidor Final', 100);
+        $billingEmail      = cleanStr($data['billingEmail'] ?? $parent1Email, 191);
+        $billingAddress    = cleanStr($data['billingAddress'] ?? $parent1Address, 255);
+        $signature1Data    = $data['signature1Data'] ?? null;
+
+        // Marcar trámite previo del mismo estudiante como reemplazado
+        $stmtReplaceRe = $pdo->prepare("
+            UPDATE `Enrollment` 
+            SET `status` = 'reemplazado' 
+            WHERE `studentDni` = :dni AND `cohortYear` = :cohort AND `type` = 'reinscripcion_2027' AND `status` = 'vigente'
+        ");
+        $stmtReplaceRe->execute([':dni' => $studentDni, ':cohort' => $formCohort]);
+
+        $stmtInsert = $pdo->prepare("
+            INSERT INTO `Enrollment` (
+                `id`, `submissionUuid`, `trackingNumber`, `type`, `cohortYear`, `status`,
+                `studentName`, `studentDni`, `school`, `studentLevel`, `studentGrade`,
+                `hasSiblings`, `siblingDetails`,
+                `parent1Name`, `parent1Dni`, `parent1Relationship`, `parent1Phone`, `parent1Email`, `parent1Address`, `parent1City`, `parent1PostalCode`,
+                `isSingleParent`, `parent2Name`, `parent2Dni`, `parent2Relationship`, `parent2Phone`, `parent2Email`, `parent2Address`, `parent2City`, `parent2PostalCode`,
+                `billingName`, `billingCuit`, `billingTaxCondition`, `billingEmail`, `billingAddress`,
+                `contractAccepted`, `dataAccepted`, `termsAccepted`,
+                `signature1Data`, `signature2Data`, `comments`, `createdAt`, `updatedAt`
+            ) VALUES (
+                :id, :uuid, :tracking, 'reinscripcion_2027', :cohort, 'vigente',
+                :stuName, :stuDni, :school, :stuLevel, :stuGrade,
+                :hasSib, :sibDetails,
+                :p1Name, :p1Dni, :p1Rel, :p1Phone, :p1Email, :p1Address, :p1City, :p1Cp,
+                :singleP, :p2Name, :p2Dni, :p2Rel, :p2Phone, :p2Email, :p2Address, :p2City, :p2Cp,
+                :billName, :billCuit, :billTax, :billEmail, :billAddress,
+                1, 1, 1,
+                :sig1, :sig2, :comments, NOW(3), NOW(3)
+            )
+        ");
+
+        $stmtInsert->execute([
+            ':id' => $id,
+            ':uuid' => $submissionUuid,
+            ':tracking' => $trackingNumber,
+            ':cohort' => $formCohort,
+            ':stuName' => $studentName,
+            ':stuDni' => $studentDni,
+            ':school' => $school,
+            ':stuLevel' => $studentLevel,
+            ':stuGrade' => $studentGrade,
+            ':hasSib' => $hasSiblings,
+            ':sibDetails' => $siblingDetails,
+            ':p1Name' => $parent1Name,
+            ':p1Dni' => $parent1Dni,
+            ':p1Rel' => $parent1Relationship,
+            ':p1Phone' => $parent1Phone,
+            ':p1Email' => $parent1Email,
+            ':p1Address' => $parent1Address,
+            ':p1City' => $parent1City,
+            ':p1Cp' => $parent1PostalCode,
+            ':singleP' => $isSingleParent,
+            ':p2Name' => $parent2Name,
+            ':p2Dni' => $parent2Dni,
+            ':p2Rel' => $parent2Relationship,
+            ':p2Phone' => $parent2Phone,
+            ':p2Email' => $parent2Email,
+            ':p2Address' => $parent2Address,
+            ':p2City' => $parent2City,
+            ':p2Cp' => $parent2PostalCode,
+            ':billName' => $billingName,
+            ':billCuit' => $billingCuit,
+            ':billTax' => $billingTaxCondition,
+            ':billEmail' => $billingEmail,
+            ':billAddress' => $billingAddress,
+            ':sig1' => $signature1Data,
+            ':sig2' => $signature2Data,
+            ':comments' => cleanStr($data['comments'] ?? '', 1000)
         ]);
     }
-} catch (Exception $e) {
-    error_log("Enrollment DB save notice: " . $e->getMessage());
-}
 
-echo json_encode([
-    "success"        => true,
-    "id"             => $id,
-    "trackingNumber" => $trackingNumber,
-    "message"        => "Su solicitud de reinscripción para el ciclo lectivo 2027 fue recibida correctamente. La presentación del formulario no implica la confirmación automática de la vacante. La Fundación verificará el cumplimiento de los requisitos administrativos y arancelarios y comunicará posteriormente la confirmación de la reinscripción."
-]);
-?>
+    $pdo->commit();
+
+    // Sincronización asíncrona a Google Sheets
+    syncToGoogleSheets([
+        "id" => $id,
+        "trackingNumber" => $trackingNumber,
+        "type" => $isPreinscripcion ? 'preinscripcion_2027' : 'reinscripcion_2027',
+        "cohort" => $formCohort,
+        "studentName" => $studentName,
+        "studentDni" => $studentDni,
+        "school" => $school,
+        "studentGrade" => $studentGrade,
+        "parent1Name" => $parent1Name,
+        "parent1Phone" => $parent1Phone,
+        "parent1Email" => $parent1Email,
+        "createdAt" => date('Y-m-d H:i:s')
+    ]);
+
+    echo json_encode([
+        "success" => true,
+        "id" => $id,
+        "trackingNumber" => $trackingNumber,
+        "type" => $isPreinscripcion ? 'preinscripcion' : 'reinscripcion',
+        "message" => "Trámite procesado exitosamente."
+    ]);
+
+} catch (Exception $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    http_response_code(500);
+    echo json_encode([
+        "success" => false,
+        "error" => $e->getMessage()
+    ]);
+}

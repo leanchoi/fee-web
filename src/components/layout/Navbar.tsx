@@ -20,7 +20,30 @@ const links = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [admissionsMode, setAdmissionsMode] = useState<"reinscripciones" | "preinscripciones" | "cerrado">("reinscripciones");
   const pathname = usePathname();
+
+  useEffect(() => {
+    // 1. Lectura inmediata de cache local para 0ms flash
+    try {
+      const cached = JSON.parse(sessionStorage.getItem("fee_admissions_mode") || "{}");
+      if (cached.mode) {
+        setAdmissionsMode(cached.mode);
+      }
+    } catch {}
+
+    // 2. Fetch fresco a settings.php
+    fetch("/api/settings.php", { credentials: "same-origin" })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.mode) {
+          setAdmissionsMode(data.mode);
+          sessionStorage.setItem("fee_admissions_mode", JSON.stringify({ mode: data.mode, t: Date.now() }));
+          document.documentElement.dataset.admissions = data.mode;
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -32,6 +55,14 @@ export function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  const ctaLabel = admissionsMode === "preinscripciones" 
+    ? "Preinscripciones 2027" 
+    : (admissionsMode === "reinscripciones" ? "Reinscripciones 2027" : "Inscripciones");
+  
+  const ctaHref = admissionsMode === "preinscripciones"
+    ? "/preinscripciones"
+    : (admissionsMode === "reinscripciones" ? "/reinscripciones" : "/inscripciones");
 
   return (
     <header
@@ -89,12 +120,14 @@ export function Navbar() {
               />
             </Link>
           ))}
-          <Link
-            href="/inscripciones"
-            className="bg-brand-green text-white px-6 py-2.5 rounded-full text-sm font-semibold shadow-md shadow-brand-green/20 hover:bg-brand-blue hover:shadow-lg transition-all hover:-translate-y-0.5"
-          >
-            Inscripciones
-          </Link>
+          <div className="min-w-[190px] flex justify-end">
+            <Link
+              href={ctaHref}
+              className="bg-brand-green text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow-md shadow-brand-green/20 hover:bg-brand-blue hover:shadow-lg transition-all hover:-translate-y-0.5 whitespace-nowrap"
+            >
+              {ctaLabel}
+            </Link>
+          </div>
           <Link
             href="/admin"
             className="text-brand-blue/30 hover:text-brand-blue transition-colors p-2.5 rounded-full flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-green"

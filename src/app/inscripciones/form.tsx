@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   FileText, 
   Download, 
@@ -108,6 +108,20 @@ export function EnrollmentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ trackingNumber: string } | null>(null);
+  const [isConvocatoriaAbierta, setIsConvocatoriaAbierta] = useState(true);
+  const [closedMessage, setClosedMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings.php", { credentials: "same-origin" })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.reinscripciones) {
+          setIsConvocatoriaAbierta(data.reinscripciones.isOpen);
+          setClosedMessage(data.reinscripciones.closedMessage || "El período de reinscripción ha concluido.");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Cursos disponibles para el nivel seleccionado
   const currentLevel = (formData.studentLevel as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
@@ -380,6 +394,28 @@ export function EnrollmentForm() {
       setIsSubmitting(false);
     }
   };
+
+  // Pantalla de convocatoria cerrada
+  if (!isConvocatoriaAbierta && !successData) {
+    return (
+      <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-200 text-center max-w-xl mx-auto space-y-5">
+        <div className="w-16 h-16 bg-amber-100 text-amber-800 rounded-full flex items-center justify-center mx-auto shadow-md">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <span className="inline-block bg-amber-100 text-amber-900 text-xs font-black uppercase tracking-widest px-3.5 py-1 rounded-full border border-amber-300">
+          Convocatoria Cerrada
+        </span>
+        <h2 className="text-2xl font-black text-slate-900">Período de Reinscripción Finalizado</h2>
+        <p className="text-sm text-slate-600 leading-relaxed">{closedMessage}</p>
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 space-y-1 text-left">
+          <p className="font-bold text-slate-800">Canales de Contacto Administrativo:</p>
+          <p>• Escuela N.º 1030 (Inicial y Primario): +54 2945 45-1030</p>
+          <p>• Escuela N.º 1739 (Secundario): +54 2945 45-1739</p>
+          <p>• Email: administracion@fundacionesquel.edu.ar</p>
+        </div>
+      </div>
+    );
+  }
 
   // Pantalla de éxito tras el envío
   if (successData) {

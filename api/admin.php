@@ -280,17 +280,27 @@ switch ($action) {
         $posts       = [];
         $users       = [];
         $gallery     = [];
+        $cohorts     = [];
 
         $canEnrollments = checkPermission($session, 'enrollments');
         $canContacts    = checkPermission($session, 'contacts');
         $canBlog        = checkPermission($session, 'blog');
         $isSuperAdmin   = ($session['role'] ?? '') === 'SUPER_ADMIN';
+        $filterCohort   = isset($_GET['cohort']) ? (int)$_GET['cohort'] : null;
 
         try {
             $pdo = getPDO();
             if ($pdo) {
                 if ($canEnrollments) {
-                    $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    if ($filterCohort && $filterCohort > 2020) {
+                        $stmtEn = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `cohortYear` = :cohort ORDER BY `createdAt` DESC");
+                        $stmtEn->execute([':cohort' => $filterCohort]);
+                        $enrollments = $stmtEn->fetchAll() ?: [];
+                    } else {
+                        $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    }
+
+                    $cohorts = $pdo->query("SELECT `id`, `year`, `type`, `status`, `notes` FROM `Cohort` ORDER BY `year` DESC, `type` ASC")->fetchAll() ?: [];
                 }
                 if ($canContacts) {
                     $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
@@ -357,7 +367,104 @@ switch ($action) {
             }
         }
 
-        if ($isSuperAdmin) {
+        echo json_encode([
+            "success"      => true,
+            "enrollments"  => $enrollments,
+            "cohorts"      => $cohorts,
+            "contacts"     => $contacts,
+            "posts"        => $posts,
+            "users"        => $users,
+            "gallery"      => $gallery,
+            "session"      => [
+                "userId"             => $session['userId'] ?? '',
+                "username"           => $session['username'] ?? '',
+                "name"               => $session['name'] ?? '',
+                "email"              => $session['email'] ?? '',
+                "role"               => $session['role'] ?? '',
+                "permissions"        => $session['permissions'] ?? '',
+                "mustChangePassword" => !empty($session['mustChangePassword'])
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+
+    // 2. Actualizar estado de admisión (individual o masivo)
+    case 'update_admission_status':
+        if (!checkPermission($session, 'enrollments')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $ids = $bodyData['ids'] ?? (!empty($bodyData['id']) ? [$bodyData['id']] : []);
+        $admissionStatus = trim($bodyData['admissionStatus'] ?? '');
+        $admissionNotes  = trim($bodyData['admissionNotes'] ?? '');
+        $decidedBy       = $session['name'] ?? ($session['username'] ?? 'admin');
+
+        $allowedStatuses = ['recibida', 'entrevista_agendada', 'entrevista_realizada', 'admitida', 'lista_espera', 'no_admitida', 'desistida'];
+        if (empty($ids) || !in_array($admissionStatus, $allowedStatuses, true)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "Parámetros inválidos o estado de admisión no permitido"]);
+            exit;
+        }
+
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                $inClause = implode(',', array_fill(0, count($ids), '?'));
+                $params = array_merge([$admissionStatus, $admissionNotes, $decidedBy], $ids);
+                $stmt = $pdo->prepare("
+                    UPDATE `Enrollment` 
+                    SET `admissionStatus` = ?, 
+                        `admissionNotes` = COALESCE(NULLIF(?, ''), `admissionNotes`), 
+                        `decidedBy` = ?, 
+                        `decidedAt` = NOW(3)
+                    WHERE `id` IN ($inClause)
+                ");
+                $stmt->execute($params);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(["success" => true, "updatedCount" => count($ids)]);
+        break;
+
+    // 2b. Verificar prioridad de aspirante
+    case 'verify_priority':
+        if (!checkPermission($session, 'enrollments')) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "error" => "Permisos insuficientes"]);
+            exit;
+        }
+
+        $id = trim($bodyData['id'] ?? '');
+        $priorityVerified = !empty($bodyData['priorityVerified']) ? 1 : 0;
+
+        if (empty($id)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "ID de trámite requerido"]);
+            exit;
+        }
+
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                $stmt = $pdo->prepare("UPDATE `Enrollment` SET `priorityVerified` = :v WHERE `id` = :id");
+                $stmt->execute([':v' => $priorityVerified, ':id' => $id]);
+            }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(["success" => false, "error" => $e->getMessage()]);
+            exit;
+        }
+
+        echo json_encode(["success" => true]);
+        break;
+
+    // 2c. Actualizar estado genérico
+    case 'update_enrollment_status':
             $usersFile = $dataDir . '/users.json';
             if (file_exists($usersFile)) {
                 $jsonUsers = json_decode(file_get_contents($usersFile), true) ?: [];

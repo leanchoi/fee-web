@@ -1,21 +1,26 @@
-<?php
+﻿<?php
 // ==============================================================================
 // CONFIGURACIÓN CENTRAL Y SEGURIDAD - FUNDACIÓN EDUCATIVA ESQUEL
 // ==============================================================================
+
+// Fijar Zona Horaria Oficial de Argentina (GMT-3)
+date_default_timezone_set('America/Argentina/Buenos_Aires');
 
 // Manejo estricto de CORS
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowedOrigins = [
     'https://fundacionesquel.edu.ar',
-    'https://www.fundacionesquel.edu.ar'
+    'https://www.fundacionesquel.edu.ar',
+    'http://localhost:3000',
+    'http://localhost:3001'
 ];
 
 if (in_array($origin, $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: $origin");
     header("Access-Control-Allow-Credentials: true");
 }
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token");
 header("Content-Type: application/json; charset=UTF-8");
 header("X-Content-Type-Options: nosniff");
 header("X-Frame-Options: SAMEORIGIN");
@@ -46,173 +51,7 @@ if (!defined('GOOGLE_SHEET_WEBHOOK_URL')) {
     define('GOOGLE_SHEET_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
 }
 
-// Asegurar automáticamente que la estructura de la tabla User esté al día con username y mustChangePassword
-function ensureUserTableSchema($pdo) {
-    if (!$pdo) return;
-    static $schemaChecked = false;
-    if ($schemaChecked) return;
-
-    try {
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS `User` (
-                `id` VARCHAR(36) PRIMARY KEY,
-                `username` VARCHAR(100) NULL,
-                `email` VARCHAR(191) UNIQUE NOT NULL,
-                `password` VARCHAR(255) NOT NULL,
-                `name` VARCHAR(191) NULL,
-                `role` VARCHAR(50) DEFAULT 'SUPER_ADMIN',
-                `permissions` VARCHAR(255) DEFAULT 'blog,contacts,enrollments,users,gallery',
-                `mustChangePassword` TINYINT(1) DEFAULT 0,
-                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ");
-
-        $stmt = $pdo->query("SHOW COLUMNS FROM `User`");
-        $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
-        
-        if (!in_array('username', $cols, true)) {
-            @$pdo->exec("ALTER TABLE `User` ADD COLUMN `username` VARCHAR(100) NULL AFTER `id`");
-        }
-        if (!in_array('mustChangePassword', $cols, true)) {
-            @$pdo->exec("ALTER TABLE `User` ADD COLUMN `mustChangePassword` TINYINT(1) DEFAULT 0 AFTER `permissions`");
-        }
-
-        // Auto-reparar username si está vacío pero existe email
-        @$pdo->exec("UPDATE `User` SET `username` = LOWER(SUBSTRING_INDEX(email, '@', 1)) WHERE (`username` IS NULL OR `username` = '') AND email IS NOT NULL");
-
-        // Asegurar que exista el usuario admin
-        $checkAdmin = $pdo->query("SELECT id FROM `User` WHERE LOWER(COALESCE(username, '')) = 'admin' OR LOWER(email) = 'admin@fundacionesquel.edu.ar' LIMIT 1")->fetch();
-        if (!$checkAdmin) {
-            $adminHash = password_hash('FEE_Esquel_2026$Patagonia', PASSWORD_DEFAULT);
-            $stmtA = $pdo->prepare("INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`) VALUES ('fee-super-admin-01', 'admin', 'admin@fundacionesquel.edu.ar', :pwd, 'Administrador FEE', 'SUPER_ADMIN', 'blog,contacts,enrollments,users,gallery', 0, NOW(3), NOW(3))");
-            $stmtA->execute([':pwd' => $adminHash]);
-        }
-
-        // Asegurar que exista el usuario mar
-        $checkMar = $pdo->query("SELECT id FROM `User` WHERE LOWER(COALESCE(username, '')) = 'mar' OR LOWER(email) = 'mar@fee.local' LIMIT 1")->fetch();
-        if (!$checkMar) {
-            $marHash = password_hash('Mar2026!Escuela', PASSWORD_DEFAULT);
-            $stmtM = $pdo->prepare("INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`) VALUES ('fee-user-mar-01', 'mar', 'mar@fee.local', :pwd, 'Marina Caselli', 'EDITOR', 'blog,enrollments,contacts', 1, NOW(3), NOW(3))");
-            $stmtM->execute([':pwd' => $marHash]);
-        }
-
-        $schemaChecked = true;
-    } catch (Exception $e) {
-        error_log("Schema auto-migration notice: " . $e->getMessage());
-    }
-}
-
-// Asegurar estructura de la tabla Enrollment para Reinscripciones 2027
-function ensureEnrollmentTableSchema($pdo) {
-    if (!$pdo) return;
-    static $enrollmentSchemaChecked = false;
-    if ($enrollmentSchemaChecked) return;
-
-    try {
-        $pdo->exec("
-            CREATE TABLE IF NOT EXISTS `Enrollment` (
-                `id` VARCHAR(36) PRIMARY KEY,
-                `trackingNumber` VARCHAR(50) NULL,
-                `studentName` VARCHAR(191) NOT NULL,
-                `studentDni` VARCHAR(50) NULL,
-                `school` VARCHAR(100) NULL DEFAULT 'Escuela N.º 1030',
-                `studentLevel` VARCHAR(50) NULL,
-                `studentGrade` VARCHAR(100) NOT NULL,
-                `hasSiblings` TINYINT(1) DEFAULT 0,
-                `siblingDetails` TEXT NULL,
-                `parent1Name` VARCHAR(191) NULL,
-                `parent1Dni` VARCHAR(50) NULL,
-                `parent1Relationship` VARCHAR(100) NULL,
-                `parent1Phone` VARCHAR(100) NULL,
-                `parent1Email` VARCHAR(191) NULL,
-                `parent1Address` VARCHAR(255) NULL,
-                `parent1City` VARCHAR(100) NULL,
-                `parent1PostalCode` VARCHAR(50) NULL,
-                `isSingleParent` TINYINT(1) DEFAULT 0,
-                `parent2Name` VARCHAR(191) NULL,
-                `parent2Dni` VARCHAR(50) NULL,
-                `parent2Relationship` VARCHAR(100) NULL,
-                `parent2Phone` VARCHAR(100) NULL,
-                `parent2Email` VARCHAR(191) NULL,
-                `parent2Address` VARCHAR(255) NULL,
-                `parent2City` VARCHAR(100) NULL,
-                `parent2PostalCode` VARCHAR(50) NULL,
-                `billingName` VARCHAR(191) NULL,
-                `billingCuit` VARCHAR(50) NULL,
-                `billingTaxCondition` VARCHAR(100) NULL,
-                `billingEmail` VARCHAR(191) NULL,
-                `billingAddress` VARCHAR(255) NULL,
-                `contractAccepted` TINYINT(1) DEFAULT 1,
-                `dataAccepted` TINYINT(1) DEFAULT 1,
-                `termsAccepted` TINYINT(1) DEFAULT 1,
-                `signature1Data` LONGTEXT NULL,
-                `signature2Data` LONGTEXT NULL,
-                `tutorName` VARCHAR(191) NULL,
-                `tutorEmail` VARCHAR(191) NULL,
-                `tutorPhone` VARCHAR(100) NULL,
-                `comments` TEXT NULL,
-                `status` VARCHAR(50) DEFAULT 'PENDING',
-                `contractVersion` VARCHAR(50) DEFAULT '2027.v1',
-                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ");
-
-        $stmt = $pdo->query("SHOW COLUMNS FROM `Enrollment`");
-        $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN) : [];
-
-        $newCols = [
-            'type'                => "VARCHAR(50) DEFAULT 'reinscripcion_2027'",
-            'trackingNumber'      => "VARCHAR(50) NULL",
-            'studentDni'          => "VARCHAR(50) NULL",
-            'school'              => "VARCHAR(100) NULL DEFAULT 'Escuela N.º 1030'",
-            'hasSiblings'         => "TINYINT(1) DEFAULT 0",
-            'siblingDetails'      => "TEXT NULL",
-            'siblingsJson'        => "TEXT NULL",
-            'parent1Name'         => "VARCHAR(191) NULL",
-            'parent1Dni'          => "VARCHAR(50) NULL",
-            'parent1Relationship' => "VARCHAR(100) NULL",
-            'parent1Phone'        => "VARCHAR(100) NULL",
-            'parent1Email'        => "VARCHAR(191) NULL",
-            'parent1Address'      => "VARCHAR(255) NULL",
-            'parent1City'         => "VARCHAR(100) NULL",
-            'parent1PostalCode'   => "VARCHAR(50) NULL",
-            'isSingleParent'      => "TINYINT(1) DEFAULT 0",
-            'parent2Name'         => "VARCHAR(191) NULL",
-            'parent2Dni'          => "VARCHAR(50) NULL",
-            'parent2Relationship' => "VARCHAR(100) NULL",
-            'parent2Phone'        => "VARCHAR(100) NULL",
-            'parent2Email'        => "VARCHAR(191) NULL",
-            'parent2Address'      => "VARCHAR(255) NULL",
-            'parent2City'         => "VARCHAR(100) NULL",
-            'parent2PostalCode'   => "VARCHAR(50) NULL",
-            'billingName'         => "VARCHAR(191) NULL",
-            'billingCuit'         => "VARCHAR(50) NULL",
-            'billingTaxCondition' => "VARCHAR(100) NULL",
-            'billingEmail'        => "VARCHAR(191) NULL",
-            'billingAddress'      => "VARCHAR(255) NULL",
-            'contractAccepted'    => "TINYINT(1) DEFAULT 1",
-            'dataAccepted'        => "TINYINT(1) DEFAULT 1",
-            'termsAccepted'       => "TINYINT(1) DEFAULT 1",
-            'signature1Data'      => "LONGTEXT NULL",
-            'signature2Data'      => "LONGTEXT NULL",
-            'contractVersion'     => "VARCHAR(50) DEFAULT '2027.v1'"
-        ];
-
-        foreach ($newCols as $colName => $colDef) {
-            if (!in_array($colName, $cols, true)) {
-                @$pdo->exec("ALTER TABLE `Enrollment` ADD COLUMN `$colName` $colDef");
-            }
-        }
-
-        $enrollmentSchemaChecked = true;
-    } catch (Exception $e) {
-        error_log("Enrollment schema auto-migration notice: " . $e->getMessage());
-    }
-}
-
-// Conexión PDO única y ultra-resiliente (con fallback multi-host)
+// Conexión PDO única y ultra-resiliente (con fallback multi-host y timezone -03:00)
 function getPDO() {
     static $pdo = null;
     if ($pdo !== null) return $pdo;
@@ -228,8 +67,7 @@ function getPDO() {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ]);
-            ensureUserTableSchema($pdo);
-            ensureEnrollmentTableSchema($pdo);
+            $pdo->exec("SET time_zone = '-03:00'");
             return $pdo;
         } catch (PDOException $e) {
             $lastException = $e;
@@ -240,7 +78,48 @@ function getPDO() {
     return null;
 }
 
-// Tokens JWT firmados con HMAC-SHA256
+function getDatabaseConnection() {
+    return getPDO();
+}
+
+// ==============================================================================
+// GESTIÓN DE TOKENS CSRF (DOUBLE-SUBMIT COOKIE PATTERN)
+// ==============================================================================
+function generateCsrfToken() {
+    $token = bin2hex(random_bytes(32));
+    setcookie('fee_csrf', $token, [
+        'expires' => time() + 86400,
+        'path' => '/',
+        'domain' => '',
+        'secure' => isset($_SERVER['HTTPS']),
+        'httponly' => false, // Legible por JS en el cliente para adjuntar en cabecera
+        'samesite' => 'Lax'
+    ]);
+    return $token;
+}
+
+function verifyCsrfToken() {
+    $cookieToken = $_COOKIE['fee_csrf'] ?? '';
+    $headers = getallheaders();
+    $headerToken = $headers['X-CSRF-Token'] ?? $headers['x-csrf-token'] ?? '';
+
+    if (empty($cookieToken) || empty($headerToken)) {
+        return false;
+    }
+    return hash_equals($cookieToken, $headerToken);
+}
+
+function requireCsrfToken() {
+    if (!verifyCsrfToken()) {
+        http_response_code(403);
+        echo json_encode(["success" => false, "error" => "Token de seguridad CSRF inválido o ausente."]);
+        exit;
+    }
+}
+
+// ==============================================================================
+// AUTENTICACIÓN JWT
+// ==============================================================================
 function generateToken($payload) {
     $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
     $body = base64_encode(json_encode($payload));
@@ -265,6 +144,10 @@ function verifyToken($token) {
     return false;
 }
 
+function verifyJwtToken($token) {
+    return verifyToken($token);
+}
+
 function getBearerToken() {
     $headers = getallheaders();
     if (isset($headers['Authorization'])) {
@@ -274,6 +157,9 @@ function getBearerToken() {
     }
     if (isset($_COOKIE['admin_session'])) {
         return $_COOKIE['admin_session'];
+    }
+    if (isset($_COOKIE['fee_token'])) {
+        return $_COOKIE['fee_token'];
     }
     return null;
 }
@@ -289,7 +175,7 @@ function generateUUID() {
     );
 }
 
-// Sincronización a Google Sheets con verificación TLS estricta
+// Sincronización a Google Sheets
 function syncToGoogleSheets($payload) {
     $url = defined('GOOGLE_SHEET_WEBHOOK_URL') ? GOOGLE_SHEET_WEBHOOK_URL : '';
     if (empty($url)) return false;

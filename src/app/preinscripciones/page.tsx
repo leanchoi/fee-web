@@ -4,8 +4,8 @@ import Link from "next/link";
 import { ShieldCheck, ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Solicitud de Preinscripción | Fundación Educativa Esquel",
-  description: "Formulario de admisión e ingreso para nuevos estudiantes en Nivel Inicial, Primario y Secundario.",
+  title: "Preinscripciones Ciclo Lectivo 2027 | Fundación Educativa Esquel",
+  description: "Formulario de admisión e ingreso para nuevos estudiantes en Nivel Inicial, Primario y Secundario para el Ciclo Lectivo 2027.",
 };
 
 export default function PreinscripcionesPage() {
@@ -15,13 +15,13 @@ export default function PreinscripcionesPage() {
       <section className="pt-28 pb-16 bg-brand-blue text-white relative overflow-hidden">
         <div className="container mx-auto px-6 lg:px-12 text-center relative z-10">
           <span className="inline-block bg-white/10 text-brand-yellow text-xs font-extrabold uppercase tracking-widest px-3.5 py-1 rounded-full mb-3 border border-white/20">
-            Admisión General
+            Convocatoria Abierta • Ingresantes 2027
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-4 max-w-4xl mx-auto tracking-tight leading-tight">
-            Solicitud de Preinscripción
+            Preinscripción Ciclo Lectivo 2027
           </h1>
           <p className="text-sm sm:text-base md:text-lg max-w-2xl mx-auto text-slate-200 leading-relaxed font-normal">
-            Registro de aspirantes y lista de espera para nuevos estudiantes en Nivel Inicial, Primario y Secundario.
+            Registro oficial de aspirantes para Nivel Inicial, Primario (Escuela N.º 1030) y Secundario (Escuela N.º 1739).
           </p>
         </div>
       </section>

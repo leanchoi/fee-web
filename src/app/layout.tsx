@@ -89,6 +89,11 @@ export default function RootLayout({
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:image:alt" content="Fundación Educativa Esquel" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var c=JSON.parse(sessionStorage.getItem('fee_admissions_mode')||'{}');if(c.mode&&(Date.now()-c.t)<300000){document.documentElement.dataset.admissions=c.mode;}}catch(e){}})();`,
+          }}
+        />
       </head>
       <body
         className={cn(

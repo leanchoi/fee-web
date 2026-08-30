@@ -82,6 +82,8 @@ import JSZip from "jszip";
 import { generateContractPdf, downloadFilledContract, determineLevel, determineSchool, getContractFilename } from "@/lib/contractGenerator";
 import { extractAllStudents, extractStudentsFromEnrollment, ExtractedStudent } from "@/lib/studentExtractor";
 import { consolidateFamilies, exportCleanBaseToCSV, ConsolidatedFamilyGroup, CleanBaseStudent } from "@/lib/familyConsolidator";
+import { ConvocatoriasSettingsTab } from "@/components/admin/ConvocatoriasSettingsTab";
+import { PreinscripcionesTab } from "@/components/admin/PreinscripcionesTab";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -286,12 +288,29 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "familias" | "base_limpia" | "preinscripciones" | "contacts" | "users" | "gallery" | "audit">(() => {
+  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "familias" | "base_limpia" | "preinscripciones" | "config_convocatorias" | "contacts" | "users" | "gallery" | "audit">(() => {
     if (userPerms.includes("enrollments") || isSuperAdmin) return "reinscripciones";
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
     if (userPerms.includes("contacts")) return "contacts";
     return "reinscripciones";
   });
+
+  const [cohortSettings, setCohortSettings] = useState<any>(null);
+
+  const fetchGlobalSettings = () => {
+    fetch("/api/settings.php", { credentials: "same-origin" })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.reinscripciones) {
+          setCohortSettings(data);
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchGlobalSettings();
+  }, []);
 
   // Estado y Monitoreo de Auditoría y Actividad
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -1239,6 +1258,62 @@ export function AdminDashboard({
   return (
     <div className="bg-white rounded-[2rem] shadow-xl border border-brand-gray/10 overflow-hidden">
       
+      {/* 0. Barra Sticky de Contexto Global */}
+      <div className="sticky top-0 z-40 bg-slate-900 text-white px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md border-b border-slate-800">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-slate-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Ciclo Activo:</span>
+            <span className="bg-slate-800 text-emerald-300 px-2 py-0.5 rounded font-mono font-black border border-slate-700">
+              2027
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-semibold">Reinscripciones 2027:</span>
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+              cohortSettings?.reinscripciones?.isOpen
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                : "bg-slate-750 text-slate-400 border border-slate-700"
+            )}>
+              {cohortSettings?.reinscripciones?.isOpen ? "● Abierta" : "○ Cerrada"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-semibold">Preinscripciones 2027:</span>
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+              cohortSettings?.preinscripciones?.isOpen
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                : "bg-slate-750 text-slate-400 border border-slate-700"
+            )}>
+              {cohortSettings?.preinscripciones?.isOpen ? "● Abierta" : "○ Cerrada"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button
+              onClick={() => setActiveTab("config_convocatorias")}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                activeTab === "config_convocatorias"
+                  ? "bg-amber-400 text-slate-950 font-black shadow-xs"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+              )}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+              <span>Configuración Convocatorias</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Dashboard Nav */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b px-8 py-6 bg-brand-gray/5">
         <div className="flex flex-wrap gap-2">
@@ -1288,13 +1363,26 @@ export function AdminDashboard({
               )}
             >
               <Users className="w-4 h-4" />
-              <span>Preinscripciones</span>
+              <span>Preinscripciones 2027</span>
               <span className={cn(
                 "px-2 py-0.5 rounded-full text-[10px] font-black",
                 activeTab === "preinscripciones" ? "bg-white text-brand-blue" : "bg-brand-blue/10 text-brand-blue"
               )}>
                 {preinscripcionesList.length}
               </span>
+            </button>
+          )}
+
+          {isSuperAdmin && (
+            <button 
+              onClick={() => setActiveTab("config_convocatorias")}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                activeTab === "config_convocatorias" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "text-amber-800 hover:bg-amber-50"
+              )}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Convocatorias</span>
             </button>
           )}
           
@@ -2919,115 +3007,23 @@ export function AdminDashboard({
           </div>
         )}
 
-        {/* TAB DE PREINSCRIPCIONES GENERALES */}
+        {/* TAB DE PREINSCRIPCIONES 2027 */}
         {hasEnrollmentsPerm && activeTab === "preinscripciones" && (
-          <div>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-brand-blue">Preinscripciones Generales</h2>
-                  <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wide">
-                    Nuevos Ingresantes
-                  </span>
-                </div>
-                <p className="text-xs text-brand-foreground/70 mt-1">
-                  Aspirantes a vacantes nuevas y lista de espera para Nivel Inicial, Primario y Secundario.
-                </p>
-              </div>
+          <PreinscripcionesTab
+            preinscripcionesList={preinscripcionesList}
+            isSuperAdmin={isSuperAdmin}
+            onRefreshData={fetchGlobalSettings}
+            onDeleteEnrollment={handleDeleteEnrollment}
+          />
+        )}
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold px-3 py-1.5 bg-brand-blue/10 text-brand-blue rounded-full">
-                  Total: {preinscripcionesList.length} aspirantes
-                </span>
-              </div>
-            </div>
-
-            {/* Listado de Preinscripciones */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {preinscripcionesList.map((e: any) => {
-                const initial = e.studentName ? e.studentName.charAt(0).toUpperCase() : "A";
-                return (
-                  <div key={e.id} className="bg-white border rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-start gap-4 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-brand-blue/10 flex items-center justify-center font-extrabold text-brand-blue shrink-0">
-                          {initial}
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] text-brand-foreground/50 font-semibold block">
-                            {new Date(e.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border mt-1 bg-blue-50 text-blue-800 border-blue-200">
-                            {e.studentLevel || "Nivel Primario"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <h4 className="font-bold text-brand-blue text-base mb-1">{e.studentName}</h4>
-                      <p className="text-xs text-brand-foreground/60 mb-4 font-semibold">Grado/Año: {e.studentGrade}</p>
-
-                      <div className="space-y-1.5 border-t pt-3 text-xs mb-4 text-slate-700">
-                        <p className="truncate"><span className="font-bold text-slate-900">Tutor:</span> {e.tutorName || e.parent1Name || "---"}</p>
-                        <p className="flex items-center gap-1.5 truncate text-slate-600"><Mail className="w-3.5 h-3.5 text-brand-blue shrink-0" /> {e.tutorEmail || e.parent1Email}</p>
-                        <p className="flex items-center gap-1.5 text-slate-600"><Phone className="w-3.5 h-3.5 text-brand-green shrink-0" /> {e.tutorPhone || e.parent1Phone}</p>
-                      </div>
-
-                      {e.comments && (
-                        <div className="bg-slate-50 border p-2.5 rounded-xl text-[11px] text-slate-700 leading-normal max-h-24 overflow-y-auto mb-4">
-                          <span className="font-bold block mb-0.5 text-slate-900">Comentarios:</span>
-                          {e.comments}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 border-t pt-3">
-                      {(() => {
-                        const wa = getWhatsAppUrl(e.tutorPhone || e.parent1Phone, e.studentName, undefined, false);
-                        return wa ? (
-                          <a 
-                            href={wa} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors border border-emerald-200 cursor-pointer"
-                            title="Enviar WhatsApp"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </a>
-                        ) : null;
-                      })()}
-                      <a 
-                        href={`mailto:${e.tutorEmail || e.parent1Email}`} 
-                        className="flex-1 text-center bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
-                      >
-                        Enviar Mail
-                      </a>
-                      <a 
-                        href={`tel:${e.tutorPhone || e.parent1Phone}`} 
-                        className="flex-1 text-center bg-brand-green/5 hover:bg-brand-green/10 text-brand-green font-bold text-xs py-2 rounded-xl transition-colors cursor-pointer"
-                      >
-                        Llamar
-                      </a>
-                      {isSuperAdmin && (
-                        <button 
-                          onClick={() => handleDeleteEnrollment(e.id)} 
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0 cursor-pointer border border-red-200" 
-                          title="Eliminar solicitud (Solo Super Admin)"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {preinscripcionesList.length === 0 && (
-                <div className="col-span-full py-12 text-center text-brand-gray border border-dashed rounded-3xl">
-                  No hay solicitudes de preinscripción registradas actualmente.
-                </div>
-              )}
-            </div>
-          </div>
+        {/* TAB DE CONFIGURACIÓN DE CONVOCATORIAS */}
+        {isSuperAdmin && activeTab === "config_convocatorias" && (
+          <ConvocatoriasSettingsTab
+            isSuperAdmin={isSuperAdmin}
+            session={session}
+            onRefreshData={fetchGlobalSettings}
+          />
         )}
 
         {hasContactsPerm && activeTab === "contacts" && (
