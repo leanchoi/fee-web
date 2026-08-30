@@ -253,15 +253,57 @@ if ($method === 'POST') {
         $username = $user['name'] ?? ($user['username'] ?? 'admin');
         $jsonSettings = getJsonSettings();
 
-        // 1. Toggles de Apertura/Cierre de Convocatorias
-        if (isset($data['reinscripciones_status']) || isset($data['preinscripciones_status'])) {
+        // 1. Selector Exclusivo de Modo de Convocatoria
+        if (isset($data['mode'])) {
+            if ($userRole !== 'SUPER_ADMIN') {
+                jsonResponse(403, ["success" => false, "error" => "Solo un SUPER_ADMIN puede modificar el modo de convocatoria."]);
+            }
+
+            $targetMode = in_array($data['mode'], ['reinscripciones', 'preinscripciones', 'cerrado']) ? $data['mode'] : 'cerrado';
+            $cohortYear = (int)($data['cohort'] ?? ($data['active_cohort_year'] ?? ($jsonSettings['reinscripciones']['cohort'] ?? 2027)));
+            if ($cohortYear < 2020 || $cohortYear > 2040) $cohortYear = 2027;
+
+            $statusRe = ($targetMode === 'reinscripciones') ? 'abierta' : 'cerrada';
+            $statusPre = ($targetMode === 'preinscripciones') ? 'abierta' : 'cerrada';
+
+            if ($pdo) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO `Cohort` (`year`, `type`, `status`)
+                    VALUES (:year, 'reinscripcion', :status)
+                    ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
+                ");
+                $stmt->execute([':status' => $statusRe, ':year' => $cohortYear]);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO `Cohort` (`year`, `type`, `status`)
+                    VALUES (:year, 'preinscripcion', :status)
+                    ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
+                ");
+                $stmt->execute([':status' => $statusPre, ':year' => $cohortYear]);
+            }
+
+            $jsonSettings['mode'] = $targetMode;
+            $jsonSettings['reinscripciones']['cohort'] = $cohortYear;
+            $jsonSettings['reinscripciones']['status'] = $statusRe;
+            $jsonSettings['reinscripciones']['isOpen'] = ($statusRe === 'abierta');
+
+            $jsonSettings['preinscripciones']['cohort'] = $cohortYear;
+            $jsonSettings['preinscripciones']['status'] = $statusPre;
+            $jsonSettings['preinscripciones']['isOpen'] = ($statusPre === 'abierta');
+        }
+
+        // 1.b Toggles individuales si vinieran
+        if (!isset($data['mode']) && (isset($data['reinscripciones_status']) || isset($data['preinscripciones_status']))) {
             if ($userRole !== 'SUPER_ADMIN') {
                 jsonResponse(403, ["success" => false, "error" => "Solo un SUPER_ADMIN puede modificar el estado de apertura de las convocatorias."]);
             }
 
+            $cohortYear = (int)($data['cohort'] ?? 2027);
+
             if (isset($data['reinscripciones_status'])) {
                 $statusRe = in_array($data['reinscripciones_status'], ['abierta', 'cerrada', 'borrador', 'archivada']) ? $data['reinscripciones_status'] : 'cerrada';
-                $cohortRe = (int)($data['reinscripciones_cohort'] ?? 2027);
+                // Exclusividad mutua: si se abre reinscripciones, se cierra preinscripciones
+                $statusPre = ($statusRe === 'abierta') ? 'cerrada' : ($jsonSettings['preinscripciones']['status'] ?? 'cerrada');
 
                 if ($pdo) {
                     $stmt = $pdo->prepare("
@@ -269,16 +311,26 @@ if ($method === 'POST') {
                         VALUES (:year, 'reinscripcion', :status)
                         ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
                     ");
-                    $stmt->execute([':status' => $statusRe, ':year' => $cohortRe]);
+                    $stmt->execute([':status' => $statusRe, ':year' => $cohortYear]);
+
+                    $stmt = $pdo->prepare("
+                        INSERT INTO `Cohort` (`year`, `type`, `status`)
+                        VALUES (:year, 'preinscripcion', :status)
+                        ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
+                    ");
+                    $stmt->execute([':status' => $statusPre, ':year' => $cohortYear]);
                 }
 
                 $jsonSettings['reinscripciones']['status'] = $statusRe;
                 $jsonSettings['reinscripciones']['isOpen'] = ($statusRe === 'abierta');
+                $jsonSettings['preinscripciones']['status'] = $statusPre;
+                $jsonSettings['preinscripciones']['isOpen'] = ($statusPre === 'abierta');
             }
 
             if (isset($data['preinscripciones_status'])) {
                 $statusPre = in_array($data['preinscripciones_status'], ['abierta', 'cerrada', 'borrador', 'archivada']) ? $data['preinscripciones_status'] : 'cerrada';
-                $cohortPre = (int)($data['preinscripciones_cohort'] ?? 2027);
+                // Exclusividad mutua: si se abre preinscripciones, se cierra reinscripciones
+                $statusRe = ($statusPre === 'abierta') ? 'cerrada' : ($jsonSettings['reinscripciones']['status'] ?? 'cerrada');
 
                 if ($pdo) {
                     $stmt = $pdo->prepare("
@@ -286,11 +338,20 @@ if ($method === 'POST') {
                         VALUES (:year, 'preinscripcion', :status)
                         ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
                     ");
-                    $stmt->execute([':status' => $statusPre, ':year' => $cohortPre]);
+                    $stmt->execute([':status' => $statusPre, ':year' => $cohortYear]);
+
+                    $stmt = $pdo->prepare("
+                        INSERT INTO `Cohort` (`year`, `type`, `status`)
+                        VALUES (:year, 'reinscripcion', :status)
+                        ON DUPLICATE KEY UPDATE `status` = VALUES(`status`), `updatedAt` = CURRENT_TIMESTAMP
+                    ");
+                    $stmt->execute([':status' => $statusRe, ':year' => $cohortYear]);
                 }
 
                 $jsonSettings['preinscripciones']['status'] = $statusPre;
                 $jsonSettings['preinscripciones']['isOpen'] = ($statusPre === 'abierta');
+                $jsonSettings['reinscripciones']['status'] = $statusRe;
+                $jsonSettings['reinscripciones']['isOpen'] = ($statusRe === 'abierta');
             }
         }
 
@@ -299,6 +360,7 @@ if ($method === 'POST') {
             'preinscripciones_interview_notice',
             'reinscripciones_closed_message',
             'preinscripciones_closed_message',
+            'vigencia_fechas',
             'age_cutoff_date'
         ];
 
@@ -321,6 +383,8 @@ if ($method === 'POST') {
                     $jsonSettings['reinscripciones']['closedMessage'] = $val;
                 } elseif ($key === 'preinscripciones_closed_message') {
                     $jsonSettings['preinscripciones']['closedMessage'] = $val;
+                } elseif ($key === 'vigencia_fechas') {
+                    $jsonSettings['vigencia_fechas'] = $val;
                 }
             }
         }
@@ -337,7 +401,7 @@ if ($method === 'POST') {
 
         jsonResponse(200, [
             "success" => true,
-            "message" => "Configuraciones actualizadas exitosamente.",
+            "message" => "Configuración de convocatoria actualizada correctamente.",
             "settings" => $jsonSettings
         ]);
 

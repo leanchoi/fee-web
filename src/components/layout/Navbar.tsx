@@ -21,6 +21,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [admissionsMode, setAdmissionsMode] = useState<"reinscripciones" | "preinscripciones" | "cerrado">("reinscripciones");
+  const [cohortYear, setCohortYear] = useState<number>(2027);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -30,16 +31,24 @@ export function Navbar() {
       if (cached.mode) {
         setAdmissionsMode(cached.mode);
       }
+      if (cached.cohort) {
+        setCohortYear(cached.cohort);
+      }
     } catch {}
 
     // 2. Fetch fresco a settings.php
     fetch("/api/settings.php", { credentials: "same-origin" })
       .then(res => res.json())
       .then(data => {
-        if (data && data.mode) {
-          setAdmissionsMode(data.mode);
-          sessionStorage.setItem("fee_admissions_mode", JSON.stringify({ mode: data.mode, t: Date.now() }));
-          document.documentElement.dataset.admissions = data.mode;
+        if (data) {
+          const mode = data.mode || "reinscripciones";
+          const yr = (mode === "preinscripciones" ? data.preinscripciones?.cohort : data.reinscripciones?.cohort) || 2027;
+          
+          setAdmissionsMode(mode);
+          setCohortYear(yr);
+          
+          sessionStorage.setItem("fee_admissions_mode", JSON.stringify({ mode, cohort: yr, t: Date.now() }));
+          document.documentElement.dataset.admissions = mode;
         }
       })
       .catch(() => {});
@@ -57,8 +66,8 @@ export function Navbar() {
   }, [pathname]);
 
   const ctaLabel = admissionsMode === "preinscripciones" 
-    ? "Preinscripciones 2027" 
-    : (admissionsMode === "reinscripciones" ? "Reinscripciones 2027" : "Inscripciones");
+    ? `Preinscripciones ${cohortYear}` 
+    : (admissionsMode === "reinscripciones" ? `Reinscripciones ${cohortYear}` : "Inscripciones");
   
   const ctaHref = admissionsMode === "preinscripciones"
     ? "/preinscripciones"
@@ -187,10 +196,10 @@ export function Navbar() {
                 className="w-full mt-4"
               >
                 <Link
-                  href="/inscripciones"
+                  href={ctaHref}
                   className="block w-full text-center bg-brand-yellow text-brand-blue py-3.5 rounded-full text-lg font-bold shadow-lg shadow-brand-yellow/15 hover:bg-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
-                  Inscripciones {getAdmissionYear()}
+                  {ctaLabel}
                 </Link>
               </motion.div>
             </nav>
