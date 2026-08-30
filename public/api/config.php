@@ -1,178 +1,287 @@
 <?php
-// ==============================================================================
-// CONFIGURACIÓN CENTRAL Y SEGURIDAD - FUNDACIÓN EDUCATIVA ESQUEL
-// ==============================================================================
+declare(strict_types=1);
 
-// Fijar Zona Horaria Oficial de Argentina (GMT-3)
+/* ═══════════════════════════════════════════════════════════════
+Buffer de salida: ningún warning suelto puede romper el JSON.
+═══════════════════════════════════════════════════════════════ */
+ob_start();
+
+/* ── Errores: NUNCA visibles al cliente, SIEMPRE registrados en log ── */
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+if (!is_dir(__DIR__ . '/logs')) {
+    @mkdir(__DIR__ . '/logs', 0750, true);
+}
+ini_set('error_log', __DIR__ . '/logs/php-error.log');
+
 date_default_timezone_set('America/Argentina/Buenos_Aires');
 
-// Manejo estricto de CORS
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedOrigins = [
-    'https://fundacionesquel.edu.ar',
-    'https://www.fundacionesquel.edu.ar',
-    'http://localhost:3000',
-    'http://localhost:3001'
-];
+/* ═══════════════════════════════════════════════════════════════
+Configuración de Base de Datos y Secretos
+═══════════════════════════════════════════════════════════════ */
+$envFile = __DIR__ . '/env.php';
+$env = is_readable($envFile) ? (require $envFile) : [];
 
-if (in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: $origin");
-    header("Access-Control-Allow-Credentials: true");
+if (!defined('DB_HOST'))    define('DB_HOST',    $env['DB_HOST']    ?? 'localhost');
+if (!defined('DB_NAME'))    define('DB_NAME',    $env['DB_NAME']    ?? 'u769174130_escueladb');
+if (!defined('DB_USER'))    define('DB_USER',    $env['DB_USER']    ?? 'u769174130_admin');
+if (!defined('DB_PASS'))    define('DB_PASS',    $env['DB_PASS']    ?? 'FEE_Esquel_2026$Patagonia');
+if (!defined('JWT_SECRET')) define('JWT_SECRET', $env['JWT_SECRET'] ?? 'c0f8e9a2b4d6f8a0c2e4f6a8b0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b4c6d8');
+
+if (!defined('GOOGLE_SHEET_WEBHOOK_URL')) {
+    define('GOOGLE_SHEET_WEBHOOK_URL', $env['GOOGLE_SHEET_WEBHOOK_URL'] ?? 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
 }
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token");
-header("Content-Type: application/json; charset=UTF-8");
-header("X-Content-Type-Options: nosniff");
-header("X-Frame-Options: SAMEORIGIN");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+/* ═══════════════════════════════════════════════════════════════
+Respuesta JSON única y a prueba de basura previa
+═══════════════════════════════════════════════════════════════ */
+function jsonResponse(int $status, array $payload): void {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    if (!headers_sent()) {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Content-Type-Options: nosniff');
+    }
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-// 1. Cargar configuración externa protegida si existe fuera del webroot
-$externalConfigFile = '/home/' . get_current_user() . '/fee-config.php';
-if (file_exists($externalConfigFile)) {
-    require_once $externalConfigFile;
-}
+/* ── Todo fatal o excepción sale como JSON, no como cuerpo vacío ── */
+set_exception_handler(static function (Throwable $t): void {
+    error_log('[UNCAUGHT] ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
+    jsonResponse(500, ['success' => false, 'error' => 'Error interno del servidor.']);
+});
 
-// 2. Parámetros por defecto protegidos
-if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME') ?: 'u769174130_escueladb');
-if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: 'u769174130_admin_db');
-if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASS') ?: 'Arcoiris1986');
-
-if (!defined('JWT_SECRET')) {
-    $secret = getenv('JWT_SECRET') ?: 'f93c04968848d5eb29cbca82dbbbd76e4c76b911762c2f10b3724c96adbfcb36';
-    define('JWT_SECRET', $secret);
-}
-
-if (!defined('GOOGLE_SHEET_WEBHOOK_URL')) {
-    define('GOOGLE_SHEET_WEBHOOK_URL', 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
-}
-
-// Conexión PDO única y ultra-resiliente (con fallback multi-host y timezone -03:00)
-function getPDO() {
-    static $pdo = null;
-    if ($pdo !== null) return $pdo;
-
-    $hosts = [DB_HOST, 'localhost', '127.0.0.1'];
-    $lastException = null;
-
-    foreach (array_unique($hosts) as $host) {
-        $dsn = "mysql:host=" . $host . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-        try {
-            $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
-            $pdo->exec("SET time_zone = '-03:00'");
-            return $pdo;
-        } catch (PDOException $e) {
-            $lastException = $e;
+register_shutdown_function(static function (): void {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log('[FATAL] ' . $e['message'] . ' @ ' . $e['file'] . ':' . $e['line']);
+        if (!headers_sent()) {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'error' => 'Error interno del servidor.']);
         }
     }
+});
 
-    error_log("Database connection failed: " . ($lastException ? $lastException->getMessage() : 'unknown'));
-    return null;
+/* ═══════════════════════════════════════════════════════════════
+PDO: conexión única, timeout corto, sin bucles de reintentos
+═══════════════════════════════════════════════════════════════ */
+function getPDO(): ?PDO {
+    static $pdo = null;
+    static $tried = false;
+
+    if ($pdo instanceof PDO) return $pdo;
+    if ($tried) return null;
+    $tried = true;
+
+    try {
+        $pdo = new PDO(
+            'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+            DB_USER,
+            DB_PASS,
+            [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::ATTR_TIMEOUT            => 3, // Evita spinners infinitos
+            ]
+        );
+        $pdo->exec("SET time_zone = '-03:00'");
+        return $pdo;
+    } catch (PDOException $e) {
+        error_log('[DB] Connect failed: ' . $e->getMessage());
+        $pdo = null;
+        return null;
+    }
 }
 
-function getDatabaseConnection() {
+function getDatabaseConnection(): ?PDO {
     return getPDO();
 }
 
-// Compatibilidad retroactiva para endpoints existentes
-function ensureUserTableSchema($pdo) {
-    return true;
-}
-function ensureEnrollmentTableSchema($pdo) {
-    return true;
-}
+function ensureUserTableSchema($pdo) { return true; }
+function ensureEnrollmentTableSchema($pdo) { return true; }
 
-// ==============================================================================
-// GESTIÓN DE TOKENS CSRF (DOUBLE-SUBMIT COOKIE PATTERN)
-// ==============================================================================
-function generateCsrfToken() {
-    $token = bin2hex(random_bytes(32));
-    setcookie('fee_csrf', $token, [
-        'expires' => time() + 86400,
-        'path' => '/',
-        'domain' => '',
-        'secure' => isset($_SERVER['HTTPS']),
-        'httponly' => false, // Legible por JS en el cliente para adjuntar en cabecera
-        'samesite' => 'Lax'
-    ]);
-    return $token;
+/* ═══════════════════════════════════════════════════════════════
+JWT — base64url real (RFC 7515)
+═══════════════════════════════════════════════════════════════ */
+function b64uEncode(string $bin): string {
+    return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
 }
 
-function verifyCsrfToken() {
-    $cookieToken = $_COOKIE['fee_csrf'] ?? '';
-    $headers = getallheaders();
-    $headerToken = $headers['X-CSRF-Token'] ?? $headers['x-csrf-token'] ?? '';
+function b64uDecode(string $txt): string {
+    $rem = strlen($txt) % 4;
+    if ($rem) {
+        $txt .= str_repeat('=', 4 - $rem);
+    }
+    $out = base64_decode(strtr($txt, '-_', '+/'), true);
+    return $out === false ? '' : $out;
+}
 
-    if (empty($cookieToken) || empty($headerToken)) {
+function generateToken(array $payload): string {
+    $now = time();
+    $payload += ['iat' => $now, 'nbf' => $now];
+    $h = b64uEncode((string) json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
+    $b = b64uEncode((string) json_encode($payload, JSON_UNESCAPED_UNICODE));
+    $s = b64uEncode(hash_hmac('sha256', "$h.$b", JWT_SECRET, true));
+    return "$h.$b.$s";
+}
+
+/**
+ * @return array<string,mixed>|false
+ */
+function verifyToken(?string $token) {
+    if (!is_string($token) || $token === '') return false;
+    if (strlen(JWT_SECRET) < 32) {
+        error_log('[JWT] JWT_SECRET ausente o demasiado corto.');
         return false;
     }
-    return hash_equals($cookieToken, $headerToken);
-}
 
-function requireCsrfToken() {
-    if (!verifyCsrfToken()) {
-        http_response_code(403);
-        echo json_encode(["success" => false, "error" => "Token de seguridad CSRF inválido o ausente."]);
-        exit;
-    }
-}
-
-// ==============================================================================
-// AUTENTICACIÓN JWT
-// ==============================================================================
-function generateToken($payload) {
-    $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
-    $body = base64_encode(json_encode($payload));
-    $signature = hash_hmac('sha256', "$header.$body", JWT_SECRET, true);
-    $signature = base64_encode($signature);
-    return "$header.$body.$signature";
-}
-
-function verifyToken($token) {
-    if (!$token || strlen(JWT_SECRET) < 32) return false;
     $parts = explode('.', $token);
     if (count($parts) !== 3) return false;
-    list($header, $body, $signature) = $parts;
-    $validSignature = base64_encode(hash_hmac('sha256', "$header.$body", JWT_SECRET, true));
-    if (hash_equals($validSignature, $signature)) {
-        $payload = json_decode(base64_decode($body), true);
-        if (isset($payload['exp']) && $payload['exp'] < time()) {
-            return false; // Token expirado
-        }
-        return $payload;
-    }
-    return false;
+    [$h, $b, $s] = $parts;
+
+    $expected = b64uEncode(hash_hmac('sha256', "$h.$b", JWT_SECRET, true));
+    if (!hash_equals($expected, $s)) return false;
+
+    $header = json_decode(b64uDecode($h), true);
+    if (!is_array($header) || ($header['alg'] ?? '') !== 'HS256') return false;
+
+    $payload = json_decode(b64uDecode($b), true);
+    if (!is_array($payload)) return false;
+
+    $leeway = 60;
+    if (isset($payload['nbf']) && (int) $payload['nbf'] > (time() + $leeway)) return false;
+    if (isset($payload['exp']) && (int) $payload['exp'] < (time() - $leeway)) return false;
+
+    return $payload;
 }
 
 function verifyJwtToken($token) {
     return verifyToken($token);
 }
 
-function getBearerToken() {
-    $headers = getallheaders();
-    if (isset($headers['Authorization'])) {
-        if (preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
-            return $matches[1];
+/* ═══════════════════════════════════════════════════════════════
+Headers y Extracción de Token Resiliente
+═══════════════════════════════════════════════════════════════ */
+function getRequestHeaders(): array {
+    $out = [];
+    if (function_exists('getallheaders')) {
+        foreach ((array) getallheaders() as $k => $v) {
+            $out[strtolower((string) $k)] = $v;
         }
     }
-    if (isset($_COOKIE['admin_session'])) {
-        return $_COOKIE['admin_session'];
+    foreach ($_SERVER as $k => $v) {
+        if (strncmp($k, 'HTTP_', 5) === 0) {
+            $out[strtolower(str_replace('_', '-', substr($k, 5)))] = $v;
+        }
     }
-    if (isset($_COOKIE['fee_token'])) {
-        return $_COOKIE['fee_token'];
+    return $out;
+}
+
+function getBearerToken(): ?string {
+    $h = getRequestHeaders();
+    $candidates = [
+        $h['authorization'] ?? null,
+        $h['x-authorization'] ?? null,
+        $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+        $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null,
+        $_SERVER['HTTP_X_AUTHORIZATION'] ?? null,
+        $_SERVER['REDIRECT_HTTP_X_AUTHORIZATION'] ?? null,
+    ];
+
+    foreach ($candidates as $raw) {
+        if (is_string($raw) && $raw !== ''
+            && preg_match('/Bearer\s+([A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+)/i', $raw, $m)) {
+            return $m[1];
+        }
+    }
+
+    if (!empty($_COOKIE['admin_session'])) {
+        return (string) $_COOKIE['admin_session'];
     }
     return null;
 }
 
-function generateUUID() {
+/**
+ * Guardia de autenticación para endpoints protegidos
+ */
+function requireAuth(array $allowedRoles = []): array {
+    $payload = verifyToken(getBearerToken());
+    if ($payload === false) {
+        jsonResponse(401, ['success' => false, 'error' => 'Sesión expirada o inválida.']);
+    }
+    if ($allowedRoles && !in_array((string) ($payload['role'] ?? ''), $allowedRoles, true)) {
+        jsonResponse(403, ['success' => false, 'error' => 'No tenés permisos para esta acción.']);
+    }
+    return $payload;
+}
+
+function setSessionCookie(string $token, int $ttl = 86400): void {
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443)
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+    setcookie('admin_session', $token, [
+        'expires'  => time() + $ttl,
+        'path'     => '/',
+        'httponly' => true,
+        'secure'   => $secure,
+        'samesite' => 'Lax',
+    ]);
+}
+
+function clearSessionCookie(): void {
+    setcookie('admin_session', '', [
+        'expires'  => time() - 3600,
+        'path'     => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+Gestión de Tokens CSRF
+═══════════════════════════════════════════════════════════════ */
+function generateCsrfToken(): string {
+    $token = bin2hex(random_bytes(32));
+    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+    setcookie('fee_csrf', $token, [
+        'expires'  => time() + 86400,
+        'path'     => '/',
+        'secure'   => $secure,
+        'httponly' => false,
+        'samesite' => 'Lax'
+    ]);
+    return $token;
+}
+
+function verifyCsrfToken(): bool {
+    $cookieToken = $_COOKIE['fee_csrf'] ?? '';
+    $headers = getRequestHeaders();
+    $headerToken = $headers['x-csrf-token'] ?? '';
+    if (empty($cookieToken) || empty($headerToken)) {
+        return false;
+    }
+    return hash_equals($cookieToken, $headerToken);
+}
+
+function requireCsrfToken(): void {
+    if (!verifyCsrfToken()) {
+        jsonResponse(403, ['success' => false, 'error' => 'Token de seguridad CSRF inválido o ausente.']);
+    }
+}
+
+function generateUUID(): string {
     return sprintf(
         '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         mt_rand(0, 0xffff), mt_rand(0, 0xffff),
@@ -183,8 +292,7 @@ function generateUUID() {
     );
 }
 
-// Sincronización a Google Sheets
-function syncToGoogleSheets($payload) {
+function syncToGoogleSheets($payload): bool {
     $url = defined('GOOGLE_SHEET_WEBHOOK_URL') ? GOOGLE_SHEET_WEBHOOK_URL : '';
     if (empty($url)) return false;
 
@@ -194,17 +302,13 @@ function syncToGoogleSheets($payload) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 4);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Content-Length: ' . strlen($jsonData)
     ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        error_log("Google Sheets sync error: " . curl_error($ch));
-    }
+    $res = curl_exec($ch);
+    $err = curl_error($ch);
     curl_close($ch);
-    return $response;
+    return empty($err);
 }

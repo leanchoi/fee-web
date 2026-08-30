@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { loginAdmin } from "@/actions/admin";
+import { loginAdmin, type AdminSession } from "@/actions/admin";
 import { Lock, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
+export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: (user: AdminSession) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,17 +19,17 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
     
     try {
       const res = await loginAdmin(password, email);
-      if (res.success) {
+      if (res.success && (res as any).user) {
         if (onLoginSuccess) {
-          onLoginSuccess();
+          onLoginSuccess((res as any).user);
         } else {
           router.refresh();
         }
       } else {
-        setError(res.error || "Error al ingresar");
+        setError(res.error || "Usuario o contraseña incorrectos.");
       }
     } catch (err) {
-      setError("Error de red");
+      setError("No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export function LoginForm({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
         <button 
           type="submit" 
           disabled={loading}
-          className="bg-brand-blue text-white w-full py-4 rounded-full font-bold shadow-lg hover:bg-brand-green transition-colors mt-4 flex justify-center items-center gap-2"
+          className="bg-brand-blue text-white w-full py-4 rounded-full font-bold shadow-lg hover:bg-brand-green transition-colors mt-4 flex justify-center items-center gap-2 cursor-pointer disabled:opacity-60"
         >
           {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : "Ingresar"}
         </button>

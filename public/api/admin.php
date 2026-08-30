@@ -239,14 +239,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
-$token = getBearerToken();
-$session = verifyToken($token);
-
-if (!$session) {
-    http_response_code(401);
-    echo json_encode(["success" => false, "authenticated" => false, "error" => "No autorizado. Sesión inválida o expirada."]);
-    exit;
-}
+$session = requireAuth();
 
 // Inicializar variables de entrada de forma segura
 $bodyData = [];
@@ -391,7 +384,7 @@ switch ($action) {
             "mustChangePassword" => !empty($session['mustChangePassword'])
         ];
 
-        echo json_encode([
+        jsonResponse(200, [
             "success"      => true,
             "enrollments"  => $enrollments,
             "cohorts"      => $cohorts,
@@ -401,8 +394,7 @@ switch ($action) {
             "gallery"      => $gallery,
             "session"      => $sessionPayload,
             "user"         => $sessionPayload
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
+        ]);
 
     // 2. Actualizar estado de admisión (individual o masivo)
     case 'update_admission_status':

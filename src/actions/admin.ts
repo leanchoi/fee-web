@@ -1,250 +1,232 @@
-function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = { ...customHeaders };
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("fee_admin_token");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+"use client";
+
+const TOKEN_KEY = "fee_admin_token";
+
+export type AdminSession = {
+  userId: string;
+  username: string;
+  name: string;
+  email: string;
+  role: string;
+  permissions: string;
+  mustChangePassword: boolean;
+};
+
+export type ApiResult =
+  | { success: true; [k: string]: any }
+  | { success: false; error: string; code?: string; status?: number };
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
   }
-  return headers;
 }
 
-export async function loginAdmin(password: string, email?: string) {
+export function clearStoredToken(): void {
+  if (typeof window === "undefined") return;
   try {
-    const res = await fetch("/api/login.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email || "admin", password }),
-    });
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
 
-    let data: any = null;
+export function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const h: Record<string, string> = { ...extra };
+  const t = getStoredToken();
+  if (t) {
+    h["Authorization"] = `Bearer ${t}`;
+    h["X-Authorization"] = `Bearer ${t}`; // Apache FastCGI no filtra headers X-*
+  }
+  return h;
+}
+
+/**
+ * Todo request pasa por acá: Lee el cuerpo como texto antes de parsear
+ * evitando excepciones crudas de JSON.parse.
+ */
+export async function apiFetch(url: string, init: RequestInit = {}): Promise<ApiResult> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      credentials: "same-origin", // Envía y acepta la cookie admin_session
+      cache: "no-store",
+    });
+  } catch {
+    return { success: false, error: "No se pudo conectar con el servidor.", status: 0 };
+  }
+
+  const text = await res.text();
+  if (!text.trim()) {
+    return { success: false, error: "El servidor no devolvió respuesta.", code: "EMPTY_BODY", status: res.status };
+  }
+
+  try {
+    const data = JSON.parse(text);
+    return { ...data, status: res.status };
+  } catch {
+    return { success: false, error: "Respuesta inválida del servidor.", code: "INVALID_JSON", status: res.status };
+  }
+}
+
+export async function loginAdmin(password: string, email?: string): Promise<ApiResult> {
+  const result = await apiFetch("/api/login.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: email || "admin",
+      email: email || "admin",
+      password: password
+    }),
+  });
+
+  if (result.success && typeof result.token === "string") {
     try {
-      data = await res.json();
-    } catch (parseErr) {
-      return { success: false, error: "Usuario o contraseña incorrectos." };
-    }
-
-    if (data && data.success && data.token && typeof window !== "undefined") {
-      localStorage.setItem("fee_admin_token", data.token);
-    }
-    return data || { success: false, error: "Usuario o contraseña incorrectos." };
-  } catch (error: any) {
-    return { success: false, error: "Usuario o contraseña incorrectos." };
+      window.localStorage.setItem(TOKEN_KEY, result.token);
+    } catch {}
   }
+
+  // Si es 401 se generaliza por seguridad; 429 y 500 muestran su mensaje real
+  if (!result.success && result.status === 401) {
+    return { success: false, error: "Usuario o contraseña incorrectos.", code: "UNAUTHORIZED", status: 401 };
+  }
+
+  return result;
 }
 
-export async function logoutAdmin() {
+export async function getDashboardData(): Promise<ApiResult> {
+  return apiFetch("/api/admin.php?action=get_data", {
+    headers: authHeaders()
+  });
+}
+
+export async function logoutAdmin(): Promise<void> {
+  clearStoredToken();
   try {
-    await fetch("/api/admin.php?action=logout", { 
-      method: "POST",
-      headers: getAuthHeaders()
-    });
-  } catch (e) {}
+    await fetch("/api/logout.php", { method: "POST", credentials: "same-origin" });
+  } catch {}
   try {
-    await fetch("/api/logout.php", { method: "POST" });
-  } catch (e) {}
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("fee_admin_token");
-  }
+    await fetch("/api/admin.php?action=logout", { method: "POST", headers: authHeaders() });
+  } catch {}
   if (typeof document !== "undefined") {
     document.cookie = "admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0;";
   }
 }
 
-export async function getDashboardData() {
-  try {
-    const res = await fetch("/api/admin.php?action=get_data", {
-      headers: getAuthHeaders()
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function updateEnrollmentStatus(id: string, status: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "update_enrollment_status", id, status }),
+  });
 }
 
-export async function updateEnrollmentStatus(id: string, status: string) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "update_enrollment_status", id, status }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function deleteEnrollment(id: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "delete_enrollment", id }),
+  });
 }
 
-export async function deleteEnrollment(id: string) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "delete_enrollment", id }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function deleteContactMessage(id: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "delete_contact", id }),
+  });
 }
 
-export async function deleteContactMessage(id: string) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "delete_contact", id }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function createPost(data: any): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "save_post", ...data }),
+  });
 }
 
-export async function createPost(data: any) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "save_post", ...data }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function updatePost(id: string, data: any): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "save_post", id, ...data }),
+  });
 }
 
-export async function updatePost(id: string, data: any) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "save_post", id, ...data }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function deletePost(id: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "delete_post", id }),
+  });
 }
 
-export async function deletePost(id: string) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "delete_post", id }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function togglePostPublish(id: string, current: boolean) {
+export async function togglePostPublish(id: string, current: boolean): Promise<ApiResult> {
   return updatePost(id, { published: !current });
 }
 
-export async function createUserAction(data: any): Promise<{ success: boolean; error?: string; message?: string }> {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "create_user", ...data }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al crear usuario" };
-  }
+export async function createUserAction(data: any): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "create_user", ...data }),
+  });
 }
 
-export async function deleteUser(id: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "delete_user", id }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al eliminar usuario" };
-  }
+export async function deleteUser(id: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "delete_user", id }),
+  });
 }
 
-export async function changePasswordAction(newPassword: string): Promise<{ success: boolean; error?: string; message?: string }> {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "change_password", newPassword }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al actualizar contraseña" };
-  }
+export async function changePasswordAction(newPassword: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "change_password", newPassword }),
+  });
 }
 
-export async function resetUserPasswordAction(userId: string, password: string): Promise<{ success: boolean; error?: string; message?: string }> {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "reset_user_password", userId, password }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al restablecer contraseña" };
-  }
+export async function resetUserPasswordAction(userId: string, password: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "reset_user_password", userId, password }),
+  });
 }
 
-export async function uploadMediaAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
-  try {
-    const res = await fetch("/api/upload.php", {
-      method: "POST",
-      headers: getAuthHeaders(),
-      body: formData,
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message || "Error al subir archivo" };
-  }
+export async function uploadMediaAction(formData: FormData): Promise<ApiResult> {
+  return apiFetch("/api/upload.php", {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
 }
 
-export async function getGalleryItemsAction() {
-  try {
-    const res = await fetch("/api/admin.php?action=get_gallery");
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function getGalleryItemsAction(): Promise<ApiResult> {
+  return apiFetch("/api/admin.php?action=get_gallery");
 }
 
-export async function saveGalleryItemAction(data: { id?: string; image: string; category: string; title: string; desc: string }) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "save_gallery_item", ...data }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function saveGalleryItemAction(data: { id?: string; image: string; category: string; title: string; desc: string }): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "save_gallery_item", ...data }),
+  });
 }
 
-export async function deleteGalleryItemAction(id: string) {
-  try {
-    const res = await fetch("/api/admin.php", {
-      method: "POST",
-      headers: getAuthHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ action: "delete_gallery_item", id }),
-    });
-    return await res.json();
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
+export async function deleteGalleryItemAction(id: string): Promise<ApiResult> {
+  return apiFetch("/api/admin.php", {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ action: "delete_gallery_item", id }),
+  });
 }
 
-export async function getSession() {
+export async function getSession(): Promise<null> {
   return null;
 }
-
