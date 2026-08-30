@@ -96,9 +96,22 @@ export async function loginAdmin(password: string, email?: string): Promise<ApiR
   return result;
 }
 
-export async function getDashboardData(): Promise<ApiResult> {
-  return apiFetch("/api/admin.php?action=get_data", {
-    headers: authHeaders()
+export async function getDashboardData(cohort?: number): Promise<ApiResult> {
+  const qs = new URLSearchParams({ action: "get_dashboard_data" });
+  if (cohort) qs.set("cohort", String(cohort));
+  qs.set("_ts", String(Date.now()));
+  return apiFetch(`/api/admin.php?${qs.toString()}`, {
+    headers: authHeaders(),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+}
+
+export async function getEnrollmentDetails(id: string): Promise<ApiResult> {
+  return apiFetch(`/api/admin.php?action=get_enrollment&id=${encodeURIComponent(id)}&_ts=${Date.now()}`, {
+    headers: authHeaders(),
+    credentials: "same-origin",
+    cache: "no-store",
   });
 }
 

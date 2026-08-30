@@ -283,6 +283,7 @@ export function PreinscripcionForm() {
         credentials: "same-origin",
         body: JSON.stringify({
           ...formData,
+          formKind: "preinscripcion",
           type: "preinscripcion_2027",
           cohortYear: 2027
         })

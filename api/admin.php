@@ -247,6 +247,98 @@ function checkPermission($session, $requiredPerm) {
     return in_array($requiredPerm, $userPerms, true);
 }
 
+require_once __DIR__ . '/schema.php';
+
+function feeResolveKind(array $r): string
+{
+    $k = strtolower(trim((string) ($r['formKind'] ?? '')));
+    if ($k === 'preinscripcion' || $k === 'reinscripcion') return $k;
+
+    $type = strtolower(trim((string) ($r['type'] ?? '')));
+    $map  = [
+        'preinscripcion' => 'preinscripcion', 'preinscripcion_2027' => 'preinscripcion',
+        'preinscripciones' => 'preinscripcion',
+        'reinscripcion'  => 'reinscripcion',  'reinscripcion_2027'  => 'reinscripcion',
+        'reinscripciones' => 'reinscripcion',
+    ];
+    if (isset($map[$type])) return $map[$type];
+
+    $tr = strtoupper(trim((string) ($r['trackingNumber'] ?? '')));
+    if (str_starts_with($tr, 'PRE-')) return 'preinscripcion';
+    if (str_starts_with($tr, 'FEE-')) return 'reinscripcion';
+
+    // Señales exclusivas de preinscripción (legacy sin type ni tracking)
+    foreach (['admissionStatus', 'currentSchool', 'interviewSlotId', 'englishAccreditationType'] as $f) {
+        $v = $r[$f] ?? null;
+        if ($v !== null && $v !== '' && $v !== 'ninguno') return 'preinscripcion';
+    }
+    // Señales exclusivas de reinscripción
+    foreach (['signature1Data', 'contractAccepted', 'billingCuit'] as $f) {
+        if (!empty($r[$f])) return 'reinscripcion';
+    }
+    return 'reinscripcion';
+}
+
+function feeNormalizeEnrollment(array $r, string $origin): array
+{
+    $r['formKind']   = feeResolveKind($r);
+    $r['type']       = $r['formKind'] === 'preinscripcion' ? 'preinscripcion_2027' : 'reinscripcion_2027';
+    $r['cohortYear'] = (int) ($r['cohortYear'] ?? 2027);
+    $r['status']     = (string) ($r['status'] ?? 'vigente');
+    $r['_origin']    = $origin;
+
+    foreach ([
+        'hasSiblings', 'hasSiblingInSchool', 'isStaffChild', 'isSingleParent',
+        'hasDebtClearance', 'hasRepeated', 'contractAccepted', 'dataAccepted',
+        'termsAccepted', 'isArchived', 'priorityVerified',
+    ] as $b) {
+        if (array_key_exists($b, $r)) { $r[$b] = (int) (bool) $r[$b]; }
+    }
+
+    $r['hasSignature1'] = !empty($r['signature1Data']) && $r['signature1Data'] !== '[stored]';
+    $r['hasSignature2'] = !empty($r['signature2Data']) && $r['signature2Data'] !== '[stored]';
+    unset($r['signature1Data'], $r['signature2Data']);
+
+    return $r;
+}
+
+function feeMergeEnrollments(array $db, array $jsonSets): array
+{
+    $out = [];
+    $seen = ['id' => [], 'uuid' => [], 'tracking' => []];
+
+    $push = static function (array $r, string $origin) use (&$out, &$seen): void {
+        $id = (string) ($r['id'] ?? '');
+        $uu = (string) ($r['submissionUuid'] ?? '');
+        $tr = (string) ($r['trackingNumber'] ?? '');
+
+        if ($id && isset($seen['id'][$id]))       return;
+        if ($uu && isset($seen['uuid'][$uu]))     return;
+        if ($tr && isset($seen['tracking'][$tr])) return;
+
+        if ($id) $seen['id'][$id]       = true;
+        if ($uu) $seen['uuid'][$uu]     = true;
+        if ($tr) $seen['tracking'][$tr] = true;
+
+        $out[] = feeNormalizeEnrollment($r, $origin);
+    };
+
+    foreach ($db as $r) { $push($r, 'mysql'); }
+    foreach ($jsonSets as $origin => $rows) {
+        foreach ($rows as $r) { if (is_array($r)) { $push($r, $origin); } }
+    }
+
+    usort($out, static fn($a, $b) => strcmp((string) ($b['createdAt'] ?? ''), (string) ($a['createdAt'] ?? '')));
+    return $out;
+}
+
+function feeReadJson(string $path): array
+{
+    if (!is_file($path)) return [];
+    $d = json_decode((string) @file_get_contents($path), true);
+    return is_array($d) ? $d : [];
+}
+
 // 3 Noticias institucionales iniciales (deshabilitadas para no resucitar posts borrados)
 $initialPosts = [];
 
@@ -254,72 +346,88 @@ switch ($action) {
     // 1. Obtener todos los datos para el Dashboard (Filtrado por permisos)
     case 'get_dashboard_data':
     case 'get_data':
-        $enrollments = [];
-        $contacts    = [];
-        $posts       = [];
-        $users       = [];
-        $gallery     = [];
-        $cohorts     = [];
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
 
         $canEnrollments = checkPermission($session, 'enrollments');
         $canContacts    = checkPermission($session, 'contacts');
         $canBlog        = checkPermission($session, 'blog');
-        $isSuperAdmin   = ($session['role'] ?? '') === 'SUPER_ADMIN';
-        $filterCohort   = isset($_GET['cohort']) ? (int)$_GET['cohort'] : null;
+        $isSuperAdmin   = (($session['role'] ?? '') === 'SUPER_ADMIN');
 
-        try {
-            $pdo = getPDO();
-            if ($pdo) {
-                if ($canEnrollments) {
-                    try {
-                        if ($filterCohort && $filterCohort > 2020) {
-                            $stmtEn = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `cohortYear` = :cohort ORDER BY `createdAt` DESC");
-                            $stmtEn->execute([':cohort' => $filterCohort]);
-                            $enrollments = $stmtEn->fetchAll() ?: [];
-                        } else {
-                            $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                        }
-                    } catch (Exception $e) {}
+        $rawCohort    = $_GET['cohort'] ?? null;
+        $filterCohort = ($rawCohort !== null && $rawCohort !== '' && $rawCohort !== 'all')
+            ? (int) $rawCohort : null;
+        if ($filterCohort !== null && $filterCohort < 2020) { $filterCohort = null; }
 
-                    try {
-                        $cohorts = $pdo->query("SELECT `id`, `year`, `type`, `status`, `notes` FROM `Cohort` ORDER BY `year` DESC, `type` ASC")->fetchAll() ?: [];
-                    } catch (Exception $e) {
-                        $cohorts = [];
+        $dbEnrollments = [];
+        $cohorts = $contacts = $posts = $users = $gallery = [];
+        $warnings = [];
+
+        $pdo = getPDO();
+        if (!$pdo) { $warnings[] = 'Sin conexión a MySQL: se muestran solo los respaldos locales.'; }
+
+        if ($pdo) {
+            if ($canEnrollments) {
+                ensureEnrollmentTableSchema($pdo);
+
+                $wanted = array_keys(enrollmentSchemaDefinition());
+                $wanted = array_values(array_diff($wanted, ['signature1Data', 'signature2Data']));
+                $have   = enrollmentExistingColumns($pdo);
+                $select = array_values(array_filter($wanted, static fn($c) => isset($have[$c])));
+                array_unshift($select, 'id');
+
+                $cols = '`' . implode('`, `', array_unique($select)) . '`'
+                      . ", CASE WHEN `signature1Data` IS NULL OR `signature1Data` = '' THEN 0 ELSE 1 END AS `hasSignature1`"
+                      . ", CASE WHEN `signature2Data` IS NULL OR `signature2Data` = '' THEN 0 ELSE 1 END AS `hasSignature2`";
+
+                try {
+                    if ($filterCohort) {
+                        $st = $pdo->prepare("SELECT {$cols} FROM `Enrollment` WHERE `cohortYear` = :c ORDER BY `createdAt` DESC LIMIT 5000");
+                        $st->execute([':c' => $filterCohort]);
+                        $dbEnrollments = $st->fetchAll() ?: [];
+                    } else {
+                        $dbEnrollments = $pdo->query("SELECT {$cols} FROM `Enrollment` ORDER BY `createdAt` DESC LIMIT 5000")->fetchAll() ?: [];
                     }
+                } catch (Throwable $e) {
+                    error_log('[ADMIN] Consulta Enrollment: ' . $e->getMessage());
+                    $warnings[] = 'La consulta a MySQL falló; se muestran los respaldos locales.';
                 }
-                if ($canContacts) {
-                    try {
-                        $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                    } catch (Exception $e) {}
-                }
-                if ($canBlog) {
-                    try {
-                        $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                    } catch (Exception $e) {}
-                }
-                if ($isSuperAdmin) {
-                    try {
-                        ensureUserTableSchema($pdo);
-                        $users = $pdo->query("SELECT `id`, `username`, `email`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                    } catch (Exception $e) {
-                        error_log("Get users DB error: " . $e->getMessage());
-                    }
-                }
-                if (!empty($session['userId'])) {
-                    try {
-                        $stmtUser = $pdo->prepare("SELECT `mustChangePassword`, `username`, `name` FROM `User` WHERE `id` = :uid LIMIT 1");
-                        $stmtUser->execute([':uid' => $session['userId']]);
-                        $freshUser = $stmtUser->fetch();
-                        if ($freshUser) {
-                            $session['mustChangePassword'] = !empty($freshUser['mustChangePassword']);
-                            if (!empty($freshUser['username'])) $session['username'] = $freshUser['username'];
-                            if (!empty($freshUser['name'])) $session['name'] = $freshUser['name'];
-                        }
-                    } catch (Exception $e) {}
+
+                try {
+                    $cohorts = $pdo->query("SELECT `id`, `year`, `type`, `status`, `notes` FROM `Cohort` ORDER BY `year` DESC, `type` ASC")->fetchAll() ?: [];
+                } catch (Throwable $e) { $cohorts = []; }
+            }
+
+            if ($canContacts) {
+                try {
+                    $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                } catch (Exception $e) {}
+            }
+            if ($canBlog) {
+                try {
+                    $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                } catch (Exception $e) {}
+            }
+            if ($isSuperAdmin) {
+                try {
+                    ensureUserTableSchema($pdo);
+                    $users = $pdo->query("SELECT `id`, `username`, `email`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                } catch (Exception $e) {
+                    error_log("Get users DB error: " . $e->getMessage());
                 }
             }
-        } catch (Exception $e) {
-            error_log("Dashboard query error: " . $e->getMessage());
+            if (!empty($session['userId'])) {
+                try {
+                    $stmtUser = $pdo->prepare("SELECT `mustChangePassword`, `username`, `name` FROM `User` WHERE `id` = :uid LIMIT 1");
+                    $stmtUser->execute([':uid' => $session['userId']]);
+                    $freshUser = $stmtUser->fetch();
+                    if ($freshUser) {
+                        $session['mustChangePassword'] = !empty($freshUser['mustChangePassword']);
+                        if (!empty($freshUser['username'])) $session['username'] = $freshUser['username'];
+                        if (!empty($freshUser['name'])) $session['name'] = $freshUser['name'];
+                    }
+                } catch (Exception $e) {}
+            }
         }
 
         // Combinar con almacenamiento JSON de respaldo para todos los módulos
@@ -329,7 +437,6 @@ switch ($action) {
             $usersFile = $dataDir . '/users.json';
             $jsonUsers = file_exists($usersFile) ? (json_decode(file_get_contents($usersFile), true) ?: []) : [];
             
-            // Garantizar la presencia de usuarios institucionales mínimos
             if (empty($jsonUsers)) {
                 $jsonUsers = [
                     [
@@ -380,27 +487,25 @@ switch ($action) {
                 }
             }
         }
+
+        $enrollments = [];
         if ($canEnrollments) {
-            $enrollFile = $dataDir . '/enrollments.json';
-            if (file_exists($enrollFile)) {
-                $jsonEnrollments = json_decode(file_get_contents($enrollFile), true) ?: [];
-                $existingIds = array_column($enrollments, 'id');
-                foreach ($jsonEnrollments as $item) {
-                    if (!in_array($item['id'], $existingIds)) {
-                        $enrollments[] = $item;
-                    }
-                }
+            $enrollments = feeMergeEnrollments($dbEnrollments, [
+                'json_enrollments'      => feeReadJson($dataDir . '/enrollments.json'),
+                'json_preinscripciones' => feeReadJson($dataDir . '/preinscripciones.json'),
+            ]);
+
+            if ($filterCohort) {
+                $enrollments = array_values(array_filter(
+                    $enrollments,
+                    static fn($r) => (int) ($r['cohortYear'] ?? 0) === $filterCohort
+                ));
             }
 
-            $preFile = $dataDir . '/preinscripciones.json';
-            if (file_exists($preFile)) {
-                $jsonPres = json_decode(file_get_contents($preFile), true) ?: [];
-                $existingIds = array_column($enrollments, 'id');
-                foreach ($jsonPres as $item) {
-                    if (!in_array($item['id'], $existingIds)) {
-                        $enrollments[] = $item;
-                    }
-                }
+            $orphans = 0;
+            foreach ($enrollments as $r) { if (!empty($r['_dbFailed'])) { $orphans++; } }
+            if ($orphans > 0) {
+                $warnings[] = "{$orphans} trámite(s) quedaron solo en respaldo local por un fallo de MySQL. Revisar api/logs/php-error.log.";
             }
         }
 
@@ -439,6 +544,25 @@ switch ($action) {
             $gallery = $initialGallery;
         }
 
+        // Contadores calculados en el servidor
+        $counts = [
+            'total'          => count($enrollments),
+            'reinscripcion'  => 0,
+            'preinscripcion' => 0,
+            'vigentes'       => 0,
+            'porCohorte'     => [],
+            'porOrigen'      => ['mysql' => 0, 'json_enrollments' => 0, 'json_preinscripciones' => 0],
+        ];
+        foreach ($enrollments as $r) {
+            $k = $r['formKind'] ?? 'reinscripcion';
+            if (isset($counts[$k])) $counts[$k]++;
+            if (($r['status'] ?? '') === 'vigente') { $counts['vigentes']++; }
+            $y = (string) ($r['cohortYear'] ?? 0);
+            $counts['porCohorte'][$y] = ($counts['porCohorte'][$y] ?? 0) + 1;
+            $o = (string) ($r['_origin'] ?? 'mysql');
+            $counts['porOrigen'][$o] = ($counts['porOrigen'][$o] ?? 0) + 1;
+        }
+
         $sessionPayload = [
             "userId"             => $session['userId'] ?? '',
             "username"           => $session['username'] ?? '',
@@ -450,16 +574,52 @@ switch ($action) {
         ];
 
         jsonResponse(200, [
-            "success"      => true,
-            "enrollments"  => $enrollments,
-            "cohorts"      => $cohorts,
-            "contacts"     => $contacts,
-            "posts"        => $posts,
-            "users"        => $users,
-            "gallery"      => $gallery,
-            "session"      => $sessionPayload,
-            "user"         => $sessionPayload
+            "success"         => true,
+            "enrollments"     => $enrollments,
+            "counts"          => $counts,
+            "cohorts"         => $cohorts,
+            "contacts"        => $contacts,
+            "posts"           => $posts,
+            "users"           => $users,
+            "gallery"         => $gallery,
+            "warnings"        => $warnings,
+            "appliedCohort"   => $filterCohort,
+            "session"         => $sessionPayload,
+            "user"            => $sessionPayload,
+            "generatedAt"     => date('c')
         ]);
+
+    case 'get_enrollment':
+        if (!checkPermission($session, 'enrollments')) {
+            jsonResponse(403, ['success' => false, 'error' => 'Sin permisos.']);
+        }
+        $eid = (string) ($_GET['id'] ?? '');
+        if ($eid === '') { jsonResponse(400, ['success' => false, 'error' => 'Falta el id.']); }
+
+        $pdo = getPDO();
+        if ($pdo) {
+            try {
+                $st = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `id` = :id LIMIT 1");
+                $st->execute([':id' => $eid]);
+                if ($rec = $st->fetch()) {
+                    $rec['formKind'] = feeResolveKind($rec);
+                    jsonResponse(200, ['success' => true, 'enrollment' => $rec]);
+                }
+            } catch (Throwable $e) {
+                error_log('[ADMIN] get_enrollment: ' . $e->getMessage());
+            }
+        }
+
+        foreach (['/data/enrollments.json', '/data/preinscripciones.json'] as $f) {
+            foreach (feeReadJson(__DIR__ . $f) as $rec) {
+                if (($rec['id'] ?? '') === $eid) {
+                    $rec['formKind'] = feeResolveKind($rec);
+                    jsonResponse(200, ['success' => true, 'enrollment' => $rec, 'source' => 'json']);
+                }
+            }
+        }
+
+        jsonResponse(404, ['success' => false, 'error' => 'Trámite no encontrado.']);
 
     // 2. Actualizar estado de admisión (individual o masivo)
     case 'update_admission_status':

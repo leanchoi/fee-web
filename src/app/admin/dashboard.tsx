@@ -15,7 +15,8 @@ import {
   uploadMediaAction,
   deleteContactMessage,
   saveGalleryItemAction,
-  deleteGalleryItemAction
+  deleteGalleryItemAction,
+  getEnrollmentDetails
 } from "@/actions/admin";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -263,6 +264,47 @@ export function HighlightText({ text, highlight }: { text?: string | number | nu
   );
 }
 
+const PREINSCRIPCION_TYPES = new Set([
+  "preinscripcion",
+  "preinscripcion_2027",
+  "preinscripciones",
+]);
+
+const REINSCRIPCION_TYPES = new Set([
+  "reinscripcion",
+  "reinscripcion_2027",
+  "reinscripciones",
+]);
+
+export function resolveFormKind(e: any): "reinscripcion" | "preinscripcion" {
+  if (e.formKind === "preinscripcion" || e.formKind === "reinscripcion") {
+    return e.formKind;
+  }
+
+  const type = String(e.type ?? "").trim().toLowerCase();
+  if (PREINSCRIPCION_TYPES.has(type)) return "preinscripcion";
+  if (REINSCRIPCION_TYPES.has(type)) return "reinscripcion";
+
+  const tracking = String(e.trackingNumber ?? "").trim().toUpperCase();
+  if (tracking.startsWith("PRE-")) return "preinscripcion";
+  if (tracking.startsWith("FEE-")) return "reinscripcion";
+
+  if (
+    (e.admissionStatus && e.admissionStatus !== "") ||
+    (e.currentSchool && e.currentSchool !== "") ||
+    (e.interviewSlotId != null) ||
+    (e.englishAccreditationType && e.englishAccreditationType !== "ninguno")
+  ) {
+    return "preinscripcion";
+  }
+
+  if (e.hasSignature1 || e.signature1Data || e.contractAccepted || e.billingCuit) {
+    return "reinscripcion";
+  }
+
+  return "reinscripcion";
+}
+
 export function AdminDashboard({ 
   posts, 
   enrollments, 
@@ -446,29 +488,24 @@ export function AdminDashboard({
   }, [contactMessages]);
 
   // Partition between Reinscripciones 2027 and Preinscripciones Generales
-  const isReinscripcionRecord = (e: any) => {
-    // Si tiene firmas digitales, aceptación de contrato, datos de facturación o hermanos tabulados, es indiscutiblemente una reinscripción
-    if (e.signature1Data || e.signature2Data || e.contractAccepted || e.billingCuit || e.billingName) {
-      return true;
-    }
-    const t = String(e.type || "").toLowerCase();
-    const tr = String(e.trackingNumber || "").toUpperCase();
-    if (t.includes("reinscripcion") || tr.startsWith("FEE-")) {
-      return true;
-    }
-    if (t.includes("preinscripcion") || tr.startsWith("PRE-") || e.admissionStatus) {
-      return false;
-    }
-    return true;
-  };
-
   const reinscripcionesList = useMemo(() => {
-    return enrollmentList.filter(isReinscripcionRecord);
+    return enrollmentList.filter((e) => resolveFormKind(e) === "reinscripcion");
   }, [enrollmentList]);
 
   const preinscripcionesList = useMemo(() => {
-    return enrollmentList.filter((e: any) => !isReinscripcionRecord(e));
+    return enrollmentList.filter((e) => resolveFormKind(e) === "preinscripcion");
   }, [enrollmentList]);
+
+  // Invariante de partición determinística
+  useEffect(() => {
+    const suma = reinscripcionesList.length + preinscripcionesList.length;
+    if (suma !== enrollmentList.length) {
+      console.error(
+        `[FEE] Partición inconsistente: ${enrollmentList.length} registros -> ` +
+          `${reinscripcionesList.length} re + ${preinscripcionesList.length} pre = ${suma}`
+      );
+    }
+  }, [enrollmentList.length, reinscripcionesList.length, preinscripcionesList.length]);
 
   // Enrollments Filtering, Selection & ZIP Export State
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
@@ -748,42 +785,54 @@ export function AdminDashboard({
     );
   };
 
-  const handleDownloadSinglePdf = (e: any) => {
+  const handleDownloadSinglePdf = async (e: any) => {
+    let fullRecord = e;
+    if ((e.hasSignature1 || e.hasSignature2) && (!e.signature1Data || e.signature1Data === "[stored]") && e.id) {
+      try {
+        const res = await getEnrollmentDetails(e.id);
+        if (res.success && res.enrollment) {
+          fullRecord = res.enrollment;
+        }
+      } catch (err) {
+        console.error("Error fetching full signatures for PDF:", err);
+      }
+    }
+
     downloadFilledContract({
-      studentName: e.studentName || "",
-      studentDni: e.studentDni || "",
-      school: e.school || "Escuela N.º 1030",
-      studentLevel: e.studentLevel || determineLevel(e.studentGrade, e.school),
-      level: e.studentLevel || determineLevel(e.studentGrade, e.school),
-      studentGrade: e.studentGrade || "",
-      hasSiblings: Boolean(e.hasSiblings),
-      siblingDetails: e.siblingDetails || "",
-      parent1Name: e.parent1Name || e.tutorName || "",
-      parent1Dni: e.parent1Dni || "",
-      parent1Relationship: e.parent1Relationship || "Madre/Padre/Tutor",
-      parent1Phone: e.parent1Phone || e.tutorPhone || "",
-      parent1Email: e.parent1Email || e.tutorEmail || "",
-      parent1Address: e.parent1Address || "",
-      parent1City: e.parent1City || "Esquel",
-      parent1PostalCode: e.parent1PostalCode || "9200",
-      isSingleParent: Boolean(e.isSingleParent),
-      parent2Name: e.parent2Name || "",
-      parent2Dni: e.parent2Dni || "",
-      parent2Relationship: e.parent2Relationship || "",
-      parent2Phone: e.parent2Phone || "",
-      parent2Email: e.parent2Email || "",
-      parent2Address: e.parent2Address || "",
-      parent2City: e.parent2City || "Esquel",
-      parent2PostalCode: e.parent2PostalCode || "9200",
-      billingName: e.billingName || e.parent1Name || e.tutorName || "",
-      billingCuit: e.billingCuit || e.parent1Dni || "",
-      billingTaxCondition: e.billingTaxCondition || "Consumidor Final",
-      billingEmail: e.billingEmail || e.parent1Email || e.tutorEmail || "",
-      billingAddress: e.billingAddress || e.parent1Address || "",
-      signature1Data: e.signature1Data || null,
-      signature2Data: e.signature2Data || null,
-      trackingNumber: e.trackingNumber || e.id,
-      signedAt: e.createdAt
+      studentName: fullRecord.studentName || "",
+      studentDni: fullRecord.studentDni || "",
+      school: fullRecord.school || "Escuela N.º 1030",
+      studentLevel: fullRecord.studentLevel || determineLevel(fullRecord.studentGrade, fullRecord.school),
+      level: fullRecord.studentLevel || determineLevel(fullRecord.studentGrade, fullRecord.school),
+      studentGrade: fullRecord.studentGrade || "",
+      hasSiblings: Boolean(fullRecord.hasSiblings),
+      siblingDetails: fullRecord.siblingDetails || "",
+      parent1Name: fullRecord.parent1Name || fullRecord.tutorName || "",
+      parent1Dni: fullRecord.parent1Dni || "",
+      parent1Relationship: fullRecord.parent1Relationship || "Madre/Padre/Tutor",
+      parent1Phone: fullRecord.parent1Phone || fullRecord.tutorPhone || "",
+      parent1Email: fullRecord.parent1Email || fullRecord.tutorEmail || "",
+      parent1Address: fullRecord.parent1Address || "",
+      parent1City: fullRecord.parent1City || "Esquel",
+      parent1PostalCode: fullRecord.parent1PostalCode || "9200",
+      isSingleParent: Boolean(fullRecord.isSingleParent),
+      parent2Name: fullRecord.parent2Name || "",
+      parent2Dni: fullRecord.parent2Dni || "",
+      parent2Relationship: fullRecord.parent2Relationship || "",
+      parent2Phone: fullRecord.parent2Phone || "",
+      parent2Email: fullRecord.parent2Email || "",
+      parent2Address: fullRecord.parent2Address || "",
+      parent2City: fullRecord.parent2City || "Esquel",
+      parent2PostalCode: fullRecord.parent2PostalCode || "9200",
+      billingName: fullRecord.billingName || fullRecord.parent1Name || fullRecord.tutorName || "",
+      billingCuit: fullRecord.billingCuit || fullRecord.parent1Dni || "",
+      billingTaxCondition: fullRecord.billingTaxCondition || "Consumidor Final",
+      billingEmail: fullRecord.billingEmail || fullRecord.parent1Email || fullRecord.tutorEmail || "",
+      billingAddress: fullRecord.billingAddress || fullRecord.parent1Address || "",
+      signature1Data: fullRecord.signature1Data && fullRecord.signature1Data !== "[stored]" ? fullRecord.signature1Data : null,
+      signature2Data: fullRecord.signature2Data && fullRecord.signature2Data !== "[stored]" ? fullRecord.signature2Data : null,
+      trackingNumber: fullRecord.trackingNumber || fullRecord.id,
+      signedAt: fullRecord.createdAt
     });
   };
 

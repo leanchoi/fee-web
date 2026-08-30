@@ -364,6 +364,7 @@ export function EnrollmentForm() {
     try {
       const result = await submitEnrollment({
         ...formData,
+        formKind: "reinscripcion",
         type: "reinscripcion_2027",
         cohortYear: 2027,
         contractAccepted: true,
