@@ -1438,7 +1438,7 @@ export function AdminDashboard({
 
       {/* Sub-navbar Nivel 1: Procesos de Admisiones / Inscripciones FEE */}
       {hasEnrollmentsPerm && activeTab === "inscripciones" && (
-        <div className="border-b px-8 py-3.5 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+        <div className="border-b px-4 sm:px-8 py-3 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-2 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-amber-400" />
@@ -1505,41 +1505,55 @@ export function AdminDashboard({
 
       {/* Sub-barra Nivel 2: Vistas Segregadas de Reinscripciones (Base Limpia, Grupos Familiares, Trámites) */}
       {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "reinscripciones" && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b px-8 py-3 bg-linear-to-r from-slate-100 via-indigo-50/40 to-emerald-50/40">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b px-3 sm:px-8 py-2.5 sm:py-3 bg-linear-to-r from-slate-100 via-indigo-50/40 to-emerald-50/40">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-indigo-600" />
               Vistas Segregadas de Reinscripción:
             </span>
-            <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-300 shadow-xs">
+            <div className="w-full sm:w-auto grid grid-cols-3 sm:flex sm:items-center gap-1 sm:gap-2 bg-white p-1 rounded-2xl border border-slate-300 shadow-xs">
               <button 
                 onClick={() => setReinscripcionesView("base_limpia")}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer border",
-                  reinscripcionesView === "base_limpia" ? "bg-emerald-800 text-white border-emerald-900 shadow-xs" : "text-emerald-950 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
+                  "flex flex-col sm:flex-row items-center justify-center text-center sm:text-left gap-1 sm:gap-2 px-1.5 py-1.5 sm:px-4 sm:py-2 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer border min-w-0",
+                  reinscripcionesView === "base_limpia" 
+                    ? "bg-emerald-800 text-white border-emerald-900 shadow-xs" 
+                    : "text-emerald-950 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
                 )}
+                title="Base Limpia Oficial (Alumnos únicos)"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Base Limpia Oficial</span>
+                <div className="flex items-center gap-1">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate block">
+                    <span className="hidden sm:inline">Base Limpia Oficial</span>
+                    <span className="sm:hidden text-[10px]">Base Limpia</span>
+                  </span>
+                </div>
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black shrink-0",
                   reinscripcionesView === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
                 )}>
-                  {consolidatedFamiliesData.cleanStudents.length} alumnos
+                  {consolidatedFamiliesData.cleanStudents.length}<span className="hidden sm:inline"> alumnos</span>
                 </span>
               </button>
 
               <button 
                 onClick={() => setReinscripcionesView("familias")}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                  "flex flex-col sm:flex-row items-center justify-center text-center sm:text-left gap-1 sm:gap-2 px-1.5 py-1.5 sm:px-4 sm:py-2 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer min-w-0",
                   reinscripcionesView === "familias" ? "bg-indigo-700 text-white shadow-xs" : "text-indigo-900 hover:bg-indigo-50"
                 )}
+                title="Grupos Familiares Consolidados"
               >
-                <Home className="w-3.5 h-3.5" />
-                <span>Grupos Familiares</span>
+                <div className="flex items-center gap-1">
+                  <Home className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate block">
+                    <span className="hidden sm:inline">Grupos Familiares</span>
+                    <span className="sm:hidden text-[10px]">Familias</span>
+                  </span>
+                </div>
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black shrink-0",
                   reinscripcionesView === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
                 )}>
                   {consolidatedFamiliesData.families.length}
@@ -1549,14 +1563,20 @@ export function AdminDashboard({
               <button 
                 onClick={() => setReinscripcionesView("tramites")}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                  "flex flex-col sm:flex-row items-center justify-center text-center sm:text-left gap-1 sm:gap-2 px-1.5 py-1.5 sm:px-4 sm:py-2 rounded-xl font-black text-[11px] sm:text-xs transition-all cursor-pointer min-w-0",
                   reinscripcionesView === "tramites" ? "bg-slate-800 text-white shadow-xs" : "text-slate-700 hover:bg-slate-100"
                 )}
+                title="Padrón de Formularios / Trámites Presentados"
               >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Padrón de Trámites</span>
+                <div className="flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate block">
+                    <span className="hidden sm:inline">Padrón de Trámites</span>
+                    <span className="sm:hidden text-[10px]">Trámites</span>
+                  </span>
+                </div>
                 <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  "px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black shrink-0",
                   reinscripcionesView === "tramites" ? "bg-white text-slate-900" : "bg-slate-200 text-slate-800"
                 )}>
                   {reinscripcionesList.length}
