@@ -1045,6 +1045,13 @@ export function AdminDashboard({
   
   // User Management State
   const [userList, setUserList] = useState<any[]>(users || []);
+  
+  useEffect(() => {
+    if (Array.isArray(users) && users.length > 0) {
+      setUserList(users);
+    }
+  }, [users]);
+
   const [userError, setUserError] = useState("");
   const [userSuccess, setUserSuccess] = useState("");
   const [newUsername, setNewUsername] = useState("");

@@ -122,7 +122,66 @@ function getDatabaseConnection(): ?PDO {
     return getPDO();
 }
 
-function ensureUserTableSchema($pdo) { return true; }
+function ensureUserTableSchema($pdo) {
+    if (!$pdo) return false;
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `User` (
+                `id` VARCHAR(191) PRIMARY KEY,
+                `username` VARCHAR(191) UNIQUE NOT NULL,
+                `email` VARCHAR(191) UNIQUE NOT NULL,
+                `password` VARCHAR(255) NOT NULL,
+                `name` VARCHAR(191) NOT NULL,
+                `role` VARCHAR(50) DEFAULT 'EDITOR',
+                `permissions` TEXT NULL,
+                `mustChangePassword` TINYINT(1) DEFAULT 0,
+                `createdAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+                `updatedAt` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // Verificar si la tabla está vacía o si falta el admin principal
+        $count = (int)$pdo->query("SELECT COUNT(*) FROM `User`")->fetchColumn();
+        if ($count === 0) {
+            // Sembrar admin inicial
+            $adminPass = password_hash('FEE_Esquel_2026$Patagonia', PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("
+                INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`)
+                VALUES ('fee-super-admin-01', 'admin', 'admin@fundacionesquel.edu.ar', :pass, 'Administrador FEE', 'SUPER_ADMIN', 'blog,contacts,enrollments,users,gallery', 0, NOW(3), NOW(3))
+                ON DUPLICATE KEY UPDATE `username` = 'admin'
+            ");
+            $stmt->execute([':pass' => $adminPass]);
+
+            // Sembrar usuarios desde users.json si existen
+            $usersFile = __DIR__ . '/data/users.json';
+            if (file_exists($usersFile)) {
+                $localUsers = json_decode(file_get_contents($usersFile), true) ?: [];
+                foreach ($localUsers as $lu) {
+                    if (($lu['username'] ?? '') === 'admin') continue;
+                    $stmtUser = $pdo->prepare("
+                        INSERT INTO `User` (`id`, `username`, `email`, `password`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt`, `updatedAt`)
+                        VALUES (:id, :username, :email, :password, :name, :role, :permissions, :mustChange, NOW(3), NOW(3))
+                        ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `role` = VALUES(`role`), `permissions` = VALUES(`permissions`)
+                    ");
+                    $stmtUser->execute([
+                        ':id'          => $lu['id'] ?? generateUUID(),
+                        ':username'    => $lu['username'] ?? 'usuario',
+                        ':email'       => $lu['email'] ?? ($lu['username'] . '@fee.local'),
+                        ':password'    => $lu['password'] ?? password_hash('FEE_Esquel_2026', PASSWORD_DEFAULT),
+                        ':name'        => $lu['name'] ?? $lu['username'],
+                        ':role'        => $lu['role'] ?? 'EDITOR',
+                        ':permissions' => $lu['permissions'] ?? 'blog,enrollments,contacts',
+                        ':mustChange'  => !empty($lu['mustChangePassword']) ? 1 : 0
+                    ]);
+                }
+            }
+        }
+        return true;
+    } catch (Exception $e) {
+        error_log('[ENSURE_USER_SCHEMA] ' . $e->getMessage());
+        return false;
+    }
+}
 function ensureEnrollmentTableSchema($pdo) { return true; }
 
 /* ═══════════════════════════════════════════════════════════════
