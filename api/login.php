@@ -4,6 +4,8 @@
 // ==============================================================================
 require_once __DIR__ . '/config.php';
 
+header('Content-Type: application/json; charset=utf-8');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(["success" => false, "error" => "Método no permitido"]);
@@ -30,7 +32,7 @@ if (time() - $attemptData['first_attempt'] > 900) {
     $attemptData = ['attempts' => 0, 'first_attempt' => time()];
 }
 
-if ($attemptData['attempts'] >= 10) {
+if ($attemptData['attempts'] >= 20) {
     http_response_code(429);
     echo json_encode(["success" => false, "error" => "Demasiados intentos fallidos. Por favor espere 15 minutos."]);
     exit;
@@ -44,7 +46,7 @@ $password = trim($data['password'] ?? '');
 
 if (empty($username) || empty($password)) {
     http_response_code(400);
-    echo json_encode(["success" => false, "error" => "El usuario y la contraseña son requeridos"]);
+    echo json_encode(["success" => false, "error" => "Usuario o contraseña requeridos."]);
     exit;
 }
 
@@ -79,8 +81,6 @@ $userFound = null;
 try {
     $pdo = getPDO();
     if ($pdo) {
-        ensureUserTableSchema($pdo);
-
         // Buscar usuario en base de datos de manera 100% flexible y case-insensitive
         $stmt = $pdo->prepare("
             SELECT * FROM `User` 
@@ -161,7 +161,7 @@ if ($userFound) {
         http_response_code(401);
         echo json_encode([
             "success" => false, 
-            "error" => "Contraseña incorrecta para el usuario '" . ($userFound['username'] ?? $username) . "'."
+            "error" => "Usuario o contraseña incorrectos."
         ]);
         exit;
     }
@@ -174,7 +174,7 @@ if (!$authenticatedUser) {
     http_response_code(401);
     echo json_encode([
         "success" => false, 
-        "error" => "El usuario '$username' no se encuentra registrado en el sistema."
+        "error" => "Usuario o contraseña incorrectos."
     ]);
     exit;
 }
@@ -196,7 +196,7 @@ $payload = [
 ];
 $token = generateToken($payload);
 
-$isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443;
+$isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
 setcookie('admin_session', $token, [
     'expires'  => time() + (60 * 60 * 24),
     'path'     => '/',

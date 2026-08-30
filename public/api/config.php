@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ==============================================================================
 // CONFIGURACIÓN CENTRAL Y SEGURIDAD - FUNDACIÓN EDUCATIVA ESQUEL
 // ==============================================================================
@@ -80,6 +80,14 @@ function getPDO() {
 
 function getDatabaseConnection() {
     return getPDO();
+}
+
+// Compatibilidad retroactiva para endpoints existentes
+function ensureUserTableSchema($pdo) {
+    return true;
+}
+function ensureEnrollmentTableSchema($pdo) {
+    return true;
 }
 
 // ==============================================================================

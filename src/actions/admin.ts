@@ -16,13 +16,20 @@ export async function loginAdmin(password: string, email?: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email || "admin", password }),
     });
-    const data = await res.json();
+
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      return { success: false, error: "Usuario o contraseña incorrectos." };
+    }
+
     if (data && data.success && data.token && typeof window !== "undefined") {
       localStorage.setItem("fee_admin_token", data.token);
     }
-    return data;
+    return data || { success: false, error: "Usuario o contraseña incorrectos." };
   } catch (error: any) {
-    return { success: false, error: error.message || "Error al iniciar sesión" };
+    return { success: false, error: "Usuario o contraseña incorrectos." };
   }
 }
 
