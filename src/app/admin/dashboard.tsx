@@ -288,12 +288,15 @@ export function AdminDashboard({
   const hasEnrollmentsPerm = isSuperAdmin || userPerms.includes("enrollments");
   const hasContactsPerm = isSuperAdmin || userPerms.includes("contacts");
 
-  const [activeTab, setActiveTab] = useState<"posts" | "reinscripciones" | "familias" | "base_limpia" | "preinscripciones" | "config_convocatorias" | "contacts" | "users" | "gallery" | "audit">(() => {
-    if (userPerms.includes("enrollments") || isSuperAdmin) return "reinscripciones";
+  const [activeTab, setActiveTab] = useState<"inscripciones" | "posts" | "contacts" | "users" | "gallery" | "audit">(() => {
+    if (userPerms.includes("enrollments") || isSuperAdmin) return "inscripciones";
     if (isSuperAdmin || userPerms.includes("blog")) return "posts";
     if (userPerms.includes("contacts")) return "contacts";
-    return "reinscripciones";
+    return "inscripciones";
   });
+
+  const [inscripcionesSubTab, setInscripcionesSubTab] = useState<"reinscripciones" | "preinscripciones" | "convocatorias">("reinscripciones");
+  const [reinscripcionesView, setReinscripcionesView] = useState<"base_limpia" | "familias" | "tramites">("base_limpia");
 
   const [cohortSettings, setCohortSettings] = useState<any>(null);
 
@@ -1299,28 +1302,50 @@ export function AdminDashboard({
         <div className="flex items-center gap-2">
           {isSuperAdmin && (
             <button
-              onClick={() => setActiveTab("config_convocatorias")}
+              onClick={() => {
+                setActiveTab("inscripciones");
+                setInscripcionesSubTab("convocatorias");
+              }}
               className={cn(
                 "px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
-                activeTab === "config_convocatorias"
+                activeTab === "inscripciones" && inscripcionesSubTab === "convocatorias"
                   ? "bg-amber-400 text-slate-950 font-black shadow-xs"
                   : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
               )}
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-              <span>Configuración Convocatorias</span>
+              <span>Gobernanza Convocatorias</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Dashboard Nav */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b px-8 py-6 bg-brand-gray/5">
-        <div className="flex flex-wrap gap-2">
+      {/* Dashboard Main Nav */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b px-8 py-4 bg-brand-gray/5">
+        <div className="flex flex-wrap items-center gap-2">
+          {hasEnrollmentsPerm && (
+            <button 
+              onClick={() => setActiveTab("inscripciones")}
+              className={cn(
+                "flex items-center gap-2.5 px-6 py-2.5 rounded-full font-extrabold text-sm transition-all cursor-pointer shadow-xs",
+                activeTab === "inscripciones" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue bg-white border border-brand-blue/20 hover:bg-brand-blue/5"
+              )}
+            >
+              <Users className="w-4 h-4" />
+              <span>Inscripciones</span>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[11px] font-black",
+                activeTab === "inscripciones" ? "bg-white text-brand-blue" : "bg-brand-blue text-white"
+              )}>
+                {enrollmentList.length}
+              </span>
+            </button>
+          )}
+
           {hasBlogPerm && (
             <button 
               onClick={() => setActiveTab("posts")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "posts" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "posts" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
             >
               <FileText className="w-4 h-4" /> Novedades
             </button>
@@ -1329,76 +1354,30 @@ export function AdminDashboard({
           {hasBlogPerm && (
             <button 
               onClick={() => setActiveTab("gallery")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "gallery" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "gallery" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-gray/10"}`}
             >
               <ImageIcon className="w-4 h-4" /> Galería Home
-            </button>
-          )}
-          
-          {hasEnrollmentsPerm && (
-            <button 
-              onClick={() => setActiveTab("reinscripciones")}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
-                activeTab === "reinscripciones" ? "bg-emerald-700 text-white shadow-md" : "text-emerald-800 hover:bg-emerald-50"
-              )}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Reinscripciones 2027</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-black",
-                activeTab === "reinscripciones" ? "bg-white text-emerald-900" : "bg-emerald-100 text-emerald-800"
-              )}>
-                {reinscripcionesList.length}
-              </span>
-            </button>
-          )}
-
-          {hasEnrollmentsPerm && (
-            <button 
-              onClick={() => setActiveTab("preinscripciones")}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
-                activeTab === "preinscripciones" ? "bg-brand-blue text-white shadow-md" : "text-brand-blue hover:bg-brand-blue/10"
-              )}
-            >
-              <Users className="w-4 h-4" />
-              <span>Preinscripciones 2027</span>
-              <span className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-black",
-                activeTab === "preinscripciones" ? "bg-white text-brand-blue" : "bg-brand-blue/10 text-brand-blue"
-              )}>
-                {preinscripcionesList.length}
-              </span>
-            </button>
-          )}
-
-          {isSuperAdmin && (
-            <button 
-              onClick={() => setActiveTab("config_convocatorias")}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
-                activeTab === "config_convocatorias" ? "bg-amber-500 text-slate-950 font-black shadow-md" : "text-amber-800 hover:bg-amber-50"
-              )}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span>Convocatorias</span>
             </button>
           )}
           
           {hasContactsPerm && (
             <button 
               onClick={() => setActiveTab("contacts")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "contacts" ? "bg-teal-700 text-white shadow-md" : "text-teal-700 hover:bg-brand-gray/10"}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "contacts" ? "bg-teal-700 text-white shadow-md" : "text-teal-700 hover:bg-brand-gray/10"}`}
             >
               <Mail className="w-4 h-4" /> Consultas
+              {contactList.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 text-teal-900">
+                  {contactList.length}
+                </span>
+              )}
             </button>
           )}
           
           {isSuperAdmin && (
             <button 
               onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "users" ? "bg-brand-yellow-dark text-brand-blue shadow-md bg-brand-yellow/30" : "text-brand-blue hover:bg-brand-gray/10"}`}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${activeTab === "users" ? "bg-brand-yellow-dark text-brand-blue shadow-md bg-brand-yellow/30" : "text-brand-blue hover:bg-brand-gray/10"}`}
             >
               <UserCheck className="w-4 h-4" /> Usuarios
             </button>
@@ -1411,7 +1390,7 @@ export function AdminDashboard({
                 fetchAuditData();
               }}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
+                "flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all cursor-pointer",
                 activeTab === "audit" ? "bg-slate-900 text-white shadow-md" : "text-slate-700 hover:bg-slate-100"
               )}
             >
@@ -1422,52 +1401,136 @@ export function AdminDashboard({
         </div>
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-2 text-red-500 font-bold text-sm hover:bg-red-50 px-4 py-2 rounded-full transition-colors self-end sm:self-auto"
+          className="flex items-center gap-2 text-red-500 font-bold text-sm hover:bg-red-50 px-4 py-2 rounded-full transition-colors self-end sm:self-auto cursor-pointer"
         >
           Salir <LogOut className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Sub-barra exclusiva: Herramientas de Consolidación y Padrón Limpio */}
-      {hasEnrollmentsPerm && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b px-8 py-3 bg-linear-to-r from-slate-100 via-indigo-50/40 to-emerald-50/40">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-indigo-600" />
-              Depuración & Padrón Administrativo:
+      {/* Sub-navbar Nivel 1: Procesos de Admisiones / Inscripciones FEE */}
+      {hasEnrollmentsPerm && activeTab === "inscripciones" && (
+        <div className="border-b px-8 py-3.5 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-2 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              Módulos de Admisión:
             </span>
-            <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200/80 shadow-2xs">
-              <button 
-                onClick={() => setActiveTab("familias")}
+
+            {/* Sub-tab 1: Reinscripciones */}
+            <button
+              onClick={() => setInscripcionesSubTab("reinscripciones")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                inscripcionesSubTab === "reinscripciones"
+                  ? "bg-emerald-600 text-white shadow-md scale-[1.02]"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              )}
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-300" />
+              <span>Reinscripciones 2027</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-950 text-emerald-200">
+                {reinscripcionesList.length}
+              </span>
+            </button>
+
+            {/* Sub-tab 2: Preinscripciones */}
+            <button
+              onClick={() => setInscripcionesSubTab("preinscripciones")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                inscripcionesSubTab === "preinscripciones"
+                  ? "bg-blue-600 text-white shadow-md scale-[1.02]"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              )}
+            >
+              <Users className="w-4 h-4 text-blue-300" />
+              <span>Preinscripciones 2027</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-950 text-blue-200">
+                {preinscripcionesList.length}
+              </span>
+            </button>
+
+            {/* Sub-tab 3: Convocatorias / Gobernanza */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setInscripcionesSubTab("convocatorias")}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
-                  activeTab === "familias" ? "bg-indigo-700 text-white shadow-xs" : "text-indigo-900 hover:bg-indigo-50"
+                  inscripcionesSubTab === "convocatorias"
+                    ? "bg-amber-500 text-slate-950 font-black shadow-md scale-[1.02]"
+                    : "bg-slate-800 text-amber-300 hover:bg-slate-700"
+                )}
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                <span>Convocatorias & Ciclos</span>
+              </button>
+            )}
+          </div>
+
+          <div className="text-[11px] font-bold text-slate-300 flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Cohorte Vigente: <strong>Ciclo Lectivo 2027</strong></span>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-barra Nivel 2: Vistas Segregadas de Reinscripciones (Base Limpia, Grupos Familiares, Trámites) */}
+      {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "reinscripciones" && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b px-8 py-3 bg-linear-to-r from-slate-100 via-indigo-50/40 to-emerald-50/40">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+              Vistas Segregadas de Reinscripción:
+            </span>
+            <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-slate-300 shadow-xs">
+              <button 
+                onClick={() => setReinscripcionesView("base_limpia")}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer border",
+                  reinscripcionesView === "base_limpia" ? "bg-emerald-800 text-white border-emerald-900 shadow-xs" : "text-emerald-950 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
+                )}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Base Limpia Oficial</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-black",
+                  reinscripcionesView === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
+                )}>
+                  {consolidatedFamiliesData.cleanStudents.length} alumnos
+                </span>
+              </button>
+
+              <button 
+                onClick={() => setReinscripcionesView("familias")}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                  reinscripcionesView === "familias" ? "bg-indigo-700 text-white shadow-xs" : "text-indigo-900 hover:bg-indigo-50"
                 )}
               >
                 <Home className="w-3.5 h-3.5" />
                 <span>Grupos Familiares</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[10px] font-black",
-                  activeTab === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
+                  reinscripcionesView === "familias" ? "bg-white text-indigo-900" : "bg-indigo-100 text-indigo-800"
                 )}>
                   {consolidatedFamiliesData.families.length}
                 </span>
               </button>
 
               <button 
-                onClick={() => setActiveTab("base_limpia")}
+                onClick={() => setReinscripcionesView("tramites")}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer border",
-                  activeTab === "base_limpia" ? "bg-emerald-800 text-white border-emerald-900 shadow-xs" : "text-emerald-950 border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100"
+                  "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                  reinscripcionesView === "tramites" ? "bg-slate-800 text-white shadow-xs" : "text-slate-700 hover:bg-slate-100"
                 )}
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Base Limpia</span>
+                <FileText className="w-3.5 h-3.5" />
+                <span>Padrón de Trámites</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[10px] font-black",
-                  activeTab === "base_limpia" ? "bg-white text-emerald-950" : "bg-emerald-200 text-emerald-900"
+                  reinscripcionesView === "tramites" ? "bg-white text-slate-900" : "bg-slate-200 text-slate-800"
                 )}>
-                  {consolidatedFamiliesData.cleanStudents.length} alumnos
+                  {reinscripcionesList.length}
                 </span>
               </button>
             </div>
@@ -1538,7 +1601,7 @@ export function AdminDashboard({
           </div>
         )}
 
-        {hasEnrollmentsPerm && activeTab === "reinscripciones" && (
+        {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "reinscripciones" && reinscripcionesView === "tramites" && (
           <div>
             {/* Header with Title and Actions */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -2447,7 +2510,7 @@ export function AdminDashboard({
         {/* ======================================================== */}
         {/* TAB 1: GRUPOS FAMILIARES CONSOLIDADOS (FASE 3) */}
         {/* ======================================================== */}
-        {hasEnrollmentsPerm && activeTab === "familias" && (
+        {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "reinscripciones" && reinscripcionesView === "familias" && (
           <div>
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -2770,7 +2833,7 @@ export function AdminDashboard({
         {/* ======================================================== */}
         {/* TAB 2: BASE LIMPIA Y DEPURADA (PARA ADMINISTRACIÓN) */}
         {/* ======================================================== */}
-        {hasEnrollmentsPerm && activeTab === "base_limpia" && (
+        {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "reinscripciones" && reinscripcionesView === "base_limpia" && (
           <div>
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -2813,7 +2876,7 @@ export function AdminDashboard({
             <div className="bg-linear-to-br from-emerald-50 via-teal-50/50 to-white border-2 border-emerald-400/80 rounded-3xl p-6 mb-8 shadow-sm space-y-4">
               <div className="flex items-center gap-2.5 text-emerald-950 font-black text-sm uppercase tracking-wider border-b border-emerald-200 pb-2">
                 <Info className="w-5 h-5 text-emerald-700" />
-                Criterios de Depuración Aplicados
+                Criterios de depuración aplicados
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-emerald-950">
@@ -3008,7 +3071,7 @@ export function AdminDashboard({
         )}
 
         {/* TAB DE PREINSCRIPCIONES 2027 */}
-        {hasEnrollmentsPerm && activeTab === "preinscripciones" && (
+        {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "preinscripciones" && (
           <PreinscripcionesTab
             preinscripcionesList={preinscripcionesList}
             isSuperAdmin={isSuperAdmin}
@@ -3018,7 +3081,7 @@ export function AdminDashboard({
         )}
 
         {/* TAB DE CONFIGURACIÓN DE CONVOCATORIAS */}
-        {isSuperAdmin && activeTab === "config_convocatorias" && (
+        {isSuperAdmin && activeTab === "inscripciones" && inscripcionesSubTab === "convocatorias" && (
           <ConvocatoriasSettingsTab
             isSuperAdmin={isSuperAdmin}
             session={session}
