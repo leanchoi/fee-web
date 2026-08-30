@@ -391,6 +391,17 @@ switch ($action) {
                     }
                 }
             }
+
+            $preFile = $dataDir . '/preinscripciones.json';
+            if (file_exists($preFile)) {
+                $jsonPres = json_decode(file_get_contents($preFile), true) ?: [];
+                $existingIds = array_column($enrollments, 'id');
+                foreach ($jsonPres as $item) {
+                    if (!in_array($item['id'], $existingIds)) {
+                        $enrollments[] = $item;
+                    }
+                }
+            }
         }
 
         if ($canContacts) {

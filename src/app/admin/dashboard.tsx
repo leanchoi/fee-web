@@ -432,19 +432,34 @@ export function AdminDashboard({
 
   // Enrollments and Contacts State
   const [enrollmentList, setEnrollmentList] = useState<Enrollment[]>(enrollments || []);
+  useEffect(() => {
+    if (Array.isArray(enrollments)) {
+      setEnrollmentList(enrollments);
+    }
+  }, [enrollments]);
+
   const [contactList, setContactList] = useState<ContactMessage[]>(contactMessages || []);
+  useEffect(() => {
+    if (Array.isArray(contactMessages)) {
+      setContactList(contactMessages);
+    }
+  }, [contactMessages]);
 
   // Partition between Reinscripciones 2027 and Preinscripciones Generales
-  const reinscripcionesList = useMemo(() => {
+  const preinscripcionesList = useMemo(() => {
     return enrollmentList.filter((e: any) => {
-      if (e.type === "preinscripcion_general") return false;
-      return true; // Todos los de 2027 o con datos de contrato
+      const t = String(e.type || "").toLowerCase();
+      const tr = String(e.trackingNumber || "").toUpperCase();
+      return t.includes("preinscripcion") || tr.startsWith("PRE-") || (e.admissionStatus && !e.contractAccepted);
     });
   }, [enrollmentList]);
 
-  const preinscripcionesList = useMemo(() => {
+  const reinscripcionesList = useMemo(() => {
     return enrollmentList.filter((e: any) => {
-      return e.type === "preinscripcion_general" || (!e.studentDni && !e.signature1Data && !e.parent1Dni);
+      const t = String(e.type || "").toLowerCase();
+      const tr = String(e.trackingNumber || "").toUpperCase();
+      if (t.includes("preinscripcion") || tr.startsWith("PRE-") || (e.admissionStatus && !e.contractAccepted)) return false;
+      return true; // Todos los de reinscripción regular
     });
   }, [enrollmentList]);
 
