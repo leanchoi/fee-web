@@ -55,20 +55,46 @@ export function ConvocatoriasSettingsTab({ isSuperAdmin, session, onRefreshData 
   const [typedConfirmation, setTypedConfirmation] = useState("");
   const [isProcessingClose, setIsProcessingClose] = useState(false);
 
+  // Helper para obtener token y headers de autenticación
+  const getAuthHeaders = () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("fee_admin_token") : "";
+    const match = typeof document !== "undefined" ? document.cookie.match(/(?:^|;\s*)fee_csrf=([^;]+)/) : null;
+    const csrf = match ? decodeURIComponent(match[1]) : "";
+    
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+      headers["X-Authorization"] = `Bearer ${token}`;
+    }
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
+    return headers;
+  };
+
   // Cargar settings y cohortes desde API
   const fetchSettingsAndCohorts = async () => {
     setIsLoading(true);
+    setStatusMessage(null);
     try {
-      const resSet = await fetch("/api/settings.php", { credentials: "same-origin" });
+      const resSet = await fetch("/api/settings.php", { 
+        headers: getAuthHeaders(),
+        credentials: "same-origin" 
+      });
       const dataSet = await resSet.json();
-      if (dataSet && dataSet.reinscripciones) {
+      if (dataSet && (dataSet.reinscripciones || dataSet.success)) {
         setSettings(dataSet);
         setInterviewNotice(dataSet.preinscripciones?.interviewNotice || "");
         setClosedMsgRe(dataSet.reinscripciones?.closedMessage || "");
         setClosedMsgPre(dataSet.preinscripciones?.closedMessage || "");
       }
 
-      const resCoh = await fetch("/api/cohorts.php", { credentials: "same-origin" });
+      const resCoh = await fetch("/api/cohorts.php", { 
+        headers: getAuthHeaders(),
+        credentials: "same-origin" 
+      });
       const dataCoh = await resCoh.json();
       if (dataCoh && Array.isArray(dataCoh.cohorts)) {
         setCohortsList(dataCoh.cohorts);
@@ -84,13 +110,6 @@ export function ConvocatoriasSettingsTab({ isSuperAdmin, session, onRefreshData 
     fetchSettingsAndCohorts();
   }, []);
 
-  // Helper para obtener cookie fee_csrf
-  const getCsrfToken = () => {
-    if (typeof document === "undefined") return "";
-    const match = document.cookie.match(/(?:^|;\s*)fee_csrf=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : "";
-  };
-
   // Guardar Textos Institucionales
   const handleSaveTexts = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,10 +119,7 @@ export function ConvocatoriasSettingsTab({ isSuperAdmin, session, onRefreshData 
     try {
       const res = await fetch("/api/settings.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": getCsrfToken()
-        },
+        headers: getAuthHeaders(),
         credentials: "same-origin",
         body: JSON.stringify({
           preinscripciones_interview_notice: interviewNotice,
@@ -145,10 +161,7 @@ export function ConvocatoriasSettingsTab({ isSuperAdmin, session, onRefreshData 
     try {
       const res = await fetch("/api/settings.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": getCsrfToken()
-        },
+        headers: getAuthHeaders(),
         credentials: "same-origin",
         body: JSON.stringify(payload)
       });
@@ -181,10 +194,7 @@ export function ConvocatoriasSettingsTab({ isSuperAdmin, session, onRefreshData 
     try {
       const res = await fetch("/api/cohorts.php", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": getCsrfToken()
-        },
+        headers: getAuthHeaders(),
         credentials: "same-origin",
         body: JSON.stringify({
           action: "close",
