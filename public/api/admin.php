@@ -292,34 +292,48 @@ switch ($action) {
             $pdo = getPDO();
             if ($pdo) {
                 if ($canEnrollments) {
-                    if ($filterCohort && $filterCohort > 2020) {
-                        $stmtEn = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `cohortYear` = :cohort ORDER BY `createdAt` DESC");
-                        $stmtEn->execute([':cohort' => $filterCohort]);
-                        $enrollments = $stmtEn->fetchAll() ?: [];
-                    } else {
-                        $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
-                    }
+                    try {
+                        if ($filterCohort && $filterCohort > 2020) {
+                            $stmtEn = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `cohortYear` = :cohort ORDER BY `createdAt` DESC");
+                            $stmtEn->execute([':cohort' => $filterCohort]);
+                            $enrollments = $stmtEn->fetchAll() ?: [];
+                        } else {
+                            $enrollments = $pdo->query("SELECT * FROM `Enrollment` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                        }
+                    } catch (Exception $e) {}
 
-                    $cohorts = $pdo->query("SELECT `id`, `year`, `type`, `status`, `notes` FROM `Cohort` ORDER BY `year` DESC, `type` ASC")->fetchAll() ?: [];
+                    try {
+                        $cohorts = $pdo->query("SELECT `id`, `year`, `type`, `status`, `notes` FROM `Cohort` ORDER BY `year` DESC, `type` ASC")->fetchAll() ?: [];
+                    } catch (Exception $e) {
+                        $cohorts = [];
+                    }
                 }
                 if ($canContacts) {
-                    $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    try {
+                        $contacts = $pdo->query("SELECT * FROM `ContactMessage` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    } catch (Exception $e) {}
                 }
                 if ($canBlog) {
-                    $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    try {
+                        $posts = $pdo->query("SELECT * FROM `Post` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    } catch (Exception $e) {}
                 }
                 if ($isSuperAdmin) {
-                    $users = $pdo->query("SELECT `id`, `username`, `email`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    try {
+                        $users = $pdo->query("SELECT `id`, `username`, `email`, `name`, `role`, `permissions`, `mustChangePassword`, `createdAt` FROM `User` ORDER BY `createdAt` DESC")->fetchAll() ?: [];
+                    } catch (Exception $e) {}
                 }
                 if (!empty($session['userId'])) {
-                    $stmtUser = $pdo->prepare("SELECT `mustChangePassword`, `username`, `name` FROM `User` WHERE `id` = :uid LIMIT 1");
-                    $stmtUser->execute([':uid' => $session['userId']]);
-                    $freshUser = $stmtUser->fetch();
-                    if ($freshUser) {
-                        $session['mustChangePassword'] = !empty($freshUser['mustChangePassword']);
-                        if (!empty($freshUser['username'])) $session['username'] = $freshUser['username'];
-                        if (!empty($freshUser['name'])) $session['name'] = $freshUser['name'];
-                    }
+                    try {
+                        $stmtUser = $pdo->prepare("SELECT `mustChangePassword`, `username`, `name` FROM `User` WHERE `id` = :uid LIMIT 1");
+                        $stmtUser->execute([':uid' => $session['userId']]);
+                        $freshUser = $stmtUser->fetch();
+                        if ($freshUser) {
+                            $session['mustChangePassword'] = !empty($freshUser['mustChangePassword']);
+                            if (!empty($freshUser['username'])) $session['username'] = $freshUser['username'];
+                            if (!empty($freshUser['name'])) $session['name'] = $freshUser['name'];
+                        }
+                    } catch (Exception $e) {}
                 }
             }
         } catch (Exception $e) {
@@ -367,6 +381,16 @@ switch ($action) {
             }
         }
 
+        $sessionPayload = [
+            "userId"             => $session['userId'] ?? '',
+            "username"           => $session['username'] ?? '',
+            "name"               => $session['name'] ?? '',
+            "email"              => $session['email'] ?? '',
+            "role"               => $session['role'] ?? '',
+            "permissions"        => $session['permissions'] ?? '',
+            "mustChangePassword" => !empty($session['mustChangePassword'])
+        ];
+
         echo json_encode([
             "success"      => true,
             "enrollments"  => $enrollments,
@@ -375,15 +399,8 @@ switch ($action) {
             "posts"        => $posts,
             "users"        => $users,
             "gallery"      => $gallery,
-            "session"      => [
-                "userId"             => $session['userId'] ?? '',
-                "username"           => $session['username'] ?? '',
-                "name"               => $session['name'] ?? '',
-                "email"              => $session['email'] ?? '',
-                "role"               => $session['role'] ?? '',
-                "permissions"        => $session['permissions'] ?? '',
-                "mustChangePassword" => !empty($session['mustChangePassword'])
-            ]
+            "session"      => $sessionPayload,
+            "user"         => $sessionPayload
         ], JSON_UNESCAPED_UNICODE);
         exit;
 

@@ -30,7 +30,8 @@ export default function AdminPage() {
     loadData();
   }, []);
 
-  const isAuth = !!(data && data.user);
+  const userSession = data ? (data.user || data.session) : null;
+  const isAuth = !!userSession;
 
   return (
     <div className="min-h-screen bg-brand-gray/5 pb-24">
@@ -40,10 +41,10 @@ export default function AdminPage() {
       <header className="bg-brand-blue text-white py-6 shadow-md mb-12">
         <div className="container mx-auto px-6 lg:px-12 flex justify-between items-center">
           <span className="text-xl font-bold tracking-tight">FEE <span className="text-brand-yellow">Intranet</span></span>
-          {isAuth && (
+          {isAuth && userSession && (
             <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold">{data.user.name}</span>
-              <span className="text-xs opacity-75 capitalize">{data.user.role?.toLowerCase().replace('_', ' ')}</span>
+              <span className="text-sm font-semibold">{userSession.name}</span>
+              <span className="text-xs opacity-75 capitalize">{userSession.role?.toLowerCase().replace('_', ' ')}</span>
             </div>
           )}
         </div>
@@ -55,14 +56,14 @@ export default function AdminPage() {
             <Loader2 className="w-10 h-10 animate-spin mb-4" />
             <p className="font-semibold text-sm">Cargando panel de administración...</p>
           </div>
-        ) : isAuth ? (
+        ) : isAuth && userSession ? (
           <AdminDashboard 
             posts={data.posts || []} 
             enrollments={data.enrollments || []} 
             contactMessages={data.contacts || []} 
             users={data.users || []} 
             gallery={data.gallery || []}
-            session={data.user} 
+            session={userSession} 
             onLogout={() => {
               setData(null);
             }}
