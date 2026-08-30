@@ -16,11 +16,26 @@ export interface FamilyDiscrepancy {
   severity: "high" | "medium" | "low";
 }
 
+export interface ClassifiedFamilySubmission {
+  raw: any;
+  id: string;
+  trackingNumber: string;
+  createdAt: string;
+  studentName: string;
+  studentDni: string;
+  isOfficialForStudent: boolean;
+  statusBadge: "VIGENTE OFICIAL" | "HISTÓRICO / REEMPLAZADO";
+  statusReason: string;
+}
+
 export interface ConsolidatedFamilyGroup {
   familyKey: string;
   familyDisplayName: string;
   activeSubmission: any;
   allSubmissions: any[];
+  classifiedSubmissions: ClassifiedFamilySubmission[];
+  officialSubmissionsCount: number;
+  historicalSubmissionsCount: number;
   isMultiSubmission: boolean;
   totalSubmissions: number;
   children: ConsolidatedChild[];
@@ -66,10 +81,17 @@ export interface CleanBaseStudent {
   parent1Phone: string;
   parent1Email: string;
   parent1Address: string;
+  parent1City: string;
+  parent1PostalCode: string;
   isSingleParent: boolean;
   parent2Name: string;
   parent2Dni: string;
   parent2Relationship: string;
+  parent2Phone?: string;
+  parent2Email?: string;
+  parent2Address?: string;
+  parent2City?: string;
+  parent2PostalCode?: string;
 
   // Facturación Vigente
   billingName: string;
@@ -77,6 +99,10 @@ export interface CleanBaseStudent {
   billingTaxCondition: string;
   billingEmail: string;
   billingAddress: string;
+
+  // Firmas digitalizadas
+  signature1Data?: string | null;
+  signature2Data?: string | null;
 
   // Hermanos
   hasSiblings: boolean;
@@ -132,8 +158,11 @@ function parseSiblingsFromString(detailsStr: string): Array<{ name: string; dni:
 }
 
 /**
- * Agrupa todos los trámites presentados en Familias Consolidadas
- * Regla rectora: El trámite más reciente (por createdAt) es el VIGENTE.
+ * Agrupa todos los trámites presentados en Familias Consolidadas y genera Padrón de Base Limpia
+ * Regla rectora de Contratos:
+ * - Cada estudiante tiene su contrato individual.
+ * - Si una familia presentó un trámite para el Hijo A y otro para el Hijo B, AMBOS son VIGENTES OFICIALES.
+ * - Solo se marca como HISTÓRICO si hubo re-envíos para el MISMO estudiante.
  */
 export function consolidateFamilies(enrollments: any[]): {
   families: ConsolidatedFamilyGroup[];
@@ -159,7 +188,6 @@ export function consolidateFamilies(enrollments: any[]): {
     const billingCuit = cleanDigits(item.billingCuit);
     const studentDni = cleanDigits(item.studentDni);
     
-    // Determinación de clave de familia
     let key = "";
     if (p1Dni && p1Dni.length >= 7) {
       key = `P1-${p1Dni}`;
@@ -177,7 +205,7 @@ export function consolidateFamilies(enrollments: any[]): {
     familyBuckets.get(key)!.push(item);
   }
 
-  // 2. Unificar buckets y detectar discrepancias
+  // 2. Procesar cada familia y clasificar trámites por estudiante
   const mergedFamilies: ConsolidatedFamilyGroup[] = [];
   const processedKeys = new Set<string>();
 
@@ -187,7 +215,7 @@ export function consolidateFamilies(enrollments: any[]): {
 
     const collectedItems = [...items];
 
-    // Ordenar trámites por fecha de creación descendente (el más nuevo primero = VIGENTE)
+    // Ordenar trámites por fecha de creación descendente (el más nuevo primero)
     collectedItems.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime();
       const dateB = new Date(b.createdAt || 0).getTime();
@@ -197,7 +225,7 @@ export function consolidateFamilies(enrollments: any[]): {
     const activeItem = collectedItems[0];
     const isMultiSubmission = collectedItems.length > 1;
 
-    // Detectar discrepancias entre envíos múltiples
+    // Detectar discrepancias entre presentaciones
     const discrepancies: FamilyDiscrepancy[] = [];
     if (isMultiSubmission) {
       const phones = new Set(collectedItems.map(i => cleanDigits(i.parent1Phone || i.tutorPhone)).filter(Boolean));
@@ -237,12 +265,60 @@ export function consolidateFamilies(enrollments: any[]): {
       }
     }
 
-    // Extraer hijos únicos de esta familia
-    const childrenMap = new Map<string, ConsolidatedChild>();
+    // Clasificar presentaciones por estudiante titular (para distinguir entre "trámite por hermano" vs "re-envío del mismo alumno")
+    const studentSubmissionsMap = new Map<string, any[]>();
+    for (const sub of collectedItems) {
+      const stuKey = cleanDigits(sub.studentDni) || normalizeName(sub.studentName);
+      if (!studentSubmissionsMap.has(stuKey)) {
+        studentSubmissionsMap.set(stuKey, []);
+      }
+      studentSubmissionsMap.get(stuKey)!.push(sub);
+    }
+
+    const classifiedSubmissions: ClassifiedFamilySubmission[] = [];
+    let officialCount = 0;
+    let historicalCount = 0;
 
     for (const sub of collectedItems) {
-      const isWinningSub = sub.id === activeItem.id;
+      const stuKey = cleanDigits(sub.studentDni) || normalizeName(sub.studentName);
+      const studentSubs = studentSubmissionsMap.get(stuKey) || [];
+      // El más nuevo para este estudiante es el primero (ya ordenados desc)
+      const isWinningForThisStudent = studentSubs.length > 0 && studentSubs[0].id === sub.id;
 
+      if (isWinningForThisStudent) {
+        officialCount++;
+        classifiedSubmissions.push({
+          raw: sub,
+          id: sub.id,
+          trackingNumber: sub.trackingNumber || sub.id,
+          createdAt: sub.createdAt || "",
+          studentName: sub.studentName || "Sin Nombre",
+          studentDni: sub.studentDni || "-",
+          isOfficialForStudent: true,
+          statusBadge: "VIGENTE OFICIAL",
+          statusReason: `Contrato oficial vigente para ${sub.studentName}`
+        });
+      } else {
+        historicalCount++;
+        classifiedSubmissions.push({
+          raw: sub,
+          id: sub.id,
+          trackingNumber: sub.trackingNumber || sub.id,
+          createdAt: sub.createdAt || "",
+          studentName: sub.studentName || "Sin Nombre",
+          studentDni: sub.studentDni || "-",
+          isOfficialForStudent: false,
+          statusBadge: "HISTÓRICO / REEMPLAZADO",
+          statusReason: `Reemplazado por presentación posterior para ${sub.studentName}`
+        });
+      }
+    }
+
+    // Extraer hijos únicos de esta familia y mapear su trámite de origen
+    const childrenMap = new Map<string, ConsolidatedChild>();
+    const childDirectSubmissionMap = new Map<string, any>();
+
+    for (const sub of collectedItems) {
       // Titular
       const stuDni = cleanDigits(sub.studentDni);
       const stuName = (sub.studentName || "").trim();
@@ -251,6 +327,10 @@ export function consolidateFamilies(enrollments: any[]): {
       const stuGrade = sub.studentGrade || "-";
 
       const childKey = stuDni ? `DNI-${stuDni}` : `NAME-${normalizeName(stuName)}`;
+      if (!childDirectSubmissionMap.has(childKey)) {
+        childDirectSubmissionMap.set(childKey, sub);
+      }
+
       if (!childrenMap.has(childKey)) {
         childrenMap.set(childKey, {
           dni: stuDni || sub.studentDni || "-",
@@ -258,7 +338,7 @@ export function consolidateFamilies(enrollments: any[]): {
           school: stuSchool,
           level: stuLevel,
           grade: stuGrade,
-          isTitularInActiveSubmission: isWinningSub,
+          isTitularInActiveSubmission: true,
           sourceTrackingNumber: sub.trackingNumber || sub.id
         });
       }
@@ -307,6 +387,9 @@ export function consolidateFamilies(enrollments: any[]): {
       familyDisplayName,
       activeSubmission: activeItem,
       allSubmissions: collectedItems,
+      classifiedSubmissions,
+      officialSubmissionsCount: officialCount,
+      historicalSubmissionsCount: historicalCount,
       isMultiSubmission,
       totalSubmissions: collectedItems.length,
       children: childrenList,
@@ -331,7 +414,7 @@ export function consolidateFamilies(enrollments: any[]): {
     });
   }
 
-  // 3. Generar la Base Limpia de Estudiantes (1 fila por alumno único, sin duplicados)
+  // 3. Generar la Base Limpia de Estudiantes (1 fila y 1 contrato por alumno único)
   const cleanStudents: CleanBaseStudent[] = [];
   let esc1030Count = 0;
   let esc1739Count = 0;
@@ -350,6 +433,14 @@ export function consolidateFamilies(enrollments: any[]): {
 
       const otherSiblings = allSiblingsNames.filter(n => n !== ch.name);
 
+      // Buscar si el alumno tiene un trámite directo o usa el trámite de la familia
+      const directSub = fam.allSubmissions.find(s => {
+        const sDni = cleanDigits(s.studentDni);
+        const cDni = cleanDigits(ch.dni);
+        if (sDni && cDni && sDni === cDni) return true;
+        return normalizeName(s.studentName) === normalizeName(ch.name);
+      }) || activeSub;
+
       cleanStudents.push({
         id: `clean-${ch.dni || normalizeName(ch.name)}-${fam.familyKey}`,
         studentDni: ch.dni,
@@ -359,26 +450,36 @@ export function consolidateFamilies(enrollments: any[]): {
         studentGrade: ch.grade,
         isTitular: ch.isTitularInActiveSubmission,
 
-        trackingNumber: fam.activeTrackingNumber,
-        submittedAt: fam.activeCreatedAt,
+        trackingNumber: directSub.trackingNumber || fam.activeTrackingNumber,
+        submittedAt: directSub.createdAt || fam.activeCreatedAt,
         familyKey: fam.familyKey,
 
         parent1Name: fam.parent1Name,
         parent1Dni: fam.parent1Dni,
-        parent1Relationship: activeSub.parent1Relationship || "Madre/Padre/Tutor",
+        parent1Relationship: directSub.parent1Relationship || activeSub.parent1Relationship || "Madre/Padre/Tutor",
         parent1Phone: fam.parent1Phone,
         parent1Email: fam.parent1Email,
         parent1Address: fam.parent1Address,
+        parent1City: directSub.parent1City || activeSub.parent1City || "Esquel",
+        parent1PostalCode: directSub.parent1PostalCode || activeSub.parent1PostalCode || "9200",
         isSingleParent: fam.isSingleParent,
         parent2Name: fam.parent2Name,
         parent2Dni: fam.parent2Dni,
-        parent2Relationship: activeSub.parent2Relationship || "-",
+        parent2Relationship: directSub.parent2Relationship || activeSub.parent2Relationship || "-",
+        parent2Phone: directSub.parent2Phone || activeSub.parent2Phone,
+        parent2Email: directSub.parent2Email || activeSub.parent2Email,
+        parent2Address: directSub.parent2Address || activeSub.parent2Address,
+        parent2City: directSub.parent2City || activeSub.parent2City || "Esquel",
+        parent2PostalCode: directSub.parent2PostalCode || activeSub.parent2PostalCode || "9200",
 
         billingName: fam.billingName,
         billingCuit: fam.billingCuit,
         billingTaxCondition: fam.billingTaxCondition,
         billingEmail: fam.billingEmail,
-        billingAddress: activeSub.billingAddress || fam.parent1Address,
+        billingAddress: directSub.billingAddress || activeSub.billingAddress || fam.parent1Address,
+
+        signature1Data: directSub.signature1Data || activeSub.signature1Data || null,
+        signature2Data: directSub.signature2Data || activeSub.signature2Data || null,
 
         hasSiblings: otherSiblings.length > 0,
         totalSiblingsInFamily: fam.totalChildren,

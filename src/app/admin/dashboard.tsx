@@ -743,6 +743,122 @@ export function AdminDashboard({
     });
   };
 
+  const handleDownloadCleanStudentPdf = (s: CleanBaseStudent) => {
+    downloadFilledContract({
+      studentName: s.studentName || "",
+      studentDni: s.studentDni || "",
+      school: s.school || "Escuela N.º 1030",
+      studentLevel: s.studentLevel || determineLevel(s.studentGrade, s.school),
+      level: s.studentLevel || determineLevel(s.studentGrade, s.school),
+      studentGrade: s.studentGrade || "",
+      hasSiblings: Boolean(s.hasSiblings),
+      siblingDetails: s.siblingsSummary !== "Hijo/a único/a" ? s.siblingsSummary : "",
+      parent1Name: s.parent1Name || "",
+      parent1Dni: s.parent1Dni || "",
+      parent1Relationship: s.parent1Relationship || "Madre/Padre/Tutor",
+      parent1Phone: s.parent1Phone || "",
+      parent1Email: s.parent1Email || "",
+      parent1Address: s.parent1Address || "",
+      parent1City: s.parent1City || "Esquel",
+      parent1PostalCode: s.parent1PostalCode || "9200",
+      isSingleParent: Boolean(s.isSingleParent),
+      parent2Name: s.parent2Name !== "Único/a Responsable Declarado/a" && s.parent2Name !== "N/A" ? s.parent2Name : "",
+      parent2Dni: s.parent2Dni !== "N/A" ? s.parent2Dni : "",
+      parent2Relationship: s.parent2Relationship !== "-" ? s.parent2Relationship : "",
+      parent2Phone: s.parent2Phone || "",
+      parent2Email: s.parent2Email || "",
+      parent2Address: s.parent2Address || "",
+      parent2City: s.parent2City || "Esquel",
+      parent2PostalCode: s.parent2PostalCode || "9200",
+      billingName: s.billingName || s.parent1Name || "",
+      billingCuit: s.billingCuit || s.parent1Dni || "",
+      billingTaxCondition: s.billingTaxCondition || "Consumidor Final",
+      billingEmail: s.billingEmail || s.parent1Email || "",
+      billingAddress: s.billingAddress || s.parent1Address || "",
+      signature1Data: s.signature1Data || null,
+      signature2Data: s.signature2Data || null,
+      trackingNumber: s.trackingNumber || `FEE-2027-${s.id.substring(0, 5)}`,
+      signedAt: s.submittedAt
+    });
+  };
+
+  const handleDownloadCleanStudentsZip = async (students: CleanBaseStudent[], zipName: string) => {
+    if (students.length === 0) return;
+    setIsZipping(true);
+    try {
+      const zip = new JSZip();
+      for (const s of students) {
+        const doc = generateContractPdf({
+          studentName: s.studentName || "",
+          studentDni: s.studentDni || "",
+          school: s.school || "Escuela N.º 1030",
+          studentLevel: s.studentLevel || determineLevel(s.studentGrade, s.school),
+          level: s.studentLevel || determineLevel(s.studentGrade, s.school),
+          studentGrade: s.studentGrade || "",
+          hasSiblings: Boolean(s.hasSiblings),
+          siblingDetails: s.siblingsSummary !== "Hijo/a único/a" ? s.siblingsSummary : "",
+          parent1Name: s.parent1Name || "",
+          parent1Dni: s.parent1Dni || "",
+          parent1Relationship: s.parent1Relationship || "Madre/Padre/Tutor",
+          parent1Phone: s.parent1Phone || "",
+          parent1Email: s.parent1Email || "",
+          parent1Address: s.parent1Address || "",
+          parent1City: s.parent1City || "Esquel",
+          parent1PostalCode: s.parent1PostalCode || "9200",
+          isSingleParent: Boolean(s.isSingleParent),
+          parent2Name: s.parent2Name !== "Único/a Responsable Declarado/a" && s.parent2Name !== "N/A" ? s.parent2Name : "",
+          parent2Dni: s.parent2Dni !== "N/A" ? s.parent2Dni : "",
+          parent2Relationship: s.parent2Relationship !== "-" ? s.parent2Relationship : "",
+          parent2Phone: s.parent2Phone || "",
+          parent2Email: s.parent2Email || "",
+          parent2Address: s.parent2Address || "",
+          parent2City: s.parent2City || "Esquel",
+          parent2PostalCode: s.parent2PostalCode || "9200",
+          billingName: s.billingName || s.parent1Name || "",
+          billingCuit: s.billingCuit || s.parent1Dni || "",
+          billingTaxCondition: s.billingTaxCondition || "Consumidor Final",
+          billingEmail: s.billingEmail || s.parent1Email || "",
+          billingAddress: s.billingAddress || s.parent1Address || "",
+          signature1Data: s.signature1Data || null,
+          signature2Data: s.signature2Data || null,
+          trackingNumber: s.trackingNumber || `FEE-2027-${s.id.substring(0, 5)}`,
+          signedAt: s.submittedAt
+        });
+        const pdfBlob = doc.output("blob");
+        const pdfFileName = getContractFilename({
+          studentName: s.studentName || "",
+          studentDni: s.studentDni || "",
+          parent1Dni: s.parent1Dni || "",
+          billingCuit: s.billingCuit || s.parent1Dni || "",
+          parent1Name: s.parent1Name || "",
+          parent1Relationship: s.parent1Relationship || "Madre/Padre/Tutor",
+          parent1Phone: s.parent1Phone || "",
+          parent1Email: s.parent1Email || "",
+          parent1Address: s.parent1Address || "",
+          parent1City: s.parent1City || "Esquel",
+          parent1PostalCode: s.parent1PostalCode || "9200",
+          school: s.school || "Escuela N.º 1030",
+          studentGrade: s.studentGrade || ""
+        });
+        const schoolFolder = (s.school || "Escuela_1030").includes("1739") ? "Escuela_1739" : "Escuela_1030";
+        zip.folder(schoolFolder)?.file(pdfFileName, pdfBlob);
+      }
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${zipName}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error generating clean zip:", err);
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
   const handleDownloadZip = async (itemsToZip: any[], zipName: string) => {
     if (itemsToZip.length === 0) return;
     setIsZipping(true);
@@ -2432,24 +2548,51 @@ export function AdminDashboard({
                             Estudiantes Reinscriptos de la Familia ({fam.children.length}):
                           </span>
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {fam.children.map((ch, idx) => (
-                              <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <strong className="text-sm font-bold text-slate-900 block">
-                                    <HighlightText text={ch.name} highlight={familySearchQuery} />
-                                  </strong>
-                                  <span className="bg-indigo-50 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                    DNI: <HighlightText text={ch.dni} highlight={familySearchQuery} />
-                                  </span>
+                            {fam.children.map((ch, idx) => {
+                              const cleanStudent = consolidatedFamiliesData.cleanStudents.find(cs => {
+                                const cDni = (cs.studentDni || "").replace(/[^0-9]/g, "");
+                                const chDni = (ch.dni || "").replace(/[^0-9]/g, "");
+                                if (cDni && chDni && cDni === chDni) return true;
+                                return cs.studentName.toLowerCase().trim() === ch.name.toLowerCase().trim();
+                              });
+
+                              return (
+                                <div key={idx} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2 flex flex-col justify-between">
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                      <strong className="text-sm font-bold text-slate-900 block truncate">
+                                        <HighlightText text={ch.name} highlight={familySearchQuery} />
+                                      </strong>
+                                      <span className="bg-indigo-50 text-indigo-800 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0">
+                                        DNI: <HighlightText text={ch.dni} highlight={familySearchQuery} />
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-slate-600 font-medium">
+                                      {ch.level} — <span className="font-bold text-slate-800">{ch.grade}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-400">
+                                      {ch.school}
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (cleanStudent) {
+                                        handleDownloadCleanStudentPdf(cleanStudent);
+                                      } else {
+                                        handleDownloadSinglePdf(fam.activeSubmission);
+                                      }
+                                    }}
+                                    className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                    title={`Descargar Contrato Oficial de ${ch.name}`}
+                                  >
+                                    <Download className="w-3 h-3 text-emerald-700" />
+                                    <span>Contrato PDF ({ch.name.split(" ")[0]})</span>
+                                  </button>
                                 </div>
-                                <div className="text-xs text-slate-600 font-medium">
-                                  {ch.level} — <span className="font-bold text-slate-800">{ch.grade}</span>
-                                </div>
-                                <div className="text-[11px] text-slate-400">
-                                  {ch.school}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -2476,41 +2619,42 @@ export function AdminDashboard({
                           </div>
                         </div>
 
-                        {/* Historial de Presentaciones */}
-                        {fam.allSubmissions.length > 1 && (
+                        {/* Historial de Presentaciones / Trámites */}
+                        {fam.allSubmissions.length > 0 && (
                           <div className="pt-2">
                             <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block mb-2">
-                              Historial de Trámites Presentados ({fam.allSubmissions.length}):
+                              Trámites Presentados por la Familia ({fam.allSubmissions.length}):
                             </span>
                             <div className="space-y-1.5">
-                              {fam.allSubmissions.map((sub, i) => {
-                                const isWinning = sub.id === fam.activeSubmission.id;
+                              {(fam.classifiedSubmissions || []).map((subItem) => {
+                                const isOfficial = subItem.isOfficialForStudent;
                                 return (
                                   <div
-                                    key={sub.id || i}
+                                    key={subItem.id}
                                     className={cn(
                                       "p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2",
-                                      isWinning ? "bg-emerald-50 border-emerald-300 font-medium" : "bg-slate-100/70 border-slate-200 text-slate-500"
+                                      isOfficial ? "bg-emerald-50/80 border-emerald-300 font-medium" : "bg-slate-100/70 border-slate-200 text-slate-500"
                                     )}
                                   >
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
                                       <span className={cn(
-                                        "px-2 py-0.5 rounded-md text-[10px] font-black uppercase",
-                                        isWinning ? "bg-emerald-600 text-white" : "bg-slate-300 text-slate-700"
+                                        "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide",
+                                        isOfficial ? "bg-emerald-700 text-white" : "bg-slate-300 text-slate-700"
                                       )}>
-                                        {isWinning ? "Vigente Oficial" : `Presentación #${fam.allSubmissions.length - i}`}
+                                        {subItem.statusBadge}
                                       </span>
-                                      <span className="font-mono font-bold text-slate-800">{sub.trackingNumber || sub.id}</span>
+                                      <span className="font-mono font-bold text-slate-800">{subItem.trackingNumber}</span>
                                       <span>•</span>
-                                      <span>Alumno en cabecera: <strong>{sub.studentName}</strong></span>
+                                      <span>Estudiante: <strong>{subItem.studentName}</strong> (DNI {subItem.studentDni})</span>
                                       <span>•</span>
-                                      <span>{new Date(sub.createdAt).toLocaleString("es-AR")}</span>
+                                      <span className="text-[11px] text-slate-400">{new Date(subItem.createdAt).toLocaleString("es-AR")}</span>
                                     </div>
 
                                     <button
                                       type="button"
-                                      onClick={() => handleDownloadSinglePdf(sub)}
-                                      className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                      onClick={() => handleDownloadSinglePdf(subItem.raw)}
+                                      className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                                      title="Descargar este contrato específico en PDF"
                                     >
                                       <Download className="w-3 h-3" /> PDF
                                     </button>
@@ -2550,18 +2694,31 @@ export function AdminDashboard({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Base de datos unificada sin registros duplicados ni sobre-envíos. Lista para gestión contable y administrativa.
+                  1 contrato oficial y definitivo por cada alumno único. Datos de padres y facturación vinculados sin duplicados.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => exportCleanBaseToCSV(filteredCleanStudents)}
-                className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl font-extrabold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                Exportar Padrón Limpio (Excel / CSV)
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => exportCleanBaseToCSV(filteredCleanStudents)}
+                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl font-extrabold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Exportar Padrón Excel (CSV)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isZipping || filteredCleanStudents.length === 0}
+                  onClick={() => handleDownloadCleanStudentsZip(filteredCleanStudents, `Contratos_Limpios_FEE_2027_${new Date().toISOString().slice(0, 10)}`)}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-extrabold text-xs flex items-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
+                  title="Descargar todos los contratos PDF individuales en un archivo ZIP organizado por escuela"
+                >
+                  {isZipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderArchive className="w-4 h-4 text-emerald-400" />}
+                  <span>{isZipping ? "Generando ZIP..." : "Descargar Todos los PDF (ZIP)"}</span>
+                </button>
+              </div>
             </div>
 
             {/* Explicación de Criterios de Depuración Aplicados */}
@@ -2573,30 +2730,30 @@ export function AdminDashboard({
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-emerald-950">
                 <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
-                  <strong className="text-emerald-900 block text-xs font-black">1. Unificación Familiar</strong>
+                  <strong className="text-emerald-900 block text-xs font-black">1. Contrato Individual</strong>
                   <p className="text-slate-600 leading-relaxed text-[11px]">
-                    Las 52 familias que cargaron un trámite por cada hijo quedaron consolidadas bajo un único grupo familiar, con el mismo titular de facturación y contrato.
+                    Cada estudiante cuenta con su propio contrato marco (Artículo 4 con curso y escuela correspondiente) vinculado a los datos de sus padres.
                   </p>
                 </div>
 
                 <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
-                  <strong className="text-emerald-900 block text-xs font-black">2. Criterio de Vigencia</strong>
+                  <strong className="text-emerald-900 block text-xs font-black">2. Vigencia por Alumno</strong>
                   <p className="text-slate-600 leading-relaxed text-[11px]">
-                    En re-envíos o correcciones (5 familias), se tomó de forma automática la <strong>última presentación registrada</strong> como la versión oficial y vinculante.
+                    Si una familia tiene varios hijos, cada hijo tiene su contrato oficial vigente. En re-envíos para un mismo hijo, rige la última presentación.
                   </p>
                 </div>
 
                 <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
-                  <strong className="text-emerald-900 block text-xs font-black">3. Absorción de Sobrantes</strong>
+                  <strong className="text-emerald-900 block text-xs font-black">3. Sin Filas Duplicadas</strong>
                   <p className="text-slate-600 leading-relaxed text-[11px]">
-                    Los <strong>63 trámites duplicados</strong> fueron absorbidos sin pérdida de información, unificando a los 269 alumnos únicos en 206 familias.
+                    Se eliminan las repeticiones cruzadas de hermanos, garantizando exactamente 1 fila por alumno en el padrón de Excel.
                   </p>
                 </div>
 
                 <div className="bg-white/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs space-y-1">
                   <strong className="text-emerald-900 block text-xs font-black">4. Padrón Escolar Único</strong>
                   <p className="text-slate-600 leading-relaxed text-[11px]">
-                    Cada estudiante figura exactamente 1 vez con su curso/sala 2027 definitivo, vinculado a su titular de facturación y contrato firmado.
+                    Padrón consolidado de 269 alumnos con descarga directa de PDF individual o descarga masiva de todos los contratos en ZIP.
                   </p>
                 </div>
               </div>
@@ -2736,6 +2893,15 @@ export function AdminDashboard({
                               </a>
                             ) : null;
                           })()}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadCleanStudentPdf(s)}
+                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            title={`Descargar Contrato PDF de ${s.studentName}`}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
