@@ -590,155 +590,179 @@ export function PreinscripcionesTab({
               <div 
                 key={a.id}
                 className={cn(
-                  "bg-white dark:bg-slate-900 rounded-2xl border p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3.5 relative",
+                  "bg-white dark:bg-slate-900 rounded-2xl border p-4.5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative",
                   isSelected 
                     ? "border-brand-blue ring-2 ring-brand-blue/30 bg-blue-50/20" 
                     : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                 )}
               >
                 {/* Header de la tarjeta */}
-                <div>
-                  <div className="flex items-start justify-between gap-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleToggleSelect(a.id)}
-                        className="p-1 text-slate-400 hover:text-slate-800 cursor-pointer"
+                        className="p-1 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                        title={isSelected ? "Deseleccionar" : "Seleccionar"}
                       >
                         {isSelected ? <CheckSquare className="w-4 h-4 text-brand-blue" /> : <Square className="w-4 h-4" />}
                       </button>
-                      <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                      <span className="font-mono text-[11px] font-extrabold text-brand-blue dark:text-sky-300 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-lg border border-blue-200/80 dark:border-blue-800">
                         {a.trackingNumber || a.id.substring(0, 8)}
                       </span>
                     </div>
 
-                    <span className="text-[10px] text-slate-400 font-sans">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
                       {new Date(a.createdAt).toLocaleDateString("es-AR")}
                     </span>
                   </div>
 
                   {/* Datos del Aspirante */}
-                  <div className="mt-2.5">
+                  <div>
                     <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight">
                       {a.studentName}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                      DNI: <strong className="font-mono text-slate-800 dark:text-slate-200">{a.studentDni}</strong>
-                      {a.studentBirthDate && <span className="ml-1 text-slate-400 font-normal">({a.studentBirthDate})</span>}
-                    </p>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span>DNI: <strong className="font-mono text-slate-800 dark:text-slate-200">{a.studentDni}</strong></span>
+                      {a.studentBirthDate && <span className="text-slate-400">({a.studentBirthDate})</span>}
+                    </div>
                   </div>
 
                   {/* Grado y Escuela */}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-md bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/20 dark:text-sky-300 border border-brand-blue/20">
-                      {a.studentGrade}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-brand-blue/10 text-brand-blue dark:bg-brand-blue/20 dark:text-sky-300 border border-brand-blue/20">
+                      {a.studentGrade || "Sin sala"}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                       {a.school || "Escuela N.º 1030"}
                     </span>
                   </div>
 
-                  {/* Prioridades e Inglés */}
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {a.isStaffChild && (
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePriority(a.id, a.priorityVerified)}
-                        className={cn(
-                          "text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 cursor-pointer transition-all",
-                          a.priorityVerified
-                            ? "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800"
-                            : "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800"
-                        )}
-                        title="Click para alternar verificación de prioridad"
-                      >
-                        <ShieldCheck className="w-3 h-3" />
-                        <span>Hijo Personal {a.priorityVerified ? "✓" : "(Pendiente)"}</span>
-                      </button>
-                    )}
+                  {/* Prioridades e Inglés (Renderizado seguro sin ceros) */}
+                  {(Boolean(a.isStaffChild) || Boolean(a.hasSiblingInSchool) || (a.englishAccreditationType && a.englishAccreditationType !== "ninguno")) ? (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {Boolean(a.isStaffChild) && (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePriority(a.id, a.priorityVerified)}
+                          className={cn(
+                            "text-[10px] font-black px-2.5 py-1 rounded-lg border flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs",
+                            a.priorityVerified
+                              ? "bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800"
+                              : "bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800"
+                          )}
+                          title="Click para alternar verificación de prioridad"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>Hijo Personal {a.priorityVerified ? "✓ Verificado" : "(Pendiente)"}</span>
+                        </button>
+                      )}
 
-                    {a.hasSiblingInSchool && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        Hermano DNI {a.siblingDni || "---"}
-                      </span>
-                    )}
+                      {Boolean(a.hasSiblingInSchool) && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-900 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1.5 shadow-2xs">
+                          <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                          Hermano DNI {a.siblingDni || "---"}
+                        </span>
+                      )}
 
-                    {a.englishAccreditationType && a.englishAccreditationType !== "ninguno" && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        Inglés: {a.englishAccreditationType}
-                      </span>
-                    )}
-                  </div>
+                      {a.englishAccreditationType && a.englishAccreditationType !== "ninguno" && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-50 text-purple-900 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-2xs">
+                          Inglés: {a.englishAccreditationType}
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
 
                   {/* Origen & Contacto */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px] space-y-1 text-slate-600 dark:text-slate-400">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800 text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
                     {a.currentSchool && (
-                      <p className="truncate">
-                        <span className="text-slate-400">Origen:</span> {a.currentSchool}
-                      </p>
+                      <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 truncate">
+                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          <span className="text-slate-400">Origen:</span> {a.currentSchool}
+                        </span>
+                      </div>
                     )}
-                    <p className="font-medium text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                      <span>{a.parent1Name || a.tutorName || "Tutor"}</span>
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <User className="w-3.5 h-3.5 text-brand-blue shrink-0" />
+                        <span className="font-bold text-slate-900 dark:text-white truncate">{a.parent1Name || a.tutorName || "Tutor"}</span>
+                      </div>
                       {a.parent1Phone && (
-                        <span className="font-mono text-[10px] text-slate-500">{a.parent1Phone}</span>
+                        <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 shrink-0">
+                          {a.parent1Phone}
+                        </span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Footer de la tarjeta: Estado y Acciones */}
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                  <select
-                    value={currentStatus}
-                    onChange={e => handleUpdateAdmissionStatus([a.id], e.target.value)}
-                    className={cn(
-                      "px-2.5 py-1 text-xs font-black rounded-lg border outline-none cursor-pointer flex-1",
-                      statusInfo.bg,
-                      statusInfo.text,
-                      statusInfo.border
-                    )}
-                  >
-                    <option value="recibida">Recibida</option>
-                    <option value="entrevista_agendada">Entrevista Agendada</option>
-                    <option value="entrevista_realizada">Entrevista Realizada</option>
-                    <option value="admitida">Admitida</option>
-                    <option value="lista_espera">Lista de Espera</option>
-                    <option value="no_admitida">No Admitida</option>
-                    <option value="desistida">Desistida</option>
-                  </select>
+                {/* Footer de la tarjeta: Estado y Acciones Organizadas */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 dark:text-slate-500 tracking-wider">Estado:</span>
+                    <select
+                      value={currentStatus}
+                      onChange={e => handleUpdateAdmissionStatus([a.id], e.target.value)}
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-black rounded-lg border outline-none cursor-pointer flex-1 transition-all",
+                        statusInfo.bg,
+                        statusInfo.text,
+                        statusInfo.border
+                      )}
+                    >
+                      <option value="recibida">Recibida</option>
+                      <option value="entrevista_agendada">Entrevista Agendada</option>
+                      <option value="entrevista_realizada">Entrevista Realizada</option>
+                      <option value="admitida">Admitida</option>
+                      <option value="lista_espera">Lista de Espera</option>
+                      <option value="no_admitida">No Admitida</option>
+                      <option value="desistida">Desistida</option>
+                    </select>
+                  </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenModal(a)}
+                      className="flex-1 px-3 py-2 text-brand-blue dark:text-sky-300 bg-blue-50/80 hover:bg-blue-100 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl border border-blue-200/80 dark:border-slate-700 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                      title="Ver expediente 360°"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Ver Ficha 360°</span>
+                    </button>
+
                     {wa && (
                       <a
                         href={wa}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-colors"
+                        className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 transition-colors shrink-0"
                         title="Enviar WhatsApp"
                       >
                         <MessageCircle className="w-4 h-4" />
                       </a>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenModal(a)}
-                      className="px-2.5 py-1.5 text-brand-blue hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg border border-blue-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                      title="Ver expediente 360°"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Ficha</span>
-                    </button>
+                    {a.parent1Email && (
+                      <a
+                        href={`mailto:${a.parent1Email}`}
+                        className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors shrink-0"
+                        title="Enviar correo"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </a>
+                    )}
 
                     {isSuperAdmin && onDeleteEnrollment && (
                       <button
                         type="button"
                         onClick={() => onDeleteEnrollment(a.id)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg border border-red-200 dark:border-red-800 transition-colors cursor-pointer"
+                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl border border-red-200 dark:border-red-800 transition-colors cursor-pointer shrink-0"
                         title="Eliminar solicitud"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -832,7 +856,7 @@ export function PreinscripcionesTab({
 
                       <td className="py-2.5 px-3">
                         <div className="flex flex-col gap-1 items-start">
-                          {a.isStaffChild && (
+                          {Boolean(a.isStaffChild) && (
                             <button
                               type="button"
                               onClick={() => handleTogglePriority(a.id, a.priorityVerified)}
@@ -849,13 +873,13 @@ export function PreinscripcionesTab({
                             </button>
                           )}
 
-                          {a.hasSiblingInSchool && (
+                          {Boolean(a.hasSiblingInSchool) && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                               Hermano DNI {a.siblingDni || "---"}
                             </span>
                           )}
 
-                          {!a.isStaffChild && !a.hasSiblingInSchool && (
+                          {!Boolean(a.isStaffChild) && !Boolean(a.hasSiblingInSchool) && (
                             <span className="text-[10px] text-slate-400">General</span>
                           )}
                         </div>
