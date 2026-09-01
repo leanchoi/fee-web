@@ -197,7 +197,7 @@ export default function InglesPage() {
                 <Plane className="w-8 h-8 text-brand-yellow mb-4" />
                 <h3 className="text-xl font-bold text-brand-yellow mb-3">Experiencias Internacionales</h3>
                 <p className="text-xs text-white/90 leading-relaxed font-medium">
-                  Programas de intercambio y viajes educativos al Reino Unido que ofrecen experiencias de inmersión lingüística y cultural, fortaleciendo la autonomía, la confianza y la visión global de nuestros estudiantes.
+                  Programas de intercambio y viajes educativos al Reino Unido y Europa que ofrecen experiencias de inmersión lingüística y cultural, fortaleciendo la autonomía, la confianza y la visión global de nuestros estudiantes.
                 </p>
               </div>
             </div>
@@ -221,6 +221,83 @@ export default function InglesPage() {
                 <p className="text-sm text-brand-foreground/80 leading-relaxed font-medium">
                   Acceso a literatura física y a la plataforma digital iRead con más de 400 títulos interactivos, además de la Feria del Libro junto a Roots Bookshop.
                 </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Travel Experience: Oxford & Amsterdam (New Showcase) */}
+      <section className="container mx-auto px-6 lg:px-12 my-6">
+        <div className="bg-white rounded-[2.5rem] border border-brand-gray/10 p-8 md:p-12 shadow-sm">
+          <div className="max-w-3xl mb-10">
+            <span className="bg-brand-blue/10 text-brand-blue text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider inline-block mb-3">
+              Viajes Educativos e Intercambio Global
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-brand-blue mb-4">
+              Inmersión en Oxford & Ámsterdam
+            </h2>
+            <p className="text-base text-brand-foreground/80 leading-relaxed font-medium">
+              Nuestros viajes de inmersión internacional combinan formación académica de excelencia en las universidades más prestigiosas del mundo con vivencias culturales únicas que expanden los horizontes de los estudiantes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+            
+            {/* Foto 1: Oxford University */}
+            <div className="group rounded-[2rem] overflow-hidden border border-brand-gray/10 bg-slate-900 flex flex-col shadow-md relative min-h-[420px]">
+              <div className="relative h-72 sm:h-80 w-full overflow-hidden">
+                <img 
+                  src="/photos/fee_photo_oxford.jpg" 
+                  alt="Viaje Educativo a la Universidad de Oxford - Fundación Educativa Esquel" 
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute top-4 left-4 bg-brand-blue/90 backdrop-blur-sm text-brand-yellow font-bold text-xs px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                  Oxford • Reino Unido
+                </div>
+              </div>
+              <div className="p-6 bg-white flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-brand-blue mb-2">
+                    Tradición Universitaria y Excelencia Académica
+                  </h3>
+                  <p className="text-xs text-brand-foreground/80 leading-relaxed font-medium">
+                    Recorrido formativo por los históricos colleges de la Universidad de Oxford, la icónica <strong>Radcliffe Camera</strong> y bibliotecas centenarias, interactuando en inglés en situaciones académicas reales.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-brand-gray/10 flex items-center justify-between text-[11px] font-bold text-brand-blue/70">
+                  <span>Práctica Lingüística Intensiva</span>
+                  <span>Oxford University (UK)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Foto 2: Amsterdam / Holanda */}
+            <div className="group rounded-[2rem] overflow-hidden border border-brand-gray/10 bg-slate-900 flex flex-col shadow-md relative min-h-[420px]">
+              <div className="relative h-72 sm:h-80 w-full overflow-hidden">
+                <img 
+                  src="/photos/fee_photo_amsterdam.jpg" 
+                  alt="Viaje Cultural a Ámsterdam y Zaanse Schans - Fundación Educativa Esquel" 
+                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute top-4 left-4 bg-teal-800/90 backdrop-blur-sm text-white font-bold text-xs px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+                  Ámsterdam • Países Bajos
+                </div>
+              </div>
+              <div className="p-6 bg-white flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-brand-blue mb-2">
+                    Apertura Intercultural y Patrimonio Europeo
+                  </h3>
+                  <p className="text-xs text-brand-foreground/80 leading-relaxed font-medium">
+                    Experiencia formativa descubriendo los molinos históricos de <strong>Zaanse Schans</strong>, los canales de Ámsterdam y el patrimonio cultural europeo, fomentando la autonomía y el compañerismo.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-brand-gray/10 flex items-center justify-between text-[11px] font-bold text-teal-800">
+                  <span>Convivencia & Ciudadanía Global</span>
+                  <span>Países Bajos</span>
+                </div>
               </div>
             </div>
 

@@ -101,6 +101,22 @@ $initialGallery = [
         'title'    => 'Colación y Fiesta de Egresados',
         'desc'     => 'Cierre de ciclo formativo y celebración del futuro de nuestros estudiantes.',
         'order'    => 12
+    ],
+    [
+        'id'       => 'gal-13',
+        'image'    => '/photos/fee_photo_oxford.jpg',
+        'category' => 'Viajes Internacionales',
+        'title'    => 'Inmersión Universitaria en Oxford (UK)',
+        'desc'     => 'Recorridos históricos y perfeccionamiento del idioma frente a la emblemática Radcliffe Camera en la Universidad de Oxford.',
+        'order'    => 13
+    ],
+    [
+        'id'       => 'gal-14',
+        'image'    => '/photos/fee_photo_amsterdam.jpg',
+        'category' => 'Intercambio Cultural',
+        'title'    => 'Experiencia Cultural en Ámsterdam (Holanda)',
+        'desc'     => 'Nuestros estudiantes explorando la cultura, los canales y los históricos molinos de viento en los Países Bajos.',
+        'order'    => 14
     ]
 ];
 
