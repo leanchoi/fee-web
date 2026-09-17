@@ -79,7 +79,8 @@ import {
   ChevronUp,
   AlertOctagon,
   Link as LinkIcon,
-  CheckCircle2
+  CheckCircle2,
+  School
 } from "lucide-react";
 import JSZip from "jszip";
 import { generateContractPdf, downloadFilledContract, determineLevel, determineSchool, getContractFilename } from "@/lib/contractGenerator";
@@ -87,6 +88,7 @@ import { extractAllStudents, extractStudentsFromEnrollment, ExtractedStudent } f
 import { consolidateFamilies, exportCleanBaseToCSV, ConsolidatedFamilyGroup, CleanBaseStudent } from "@/lib/familyConsolidator";
 import { ConvocatoriasSettingsTab } from "@/components/admin/ConvocatoriasSettingsTab";
 import { PreinscripcionesTab } from "@/components/admin/PreinscripcionesTab";
+import { AulasTab } from "@/components/admin/AulasTab";
 import { Post, Enrollment, User, ContactMessage } from "@prisma/client";
 
 interface Block {
@@ -355,7 +357,7 @@ export function AdminDashboard({
     return "inscripciones";
   });
 
-  const [inscripcionesSubTab, setInscripcionesSubTab] = useState<"reinscripciones" | "preinscripciones" | "convocatorias">("reinscripciones");
+  const [inscripcionesSubTab, setInscripcionesSubTab] = useState<"reinscripciones" | "preinscripciones" | "aulas" | "convocatorias">("reinscripciones");
   const [reinscripcionesView, setReinscripcionesView] = useState<"base_limpia" | "familias" | "tramites">("base_limpia");
   const [showDirectLinkModal, setShowDirectLinkModal] = useState(false);
   const [copiedDirectLinkInDashboard, setCopiedDirectLinkInDashboard] = useState(false);
@@ -1555,6 +1557,23 @@ export function AdminDashboard({
               <span>Preinscripciones 2027</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-950 text-blue-200">
                 {preinscripcionesList.length}
+              </span>
+            </button>
+
+            {/* Sub-tab 3: Aulas & Vacantes */}
+            <button
+              onClick={() => setInscripcionesSubTab("aulas")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer",
+                inscripcionesSubTab === "aulas"
+                  ? "bg-brand-blue text-white shadow-md scale-[1.02]"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              )}
+            >
+              <School className="w-4 h-4 text-cyan-300" />
+              <span>Aulas & Vacantes 2027</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-950 text-cyan-200">
+                15 aulas
               </span>
             </button>
 
@@ -3228,6 +3247,16 @@ export function AdminDashboard({
             isSuperAdmin={isSuperAdmin}
             onRefreshData={fetchGlobalSettings}
             onDeleteEnrollment={handleDeleteEnrollment}
+          />
+        )}
+
+        {/* TAB DE AULAS & VACANTES 2027 */}
+        {hasEnrollmentsPerm && activeTab === "inscripciones" && inscripcionesSubTab === "aulas" && (
+          <AulasTab
+            cleanStudents={consolidatedFamiliesData.cleanStudents}
+            preinscripcionesList={preinscripcionesList}
+            isSuperAdmin={isSuperAdmin}
+            onRefreshData={fetchGlobalSettings}
           />
         )}
 

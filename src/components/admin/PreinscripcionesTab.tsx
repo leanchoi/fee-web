@@ -399,6 +399,8 @@ export function PreinscripcionesTab({
     entrevista_agendada: { bg: "bg-indigo-100 dark:bg-indigo-950/60", text: "text-indigo-900 dark:text-indigo-200", border: "border-indigo-300 dark:border-indigo-800", label: "Entrevista Agendada" },
     entrevista_realizada: { bg: "bg-blue-100 dark:bg-blue-950/60", text: "text-blue-900 dark:text-blue-200", border: "border-blue-300 dark:border-blue-800", label: "Entrevista Realizada" },
     admitida: { bg: "bg-emerald-100 dark:bg-emerald-950/60", text: "text-emerald-900 dark:text-emerald-200", border: "border-emerald-300 dark:border-emerald-800", label: "Admitida" },
+    aprobada_pendiente_firma: { bg: "bg-gradient-to-r from-amber-100 to-emerald-100 dark:from-amber-950/60 dark:to-emerald-950/60", text: "text-emerald-950 dark:text-emerald-200", border: "border-emerald-400 dark:border-emerald-700", label: "Vacante Reservada · Pendiente Firma" },
+    confirmada: { bg: "bg-gradient-to-r from-emerald-100 to-blue-100 dark:from-emerald-950/60 dark:to-blue-950/60", text: "text-blue-950 dark:text-blue-200", border: "border-blue-400 dark:border-blue-700", label: "Matrícula Formalizada" },
     lista_espera: { bg: "bg-amber-100 dark:bg-amber-950/60", text: "text-amber-900 dark:text-amber-200", border: "border-amber-300 dark:border-amber-800", label: "Lista de Espera" },
     no_admitida: { bg: "bg-red-100 dark:bg-red-950/60", text: "text-red-900 dark:text-red-200", border: "border-red-300 dark:border-red-800", label: "No Admitida" },
     desistida: { bg: "bg-zinc-200 dark:bg-zinc-800/60", text: "text-zinc-800 dark:text-zinc-300", border: "border-zinc-300 dark:border-zinc-700", label: "Desistida" }

@@ -3,6 +3,7 @@
 // PANEL DE ADMINISTRACIÓN SEGURO - FUNDACIÓN EDUCATIVA ESQUEL
 // ==============================================================================
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/mailer.php';
 
 // 12 Tarjetas oficiales preexistentes de la galería Home
 $initialGallery = [
@@ -647,15 +648,31 @@ switch ($action) {
         $admissionStatus = trim($bodyData['admissionStatus'] ?? '');
         $admissionNotes  = trim($bodyData['admissionNotes'] ?? '');
         $decidedBy       = $session['name'] ?? ($session['username'] ?? 'admin');
+        $sendEmail       = isset($bodyData['sendEmail']) ? (bool)$bodyData['sendEmail'] : true;
 
-        $allowedStatuses = ['recibida', 'entrevista_agendada', 'entrevista_realizada', 'admitida', 'lista_espera', 'no_admitida', 'desistida'];
+        $allowedStatuses = [
+            'recibida', 
+            'entrevista_agendada', 
+            'entrevista_realizada', 
+            'admitida', 
+            'aprobada_pendiente_firma',
+            'confirmada',
+            'lista_espera', 
+            'no_admitida', 
+            'desistida'
+        ];
         if (empty($ids) || !in_array($admissionStatus, $allowedStatuses, true)) {
             jsonResponse(400, ["success" => false, "error" => "Parámetros inválidos o estado de admisión no permitido"]);
         }
 
+        $emailResults = [];
+        $tokens = [];
+
         try {
             $pdo = getPDO();
             if ($pdo) {
+                ensureEnrollmentTableSchema($pdo);
+
                 $inClause = implode(',', array_fill(0, count($ids), '?'));
                 $params = array_merge([$admissionStatus, $admissionNotes, $decidedBy], $ids);
                 $stmt = $pdo->prepare("
@@ -667,12 +684,146 @@ switch ($action) {
                     WHERE `id` IN ($inClause)
                 ");
                 $stmt->execute($params);
+
+                // Si se aprueba o se invita a formalizar, generar tokens de formalización si no tienen
+                if ($admissionStatus === 'admitida' || $admissionStatus === 'aprobada_pendiente_firma') {
+                    $fetchStmt = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `id` IN ($inClause)");
+                    $fetchStmt->execute($ids);
+                    $students = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($students as $st) {
+                        $token = $st['formalizationToken'] ?? '';
+                        if (empty($token)) {
+                            $token = bin2hex(random_bytes(32));
+                            $upToken = $pdo->prepare("
+                                UPDATE `Enrollment` 
+                                SET `formalizationToken` = :t,
+                                    `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                                WHERE `id` = :id
+                            ");
+                            $upToken->execute([':t' => $token, ':id' => $st['id']]);
+                        }
+                        $tokens[$st['id']] = $token;
+
+                        if ($sendEmail) {
+                            $mailRes = sendFormalizationInviteEmail($st, $token);
+                            $emailResults[$st['id']] = $mailRes;
+                        }
+                    }
+                } elseif ($admissionStatus === 'lista_espera' && $sendEmail) {
+                    $fetchStmt = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `id` IN ($inClause)");
+                    $fetchStmt->execute($ids);
+                    $students = $fetchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($students as $st) {
+                        $mailRes = sendWaitlistNoticeEmail($st);
+                        $emailResults[$st['id']] = $mailRes;
+                    }
+                }
             }
         } catch (Exception $e) {
             jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
         }
 
-        jsonResponse(200, ["success" => true, "updatedCount" => count($ids)]);
+        jsonResponse(200, [
+            "success"      => true, 
+            "updatedCount" => count($ids),
+            "tokens"       => $tokens,
+            "emailResults" => $emailResults
+        ]);
+
+    // 2a. Reenviar correo de formalización individual
+    case 'resend_formalization_email':
+        if (!checkPermission($session, 'enrollments')) {
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
+        }
+
+        $id = trim($bodyData['id'] ?? '');
+        if (empty($id)) {
+            jsonResponse(400, ["success" => false, "error" => "ID de trámite requerido"]);
+        }
+
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                ensureEnrollmentTableSchema($pdo);
+                $stmt = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `id` = :id LIMIT 1");
+                $stmt->execute([':id' => $id]);
+                $st = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$st) {
+                    jsonResponse(404, ["success" => false, "error" => "Estudiante no encontrado"]);
+                }
+
+                $token = $st['formalizationToken'] ?? '';
+                if (empty($token)) {
+                    $token = bin2hex(random_bytes(32));
+                    $upToken = $pdo->prepare("
+                        UPDATE `Enrollment` 
+                        SET `formalizationToken` = :t,
+                            `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                        WHERE `id` = :id
+                    ");
+                    $upToken->execute([':t' => $token, ':id' => $st['id']]);
+                }
+
+                $mailRes = sendFormalizationInviteEmail($st, $token);
+                $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
+
+                jsonResponse(200, [
+                    "success"     => true,
+                    "mailSent"    => $mailRes['success'] ?? false,
+                    "mailError"   => $mailRes['error'] ?? null,
+                    "token"       => $token,
+                    "directUrl"   => $directUrl
+                ]);
+            }
+        } catch (Exception $e) {
+            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
+        }
+        jsonResponse(500, ["success" => false, "error" => "Error de base de datos"]);
+
+    // 2b. Obtener o generar enlace directo de formalización
+    case 'get_formalization_link':
+        if (!checkPermission($session, 'enrollments')) {
+            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
+        }
+
+        $id = trim($bodyData['id'] ?? ($_GET['id'] ?? ''));
+        if (empty($id)) {
+            jsonResponse(400, ["success" => false, "error" => "ID requerido"]);
+        }
+
+        try {
+            $pdo = getPDO();
+            if ($pdo) {
+                ensureEnrollmentTableSchema($pdo);
+                $stmt = $pdo->prepare("SELECT `id`, `studentName`, `formalizationToken` FROM `Enrollment` WHERE `id` = :id LIMIT 1");
+                $stmt->execute([':id' => $id]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$row) {
+                    jsonResponse(404, ["success" => false, "error" => "Registro no encontrado"]);
+                }
+
+                $token = $row['formalizationToken'] ?? '';
+                if (empty($token)) {
+                    $token = bin2hex(random_bytes(32));
+                    $up = $pdo->prepare("UPDATE `Enrollment` SET `formalizationToken` = :t, `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE `id` = :id");
+                    $up->execute([':t' => $token, ':id' => $id]);
+                }
+
+                $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
+                jsonResponse(200, [
+                    "success"   => true,
+                    "token"     => $token,
+                    "directUrl" => $directUrl
+                ]);
+            }
+        } catch (Exception $e) {
+            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
+        }
+        jsonResponse(500, ["success" => false, "error" => "Error de base de datos"]);
 
     // 2b. Verificar prioridad de aspirante
     case 'verify_priority':
