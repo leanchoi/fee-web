@@ -25,12 +25,40 @@ $env = is_readable($envFile) ? (require $envFile) : [];
 
 if (!defined('DB_HOST'))    define('DB_HOST',    $env['DB_HOST']    ?? 'localhost');
 if (!defined('DB_NAME'))    define('DB_NAME',    $env['DB_NAME']    ?? 'u769174130_escueladb');
-if (!defined('DB_USER'))    define('DB_USER',    $env['DB_USER']    ?? 'u769174130_admin');
-if (!defined('DB_PASS'))    define('DB_PASS',    $env['DB_PASS']    ?? 'FEE_Esquel_2026$Patagonia');
+if (!defined('DB_USER'))    define('DB_USER',    $env['DB_USER']    ?? 'u769174130_admin_db');
+if (!defined('DB_PASS'))    define('DB_PASS',    $env['DB_PASS']    ?? 'Arcoiris1986');
 if (!defined('JWT_SECRET')) define('JWT_SECRET', $env['JWT_SECRET'] ?? 'c0f8e9a2b4d6f8a0c2e4f6a8b0d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b4c6d8');
 
 if (!defined('GOOGLE_SHEET_WEBHOOK_URL')) {
     define('GOOGLE_SHEET_WEBHOOK_URL', $env['GOOGLE_SHEET_WEBHOOK_URL'] ?? 'https://script.google.com/macros/s/AKfycbzfxI_lQ910slPUVyc-scTPr96Jam8jQzHmFTWbCaa6guGpnVb5JUm4oN38h8PgkBsk/exec');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+Helpers Globales para Persistencia Dual JSON
+═══════════════════════════════════════════════════════════════ */
+if (!function_exists('feeReadJson')) {
+    function feeReadJson(string $path): array {
+        if (!is_file($path)) return [];
+        $raw = @file_get_contents($path);
+        if ($raw === false || $raw === '') return [];
+        $d = json_decode($raw, true);
+        return is_array($d) ? $d : [];
+    }
+}
+
+if (!function_exists('feeWriteJson')) {
+    function feeWriteJson(string $path, array $data): bool {
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            error_log('[FEE_WRITE_JSON_ERROR] Error al serializar JSON para ' . $path . ': ' . json_last_error_msg());
+            return false;
+        }
+        return @file_put_contents($path, $json, LOCK_EX) !== false;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -68,7 +96,7 @@ function jsonResponse(int $status, array $payload): void {
 /* ── Todo fatal o excepción sale como JSON, no como cuerpo vacío ── */
 set_exception_handler(static function (Throwable $t): void {
     error_log('[UNCAUGHT] ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-    jsonResponse(500, ['success' => false, 'error' => 'Error interno del servidor.']);
+    jsonResponse(500, ['success' => false, 'error' => 'Error interno del servidor: ' . $t->getMessage()]);
 });
 
 register_shutdown_function(static function (): void {

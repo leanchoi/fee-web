@@ -742,7 +742,7 @@ switch ($action) {
                         // Si no se generó token por MySQL, generarlo aquí para el JSON
                         if ($admissionStatus === 'admitida' || $admissionStatus === 'aprobada_pendiente_firma') {
                             if (empty($item['formalizationToken'])) {
-                                $item['formalizationToken'] = bin2hex(random_bytes(32));
+                                $item['formalizationToken'] = $tokens[$itemId] ?? bin2hex(random_bytes(32));
                                 $item['formalizationExpiresAt'] = date('c', strtotime('+7 days'));
                             }
                             $tokens[$itemId] = $item['formalizationToken'];
@@ -784,45 +784,78 @@ switch ($action) {
             jsonResponse(400, ["success" => false, "error" => "ID de trámite requerido"]);
         }
 
+        $st = null;
+        $foundIn = null;
+        $pdo = getPDO();
+
         try {
-            $pdo = getPDO();
             if ($pdo) {
                 ensureEnrollmentTableSchema($pdo);
                 $stmt = $pdo->prepare("SELECT * FROM `Enrollment` WHERE `id` = :id LIMIT 1");
                 $stmt->execute([':id' => $id]);
                 $st = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$st) {
-                    jsonResponse(404, ["success" => false, "error" => "Estudiante no encontrado"]);
+                if ($st) {
+                    $foundIn = 'mysql';
                 }
-
-                $token = $st['formalizationToken'] ?? '';
-                if (empty($token)) {
-                    $token = bin2hex(random_bytes(32));
-                    $upToken = $pdo->prepare("
-                        UPDATE `Enrollment` 
-                        SET `formalizationToken` = :t,
-                            `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY)
-                        WHERE `id` = :id
-                    ");
-                    $upToken->execute([':t' => $token, ':id' => $st['id']]);
-                }
-
-                $mailRes = sendFormalizationInviteEmail($st, $token);
-                $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
-
-                jsonResponse(200, [
-                    "success"     => true,
-                    "mailSent"    => $mailRes['success'] ?? false,
-                    "mailError"   => $mailRes['error'] ?? null,
-                    "token"       => $token,
-                    "directUrl"   => $directUrl
-                ]);
             }
         } catch (Exception $e) {
-            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
+            error_log('[RESEND_EMAIL_MYSQL] ' . $e->getMessage());
         }
-        jsonResponse(500, ["success" => false, "error" => "Error de base de datos"]);
+
+        $dataDir = __DIR__ . '/data';
+        if (!$st) {
+            foreach ([$dataDir . '/preinscripciones.json', $dataDir . '/enrollments.json'] as $jsonPath) {
+                if (file_exists($jsonPath)) {
+                    $items = feeReadJson($jsonPath);
+                    foreach ($items as $item) {
+                        if (($item['id'] ?? '') === $id) {
+                            $st = $item;
+                            $foundIn = $jsonPath;
+                            break 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!$st) {
+            jsonResponse(404, ["success" => false, "error" => "Estudiante no encontrado"]);
+        }
+
+        $token = $st['formalizationToken'] ?? '';
+        if (empty($token)) {
+            $token = bin2hex(random_bytes(32));
+            if ($foundIn === 'mysql' && $pdo) {
+                $upToken = $pdo->prepare("
+                    UPDATE `Enrollment` 
+                    SET `formalizationToken` = :t,
+                        `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                    WHERE `id` = :id
+                ");
+                $upToken->execute([':t' => $token, ':id' => $st['id']]);
+            } elseif ($foundIn) {
+                $items = feeReadJson($foundIn);
+                foreach ($items as &$item) {
+                    if (($item['id'] ?? '') === $id) {
+                        $item['formalizationToken'] = $token;
+                        $item['formalizationExpiresAt'] = date('c', strtotime('+7 days'));
+                        break;
+                    }
+                }
+                feeWriteJson($foundIn, $items);
+            }
+        }
+
+        $mailRes = sendFormalizationInviteEmail($st, $token);
+        $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
+
+        jsonResponse(200, [
+            "success"     => true,
+            "mailSent"    => $mailRes['success'] ?? false,
+            "mailError"   => $mailRes['error'] ?? null,
+            "token"       => $token,
+            "directUrl"   => $directUrl
+        ]);
 
     // 2b. Obtener o generar enlace directo de formalización
     case 'get_formalization_link':
@@ -835,36 +868,69 @@ switch ($action) {
             jsonResponse(400, ["success" => false, "error" => "ID requerido"]);
         }
 
+        $row = null;
+        $foundIn = null;
+        $pdo = getPDO();
+
         try {
-            $pdo = getPDO();
             if ($pdo) {
                 ensureEnrollmentTableSchema($pdo);
                 $stmt = $pdo->prepare("SELECT `id`, `studentName`, `formalizationToken` FROM `Enrollment` WHERE `id` = :id LIMIT 1");
                 $stmt->execute([':id' => $id]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if (!$row) {
-                    jsonResponse(404, ["success" => false, "error" => "Registro no encontrado"]);
+                if ($row) {
+                    $foundIn = 'mysql';
                 }
-
-                $token = $row['formalizationToken'] ?? '';
-                if (empty($token)) {
-                    $token = bin2hex(random_bytes(32));
-                    $up = $pdo->prepare("UPDATE `Enrollment` SET `formalizationToken` = :t, `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE `id` = :id");
-                    $up->execute([':t' => $token, ':id' => $id]);
-                }
-
-                $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
-                jsonResponse(200, [
-                    "success"   => true,
-                    "token"     => $token,
-                    "directUrl" => $directUrl
-                ]);
             }
         } catch (Exception $e) {
-            jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
+            error_log('[GET_LINK_MYSQL] ' . $e->getMessage());
         }
-        jsonResponse(500, ["success" => false, "error" => "Error de base de datos"]);
+
+        $dataDir = __DIR__ . '/data';
+        if (!$row) {
+            foreach ([$dataDir . '/preinscripciones.json', $dataDir . '/enrollments.json'] as $jsonPath) {
+                if (file_exists($jsonPath)) {
+                    $items = feeReadJson($jsonPath);
+                    foreach ($items as $item) {
+                        if (($item['id'] ?? '') === $id) {
+                            $row = $item;
+                            $foundIn = $jsonPath;
+                            break 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!$row) {
+            jsonResponse(404, ["success" => false, "error" => "Registro no encontrado"]);
+        }
+
+        $token = $row['formalizationToken'] ?? '';
+        if (empty($token)) {
+            $token = bin2hex(random_bytes(32));
+            if ($foundIn === 'mysql' && $pdo) {
+                $up = $pdo->prepare("UPDATE `Enrollment` SET `formalizationToken` = :t, `formalizationExpiresAt` = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE `id` = :id");
+                $up->execute([':t' => $token, ':id' => $id]);
+            } elseif ($foundIn) {
+                $items = feeReadJson($foundIn);
+                foreach ($items as &$item) {
+                    if (($item['id'] ?? '') === $id) {
+                        $item['formalizationToken'] = $token;
+                        $item['formalizationExpiresAt'] = date('c', strtotime('+7 days'));
+                        break;
+                    }
+                }
+                feeWriteJson($foundIn, $items);
+            }
+        }
+
+        $directUrl = "https://fundacionesquel.edu.ar/formalizacion?token=" . urlencode($token);
+        jsonResponse(200, [
+            "success"   => true,
+            "token"     => $token,
+            "directUrl" => $directUrl
+        ]);
 
     // 2b. Verificar prioridad de aspirante
     case 'verify_priority':
