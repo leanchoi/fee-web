@@ -1356,7 +1356,7 @@ export function AdminDashboard({
     try {
       const res = await deleteEnrollment(id);
       if (res.success) {
-        setEnrollmentList(prev => prev.filter(e => e.id !== id));
+        setEnrollmentList(prev => prev.filter(e => (e as any).id !== id && (e as any).trackingNumber !== id && (e as any).submissionUuid !== id));
         router.refresh();
       } else {
         alert(res.error || "Error al eliminar la inscripción");
@@ -3275,6 +3275,7 @@ export function AdminDashboard({
             preinscripcionesList={preinscripcionesList}
             isSuperAdmin={isSuperAdmin}
             onRefreshData={refreshAllDashboardData}
+            onDeleteEnrollment={handleDeleteEnrollment}
           />
         )}
 

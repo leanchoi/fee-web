@@ -20,7 +20,8 @@ import {
   MessageCircle, 
   Link as LinkIcon, 
   Send,
-  Loader2
+  Loader2,
+  Trash2
 } from "lucide-react";
 import { AulaCard } from "./AulaCard";
 import { AulaStudentItem } from "./AulaStudentCard";
@@ -32,6 +33,7 @@ interface AulasTabProps {
   preinscripcionesList: any[];
   isSuperAdmin: boolean;
   onRefreshData?: () => void;
+  onDeleteEnrollment?: (id: string) => Promise<void>;
 }
 
 // Configuración canónica de aulas de la Fundación Educativa Esquel
@@ -76,7 +78,8 @@ export function AulasTab({
   cleanStudents,
   preinscripcionesList,
   isSuperAdmin,
-  onRefreshData
+  onRefreshData,
+  onDeleteEnrollment
 }: AulasTabProps) {
   // Filtros
   const [levelFilter, setLevelFilter] = useState<"all" | "Nivel Inicial" | "Nivel Primario" | "Nivel Secundario">("all");
@@ -86,6 +89,9 @@ export function AulasTab({
   // Modal 360° para inspección y edición de estudiante
   const [inspectingStudent, setInspectingStudent] = useState<AulaStudentItem | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  // Estado local para alumnos eliminados definitivamente (optimistic 0ms)
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   // Estado local reactivo de overrides inmediatos (optimistic updates)
   const [statusOverrides, setStatusOverrides] = useState<Record<string, { admissionStatus?: string; formalizationToken?: string }>>({});
@@ -142,10 +148,16 @@ export function AulasTab({
     });
   }, [preinscripcionesList, statusOverrides]);
 
-  // Consolidar todos los estudiantes
+  // Consolidar todos los estudiantes (excluyendo eliminados)
   const allStudents = useMemo(() => {
-    return [...regularStudentItems, ...preinscriptosItems];
-  }, [regularStudentItems, preinscriptosItems]);
+    return [...regularStudentItems, ...preinscriptosItems].filter((s) => {
+      if (deletedIds.has(s.id)) return false;
+      if (s.raw?.trackingNumber && deletedIds.has(s.raw.trackingNumber)) return false;
+      if (s.raw?.id && deletedIds.has(s.raw.id)) return false;
+      if (s.studentDni && deletedIds.has(s.studentDni)) return false;
+      return true;
+    });
+  }, [regularStudentItems, preinscriptosItems, deletedIds]);
 
   // Agrupar estudiantes por cada aula canónica
   const aulasData = useMemo(() => {
@@ -315,6 +327,82 @@ export function AulasTab({
       }
     } catch (err: any) {
       alert("Error de conexión: " + err.message);
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  // Acción: Eliminar alumno definitivamente de todos los registros (Exclusivo Administrador)
+  const handleDeleteStudent = async (student: AulaStudentItem) => {
+    if (!isSuperAdmin) {
+      alert("Solo el Administrador General tiene autorización para eliminar alumnos.");
+      return;
+    }
+
+    const confirmMsg = `¿Estás seguro de que deseás eliminar a "${student.studentName}" definitivamente de todos los registros del sistema?\n\nEsta acción es irreversible y purgará su expediente de la base de datos MySQL y de los archivos del servidor.`;
+    if (!confirm(confirmMsg)) return;
+
+    setIsProcessingAction(true);
+    const targetId = student.raw?.id || student.id;
+    const targetTracking = student.raw?.trackingNumber || student.studentDni || "";
+
+    // 1. Ocultamiento optimista inmediato en pantalla (0ms)
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      next.add(student.id);
+      if (targetId) next.add(targetId);
+      if (targetTracking) next.add(targetTracking);
+      if (student.studentDni) next.add(student.studentDni);
+      return next;
+    });
+    setInspectingStudent(null);
+
+    try {
+      const res = await fetch("/api/admin.php?action=delete_enrollment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": getCsrfToken()
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          action: "delete_enrollment",
+          id: targetId,
+          trackingNumber: targetTracking
+        })
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        alert(`"${student.studentName}" ha sido eliminado exitosamente de todos los registros.`);
+        if (onDeleteEnrollment) {
+          try {
+            await onDeleteEnrollment(targetId);
+          } catch {}
+        }
+        if (onRefreshData) onRefreshData();
+      } else {
+        alert(json.error || "No se pudo eliminar el alumno.");
+        // Revertir optimistic si falló
+        setDeletedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(student.id);
+          if (targetId) next.delete(targetId);
+          if (targetTracking) next.delete(targetTracking);
+          if (student.studentDni) next.delete(student.studentDni);
+          return next;
+        });
+      }
+    } catch (err: any) {
+      alert("Error de conexión al eliminar: " + err.message);
+      setDeletedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(student.id);
+        if (targetId) next.delete(targetId);
+        if (targetTracking) next.delete(targetTracking);
+        if (student.studentDni) next.delete(student.studentDni);
+        return next;
+      });
     } finally {
       setIsProcessingAction(false);
     }
@@ -495,6 +583,8 @@ export function AulasTab({
             onInspect={(st) => setInspectingStudent(st)}
             onUpdateStatus={handleUpdateStatus}
             onResendEmail={handleResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={handleDeleteStudent}
           />
         ))}
 
@@ -623,11 +713,26 @@ export function AulasTab({
             </div>
 
             {/* Pie del Modal */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between gap-2">
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteStudent(inspectingStudent)}
+                  disabled={isProcessingAction}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                >
+                  {isProcessingAction ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  <span>Eliminar Alumno Definitivamente</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setInspectingStudent(null)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-white rounded-xl font-bold text-xs cursor-pointer"
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-white rounded-xl font-bold text-xs cursor-pointer ml-auto"
               >
                 Cerrar
               </button>

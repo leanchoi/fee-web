@@ -15,7 +15,8 @@ import {
   FileText, 
   Download,
   MoreVertical,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,13 +45,17 @@ interface AulaStudentCardProps {
   onInspect: (student: AulaStudentItem) => void;
   onUpdateStatus?: (id: string, newStatus: string) => Promise<void>;
   onResendEmail?: (id: string) => Promise<void>;
+  isSuperAdmin?: boolean;
+  onDelete?: (student: AulaStudentItem) => void;
 }
 
 export function AulaStudentCard({
   student,
   onInspect,
   onUpdateStatus,
-  onResendEmail
+  onResendEmail,
+  isSuperAdmin,
+  onDelete
 }: AulaStudentCardProps) {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -193,15 +198,32 @@ export function AulaStudentCard({
           </p>
         </div>
 
-        {/* Botón Ver Ficha 360° */}
-        <button
-          type="button"
-          onClick={() => onInspect(student)}
-          className="p-1.5 text-slate-500 hover:text-brand-blue hover:bg-white/80 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          title="Ver expediente completo"
-        >
-          <Eye className="w-4 h-4" />
-        </button>
+        {/* Acciones de Cabecera */}
+        <div className="flex items-center gap-0.5">
+          {isSuperAdmin && onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(student);
+              }}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+              title="Eliminar alumno definitivamente"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Botón Ver Ficha 360° */}
+          <button
+            type="button"
+            onClick={() => onInspect(student)}
+            className="p-1.5 text-slate-500 hover:text-brand-blue hover:bg-white/80 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            title="Ver expediente completo"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Tutor y Contacto */}
@@ -308,6 +330,23 @@ export function AulaStudentCard({
                 >
                   <span>Volver a En Evaluación</span>
                 </button>
+
+                {isSuperAdmin && onDelete && (
+                  <div className="border-t border-slate-100 dark:border-slate-800 pt-1 mt-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStatusMenu(false);
+                        onDelete(student);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center gap-2 cursor-pointer font-bold"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar Alumno</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

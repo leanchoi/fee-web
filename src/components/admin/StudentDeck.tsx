@@ -26,6 +26,8 @@ interface StudentDeckProps {
   onInspect: (student: AulaStudentItem) => void;
   onUpdateStatus?: (id: string, newStatus: string) => Promise<void>;
   onResendEmail?: (id: string) => Promise<void>;
+  isSuperAdmin?: boolean;
+  onDelete?: (student: AulaStudentItem) => void;
 }
 
 export function StudentDeck({
@@ -37,7 +39,9 @@ export function StudentDeck({
   onToggleExpanded,
   onInspect,
   onUpdateStatus,
-  onResendEmail
+  onResendEmail,
+  isSuperAdmin,
+  onDelete
 }: StudentDeckProps) {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
@@ -210,6 +214,8 @@ export function StudentDeck({
                 onInspect={onInspect}
                 onUpdateStatus={onUpdateStatus}
                 onResendEmail={onResendEmail}
+                isSuperAdmin={isSuperAdmin}
+                onDelete={onDelete}
               />
             ))}
           </div>

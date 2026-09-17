@@ -26,6 +26,8 @@ interface AulaCardProps {
   onInspect: (student: AulaStudentItem) => void;
   onUpdateStatus?: (id: string, newStatus: string) => Promise<void>;
   onResendEmail?: (id: string) => Promise<void>;
+  isSuperAdmin?: boolean;
+  onDelete?: (student: AulaStudentItem) => void;
 }
 
 export function AulaCard({
@@ -37,7 +39,9 @@ export function AulaCard({
   forceExpandAll,
   onInspect,
   onUpdateStatus,
-  onResendEmail
+  onResendEmail,
+  isSuperAdmin,
+  onDelete
 }: AulaCardProps) {
   const [isAulaOpen, setIsAulaOpen] = useState(true);
 
@@ -202,6 +206,8 @@ export function AulaCard({
             onInspect={onInspect}
             onUpdateStatus={onUpdateStatus}
             onResendEmail={onResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={onDelete}
           />
 
           {/* Mazo 2: Nuevos Aspirantes en Evaluación (Amarillo) */}
@@ -214,6 +220,8 @@ export function AulaCard({
             onInspect={onInspect}
             onUpdateStatus={onUpdateStatus}
             onResendEmail={onResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={onDelete}
           />
 
           {/* Mazo 3: Vacantes Reservadas Pendiente de Firma (Amarillo + Verde) */}
@@ -226,6 +234,8 @@ export function AulaCard({
             onInspect={onInspect}
             onUpdateStatus={onUpdateStatus}
             onResendEmail={onResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={onDelete}
           />
 
           {/* Mazo 4: Nuevas Matrículas Formalizadas & Confirmadas (Verde + Azul) */}
@@ -238,6 +248,8 @@ export function AulaCard({
             onInspect={onInspect}
             onUpdateStatus={onUpdateStatus}
             onResendEmail={onResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={onDelete}
           />
 
           {/* Mazo 5: Lista de Espera (Rojo) */}
@@ -250,6 +262,8 @@ export function AulaCard({
             onInspect={onInspect}
             onUpdateStatus={onUpdateStatus}
             onResendEmail={onResendEmail}
+            isSuperAdmin={isSuperAdmin}
+            onDelete={onDelete}
           />
         </div>
       )}

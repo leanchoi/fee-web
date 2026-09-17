@@ -1001,35 +1001,83 @@ switch ($action) {
 
         jsonResponse(200, ["success" => true]);
 
-    // 3. Eliminar inscripción
+    // 3. Eliminar inscripción de todos los registros (Exclusivo Administrador)
     case 'delete_enrollment':
-        if (!checkPermission($session, 'enrollments')) {
-            jsonResponse(403, ["success" => false, "error" => "Permisos insuficientes"]);
+        $isAdmin = (($session['role'] ?? '') === 'SUPER_ADMIN') || (($session['username'] ?? '') === 'admin');
+        if (!$isAdmin) {
+            jsonResponse(403, ["success" => false, "error" => "Solo los administradores pueden eliminar registros definitivamente"]);
         }
 
         $id = trim($bodyData['id'] ?? ($_POST['id'] ?? ''));
-        if (!$id) {
-            jsonResponse(400, ["success" => false, "error" => "ID requerido"]);
+        $trackingNumber = trim($bodyData['trackingNumber'] ?? ($_POST['trackingNumber'] ?? ''));
+        if (!$id && !$trackingNumber) {
+            jsonResponse(400, ["success" => false, "error" => "ID o Número de Trámite requerido"]);
         }
 
-        $enrollFile = __DIR__ . '/data/enrollments.json';
+        $deletedCount = 0;
+        $dataDir = __DIR__ . '/data';
+
+        $checkMatches = function($it) use ($id, $trackingNumber) {
+            $itemId = (string)($it['id'] ?? '');
+            $itemTr = (string)($it['trackingNumber'] ?? '');
+            $itemUuid = (string)($it['submissionUuid'] ?? '');
+
+            if ($id !== '' && ($itemId === $id || $itemTr === $id || $itemUuid === $id)) return true;
+            if ($trackingNumber !== '' && ($itemTr === $trackingNumber || $itemId === $trackingNumber || $itemUuid === $trackingNumber)) return true;
+            return false;
+        };
+
+        // 1. Eliminar de preinscripciones.json
+        $preFile = $dataDir . '/preinscripciones.json';
+        if (file_exists($preFile)) {
+            $items = feeReadJson($preFile);
+            $before = count($items);
+            $items = array_values(array_filter($items, function($it) use ($checkMatches) {
+                return !$checkMatches($it);
+            }));
+            if (count($items) !== $before) {
+                feeWriteJson($preFile, $items);
+                $deletedCount += ($before - count($items));
+            }
+        }
+
+        // 2. Eliminar de enrollments.json
+        $enrollFile = $dataDir . '/enrollments.json';
         if (file_exists($enrollFile)) {
-            $items = json_decode(file_get_contents($enrollFile), true) ?: [];
-            $items = array_values(array_filter($items, fn($it) => $it['id'] !== $id));
-            @file_put_contents($enrollFile, json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $items = feeReadJson($enrollFile);
+            $before = count($items);
+            $items = array_values(array_filter($items, function($it) use ($checkMatches) {
+                return !$checkMatches($it);
+            }));
+            if (count($items) !== $before) {
+                feeWriteJson($enrollFile, $items);
+                $deletedCount += ($before - count($items));
+            }
         }
 
+        // 3. Eliminar de MySQL Enrollment
         try {
             $pdo = getPDO();
             if ($pdo) {
-                $stmt = $pdo->prepare("DELETE FROM `Enrollment` WHERE `id` = :id");
-                $stmt->execute([':id' => $id]);
+                $stmt = $pdo->prepare("DELETE FROM `Enrollment` WHERE `id` = :id OR `trackingNumber` = :id2 OR `submissionUuid` = :id3 OR `trackingNumber` = :tr OR `id` = :tr2");
+                $stmt->execute([
+                    ':id' => $id,
+                    ':id2' => $id,
+                    ':id3' => $id,
+                    ':tr' => $trackingNumber ?: $id,
+                    ':tr2' => $trackingNumber ?: $id
+                ]);
+                $deletedCount += $stmt->rowCount();
             }
         } catch (Exception $e) {
             error_log("Delete enrollment error: " . $e->getMessage());
         }
 
-        jsonResponse(200, ["success" => true]);
+        jsonResponse(200, [
+            "success" => true,
+            "deletedCount" => $deletedCount,
+            "message" => "Registro eliminado definitivamente de todas las fuentes."
+        ]);
 
     // 4. Eliminar mensaje de contacto
     case 'delete_contact':
