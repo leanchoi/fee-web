@@ -725,6 +725,47 @@ switch ($action) {
             jsonResponse(500, ["success" => false, "error" => $e->getMessage()]);
         }
 
+        // Sincronizar también en JSON de respaldo (resiliencia para entornos con persistencia dual)
+        $dataDir = __DIR__ . '/data';
+        foreach ([$dataDir . '/preinscripciones.json', $dataDir . '/enrollments.json'] as $jsonPath) {
+            if (file_exists($jsonPath)) {
+                $items = feeReadJson($jsonPath);
+                $changed = false;
+                foreach ($items as &$item) {
+                    $itemId = $item['id'] ?? '';
+                    if (in_array($itemId, $ids, true)) {
+                        $item['admissionStatus'] = $admissionStatus;
+                        if (!empty($admissionNotes)) $item['admissionNotes'] = $admissionNotes;
+                        $item['decidedBy'] = $decidedBy;
+                        $item['decidedAt'] = date('c');
+
+                        // Si no se generó token por MySQL, generarlo aquí para el JSON
+                        if ($admissionStatus === 'admitida' || $admissionStatus === 'aprobada_pendiente_firma') {
+                            if (empty($item['formalizationToken'])) {
+                                $item['formalizationToken'] = bin2hex(random_bytes(32));
+                                $item['formalizationExpiresAt'] = date('c', strtotime('+7 days'));
+                            }
+                            $tokens[$itemId] = $item['formalizationToken'];
+
+                            if ($sendEmail && !isset($emailResults[$itemId])) {
+                                $mailRes = sendFormalizationInviteEmail($item, $item['formalizationToken']);
+                                $emailResults[$itemId] = $mailRes;
+                            }
+                        } elseif ($admissionStatus === 'lista_espera' && $sendEmail && !isset($emailResults[$itemId])) {
+                            $mailRes = sendWaitlistNoticeEmail($item);
+                            $emailResults[$itemId] = $mailRes;
+                        }
+
+                        $changed = true;
+                    }
+                }
+                unset($item);
+                if ($changed) {
+                    feeWriteJson($jsonPath, $items);
+                }
+            }
+        }
+
         jsonResponse(200, [
             "success"      => true, 
             "updatedCount" => count($ids),
