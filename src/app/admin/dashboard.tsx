@@ -77,7 +77,9 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
-  AlertOctagon
+  AlertOctagon,
+  Link as LinkIcon,
+  CheckCircle2
 } from "lucide-react";
 import JSZip from "jszip";
 import { generateContractPdf, downloadFilledContract, determineLevel, determineSchool, getContractFilename } from "@/lib/contractGenerator";
@@ -355,6 +357,8 @@ export function AdminDashboard({
 
   const [inscripcionesSubTab, setInscripcionesSubTab] = useState<"reinscripciones" | "preinscripciones" | "convocatorias">("reinscripciones");
   const [reinscripcionesView, setReinscripcionesView] = useState<"base_limpia" | "familias" | "tramites">("base_limpia");
+  const [showDirectLinkModal, setShowDirectLinkModal] = useState(false);
+  const [copiedDirectLinkInDashboard, setCopiedDirectLinkInDashboard] = useState(false);
 
   const [cohortSettings, setCohortSettings] = useState<any>(null);
 
@@ -1394,6 +1398,16 @@ export function AdminDashboard({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowDirectLinkModal(true)}
+            className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="Copiar o compartir enlace directo para familias rezagadas"
+          >
+            <LinkIcon className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Enlace Rezagados</span>
+          </button>
+
           {isSuperAdmin && (
             <button
               onClick={() => {
@@ -1650,8 +1664,19 @@ export function AdminDashboard({
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-500 font-semibold hidden lg:block">
-            Vistas segregadas sin duplicados para administración escolar
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDirectLinkModal(true)}
+              className="px-3 py-1.5 bg-emerald-900 hover:bg-emerald-850 text-emerald-100 border border-emerald-600/50 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              title="Copiar o compartir enlace directo para familias rezagadas"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Enlace Directo Rezagados</span>
+            </button>
+            <div className="text-[11px] text-slate-500 font-semibold hidden xl:block">
+              Vistas segregadas sin duplicados
+            </div>
           </div>
         </div>
       )}
@@ -2370,9 +2395,16 @@ export function AdminDashboard({
                                       <HighlightText text={e.school || "Escuela N.º 1030"} highlight={enrollmentSearchQuery} />
                                     </span>
                                   </label>
-                                  <span className="text-[10px] text-brand-foreground/50 font-semibold">
-                                    {new Date(e.createdAt).toLocaleDateString()}
-                                  </span>
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <span className="text-[10px] text-brand-foreground/50 font-semibold">
+                                      {new Date(e.createdAt).toLocaleDateString()}
+                                    </span>
+                                    {(e._isDirectAccess || e._outOfWindow) && (
+                                      <span className="px-1.5 py-0.2 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[9px] font-black uppercase tracking-wider">
+                                        Extemporáneo
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
 
                                 {/* Student Info */}
@@ -2518,6 +2550,11 @@ export function AdminDashboard({
                                     <span className="text-[10px] text-slate-400 font-mono">
                                       <HighlightText text={e.trackingNumber || `FEE-${e.id.substring(0, 5)}`} highlight={enrollmentSearchQuery} />
                                     </span>
+                                    {(e._isDirectAccess || e._outOfWindow) && (
+                                      <span className="inline-block mt-0.5 px-1.5 py-0.2 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[9px] font-black uppercase tracking-wider">
+                                        Extemporáneo
+                                      </span>
+                                    )}
                                   </td>
                                   <td className="p-4">
                                     <span className="font-bold text-slate-900 block">
@@ -4112,6 +4149,99 @@ export function AdminDashboard({
             setResetPasswordTargetUser(null);
           }}
         />
+      )}
+
+      {/* Modal: Enlace Directo para Familias Rezagadas */}
+      {showDirectLinkModal && (
+        <div className="fixed inset-0 z-[110] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-emerald-500/40 relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              type="button"
+              onClick={() => setShowDirectLinkModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
+              <LinkIcon className="w-7 h-7" />
+            </div>
+
+            <div className="text-center mb-5">
+              <span className="inline-block bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full mb-2 border border-emerald-500/40">
+                Enlace Privado • No Listado en Menús
+              </span>
+              <h2 className="text-xl font-black text-white">
+                Enlace Directo de Reinscripción
+              </h2>
+              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                Permite a las familias de alumnos regulares acceder al formulario oficial con contratos y firmas digitales en cualquier momento, <strong>incluso si la web pública está en modo Preinscripciones o Pausa</strong>.
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  readOnly
+                  value={typeof window !== "undefined" ? `${window.location.origin}/reinscripciones` : "https://fundacionesquel.edu.ar/reinscripciones"}
+                  className="w-full px-4 py-3 text-xs sm:text-sm font-mono font-bold bg-slate-950 border border-slate-700 rounded-xl text-emerald-300 select-all outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = typeof window !== "undefined" ? `${window.location.origin}/reinscripciones` : "https://fundacionesquel.edu.ar/reinscripciones";
+                    if (typeof navigator !== "undefined" && navigator.clipboard) {
+                      navigator.clipboard.writeText(url);
+                      setCopiedDirectLinkInDashboard(true);
+                      setTimeout(() => setCopiedDirectLinkInDashboard(false), 2500);
+                    }
+                  }}
+                  className={cn(
+                    "w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md",
+                    copiedDirectLinkInDashboard ? "bg-emerald-500 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                  )}
+                >
+                  {copiedDirectLinkInDashboard ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedDirectLinkInDashboard ? "¡Enlace Copiado!" : "Copiar Enlace"}</span>
+                </button>
+
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `Hola, te compartimos el enlace directo para completar la reinscripción oficial de tu hijo/a al Ciclo Lectivo 2027 en la Fundación Educativa Esquel (Escuelas N.º 1030 y N.º 1739):\n${typeof window !== "undefined" ? `${window.location.origin}/reinscripciones` : "https://fundacionesquel.edu.ar/reinscripciones"}\n\nPodés ingresar desde el celular o computadora para completar los datos y firmar el contrato digital.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 rounded-xl font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Enviar por WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-[11px] text-slate-400">
+              <a
+                href="/reinscripciones"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-emerald-300 flex items-center gap-1 font-semibold"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Abrir en Nueva Pestaña
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowDirectLinkModal(false)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-bold cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

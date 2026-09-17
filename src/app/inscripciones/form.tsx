@@ -370,6 +370,7 @@ export function EnrollmentForm() {
         contractAccepted: true,
         dataAccepted: true,
         termsAccepted: true,
+        isDirectAccess: true,
         studentLevel: formData.studentLevel || determineLevel(formData.studentGrade, formData.school),
         school: formData.school || determineSchool(formData.studentLevel || "Nivel Primario")
       });

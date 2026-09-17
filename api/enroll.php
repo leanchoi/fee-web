@@ -220,10 +220,11 @@ if ($pdo) {
    4. Convocatoria abierta
    ══════════════════════════════════════════════════════════════════════════ */
 
-$settings   = readJsonFile(FEE_DATA_DIR . '/settings.json');
-$activeMode = (string) ($settings['mode'] ?? 'reinscripciones');
+$settings       = readJsonFile(FEE_DATA_DIR . '/settings.json');
+$activeMode     = (string) ($settings['mode'] ?? 'reinscripciones');
+$isDirectAccess = !empty($data['isDirectAccess']) || !empty($data['extemporaneo']);
 
-if ($activeMode === 'cerrado') {
+if ($activeMode === 'cerrado' && !$isDirectAccess) {
     respond(409, [
         'success' => false,
         'error'   => 'El sistema de inscripciones se encuentra cerrado temporalmente.',
@@ -233,10 +234,13 @@ if ($activeMode === 'cerrado') {
 
 $expected = $isPre ? 'preinscripciones' : 'reinscripciones';
 if ($activeMode !== $expected && $activeMode !== 'ambas') {
-    // El formulario se cargó antes del cambio de modo. No se pierde el trámite:
-    // se acepta y se marca para revisión manual.
-    error_log("[ENROLL] Modo activo '{$activeMode}' pero llegó '{$formKind}'. Se acepta y se marca.");
+    // El formulario se cargó por enlace directo o fuera de ventana. No se pierde el trámite:
+    // se acepta y se procesa formalmente.
+    error_log("[ENROLL] Modo activo '{$activeMode}' pero llegó '{$formKind}'" . ($isDirectAccess ? ' (acceso directo)' : '') . ". Se acepta y se procesa.");
     $data['_outOfWindow'] = true;
+    if ($isDirectAccess) {
+        $data['_isDirectAccess'] = true;
+    }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -460,6 +464,7 @@ $jsonRecord['signature2Data'] = !empty($row['signature2Data']) ? '[stored]' : nu
 $jsonRecord['_persistence']   = $persistence;
 $jsonRecord['_dbFailed']      = ($persistence !== 'mysql');
 if (!empty($data['_outOfWindow'])) { $jsonRecord['_outOfWindow'] = true; }
+if (!empty($data['_isDirectAccess']) || !empty($data['isDirectAccess'])) { $jsonRecord['_isDirectAccess'] = true; }
 
 $enrollFile = FEE_DATA_DIR . '/enrollments.json';
 $all = readJsonFile($enrollFile);

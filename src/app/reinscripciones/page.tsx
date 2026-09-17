@@ -5,6 +5,10 @@ import { AlertTriangle } from "lucide-react";
 export const metadata: Metadata = {
   title: "Formulario de Reinscripción – Ciclo Lectivo 2027 | Fundación Educativa Esquel",
   description: "Formulario oficial de reinscripción para estudiantes de las Escuelas N.º 1030 y N.º 1739 - Ciclo Lectivo 2027.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function ReinscripcionesPage() {
@@ -29,23 +33,23 @@ export default function ReinscripcionesPage() {
       <section className="-mt-6 relative z-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-12 max-w-4xl">
           
-          {/* Cartel Rojo de Aviso Importante */}
-          <div className="bg-red-50 border-2 border-red-500 rounded-3xl p-6 sm:p-7 mb-8 shadow-xl relative overflow-hidden">
+          {/* Cartel Informativo de Acceso Exclusivo para Alumnos Actuales */}
+          <div className="bg-emerald-50/90 border-2 border-emerald-600 rounded-3xl p-6 sm:p-7 mb-8 shadow-xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="p-3 bg-red-600 text-white rounded-2xl shrink-0 shadow-md">
+              <div className="p-3 bg-emerald-700 text-white rounded-2xl shrink-0 shadow-md">
                 <AlertTriangle className="w-8 h-8" />
               </div>
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="bg-red-600 text-white text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
-                    Aviso Importante — Período Exclusivo
+                  <span className="bg-emerald-700 text-white text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                    Acceso Exclusivo — Alumnos Regulares
                   </span>
                 </div>
-                <h3 className="text-base sm:text-lg font-black text-red-900 leading-snug">
-                  Habilitado únicamente para la reinscripción de estudiantes que ya concurren a la Fundación.
+                <h3 className="text-base sm:text-lg font-black text-emerald-950 leading-snug">
+                  Portal habilitado para la reinscripción de estudiantes que ya asisten a la institución.
                 </h3>
-                <p className="text-xs sm:text-sm text-red-800 font-medium leading-relaxed">
-                  El período de inscripción para <strong className="font-extrabold text-red-950 underline decoration-red-400 decoration-2">nuevos ingresantes</strong> a la institución iniciará con posterioridad a esta etapa de reinscripción.
+                <p className="text-xs sm:text-sm text-emerald-900 font-medium leading-relaxed">
+                  Completá este formulario digital para formalizar la reinscripción y el Contrato Marco de Servicios Educativos del Ciclo Lectivo 2027 de tu hijo/a.
                 </p>
               </div>
             </div>

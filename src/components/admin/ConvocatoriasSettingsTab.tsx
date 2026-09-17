@@ -12,7 +12,11 @@ import {
   AlertCircle,
   Eye,
   Layers,
-  Lock
+  Lock,
+  Copy,
+  ExternalLink,
+  MessageCircle,
+  Link as LinkIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +40,7 @@ export function ConvocatoriasSettingsTab({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [copiedDirectLink, setCopiedDirectLink] = useState(false);
 
   const [activeMode, setActiveMode] = useState<"reinscripciones" | "preinscripciones" | "cerrado">("reinscripciones");
   const [cohortYear, setCohortYear] = useState<number>(2027);
@@ -53,6 +58,22 @@ export function ConvocatoriasSettingsTab({
   const [showCloseCohortModal, setShowCloseCohortModal] = useState(false);
   const [typedConfirmation, setTypedConfirmation] = useState("");
   const [isProcessingClose, setIsProcessingClose] = useState(false);
+
+  const directLinkUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/reinscripciones`
+    : "https://fundacionesquel.edu.ar/reinscripciones";
+
+  const handleCopyDirectLink = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(directLinkUrl);
+      setCopiedDirectLink(true);
+      setTimeout(() => setCopiedDirectLink(false), 2500);
+    }
+  };
+
+  const whatsappMessage = encodeURIComponent(
+    `Hola, te compartimos el enlace directo para completar la reinscripción oficial de tu hijo/a al Ciclo Lectivo ${cohortYear} de la Fundación Educativa Esquel (Escuelas N.º 1030 y N.º 1739):\n${directLinkUrl}\n\nPodés ingresar desde el celular o la computadora para completar los datos y firmar el contrato digital.`
+  );
 
   const getAuthHeaders = () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("fee_admin_token") : "";
@@ -380,6 +401,77 @@ export function ConvocatoriasSettingsTab({
             <div className="mt-4 pt-3 border-t border-slate-200/60">
               {activeMode === "cerrado" ? <span className="inline-flex items-center gap-1.5 text-xs font-black text-amber-800"><Lock className="w-4 h-4" /> ● AMBAS CERRADAS</span> : <button type="button" disabled={!isSuperAdmin} className="w-full py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer disabled:opacity-40">Pausar Convocatorias</button>}
             </div>
+          </div>
+        </div>
+
+        {/* Enlace Directo para Familias Rezagadas / Extemporáneas (No Listado Públicamente) */}
+        <div className="bg-slate-900 text-white p-6 sm:p-7 rounded-3xl border border-emerald-500/30 shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Enlace Privado • No Listado en Menús
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline">
+                  • Siempre Activo para Alumnos Regulares
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <LinkIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                Enlace Directo de Reinscripción para Familias Rezagadas
+              </h3>
+            </div>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
+            Permite a las familias que olvidaron reinscribirse a término completar el formulario oficial con contratos y firmas digitales. <strong>Podés mantener la web pública en modo Preinscripciones sin interrumpir la llegada de nuevos aspirantes</strong>, y enviar este enlace privado por WhatsApp o email a las familias que lo soliciten.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                readOnly
+                value={directLinkUrl}
+                className="w-full px-4 py-2.5 text-xs sm:text-sm font-mono font-bold bg-slate-950/80 border border-slate-700 rounded-xl text-emerald-300 select-all outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopyDirectLink}
+              className={cn(
+                "px-4 py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md",
+                copiedDirectLink
+                  ? "bg-emerald-500 text-white"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white"
+              )}
+            >
+              {copiedDirectLink ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedDirectLink ? "¡Enlace Copiado!" : "Copiar Enlace"}</span>
+            </button>
+
+            <a
+              href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-200 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md"
+              title="Compartir por WhatsApp con mensaje prearmado"
+            >
+              <MessageCircle className="w-4 h-4 text-emerald-400" />
+              <span>WhatsApp</span>
+            </a>
+
+            <a
+              href="/reinscripciones"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all shadow-md"
+              title="Abrir formulario en pestaña nueva"
+            >
+              <ExternalLink className="w-4 h-4 text-slate-300" />
+              <span>Abrir</span>
+            </a>
           </div>
         </div>
 
