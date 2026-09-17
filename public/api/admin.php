@@ -674,13 +674,22 @@ switch ($action) {
                 ensureEnrollmentTableSchema($pdo);
 
                 $inClause = implode(',', array_fill(0, count($ids), '?'));
-                $params = array_merge([$admissionStatus, $admissionNotes, $decidedBy], $ids);
+                $setClauses = ["`admissionStatus` = ?"];
+                $params = [$admissionStatus];
+
+                if ($admissionNotes !== '') {
+                    $setClauses[] = "`admissionNotes` = ?";
+                    $params[] = $admissionNotes;
+                }
+
+                $setClauses[] = "`decidedBy` = ?";
+                $params[] = $decidedBy;
+                $setClauses[] = "`decidedAt` = NOW(3)";
+
+                $params = array_merge($params, $ids);
                 $stmt = $pdo->prepare("
                     UPDATE `Enrollment` 
-                    SET `admissionStatus` = ?, 
-                        `admissionNotes` = COALESCE(NULLIF(?, ''), `admissionNotes`), 
-                        `decidedBy` = ?, 
-                        `decidedAt` = NOW(3)
+                    SET " . implode(", ", $setClauses) . "
                     WHERE `id` IN ($inClause)
                 ");
                 $stmt->execute($params);

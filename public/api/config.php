@@ -137,6 +137,7 @@ function getPDO(): ?PDO {
                 PDO::ATTR_TIMEOUT            => 3, // Evita spinners infinitos
             ]
         );
+        $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
         $pdo->exec("SET time_zone = '-03:00'");
         return $pdo;
     } catch (PDOException $e) {

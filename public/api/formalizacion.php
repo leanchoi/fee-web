@@ -219,36 +219,30 @@ switch ($action) {
         // 1. Actualizar MySQL si existe
         if ($pdo && !empty($current['id'])) {
             try {
-                $updateStmt = $pdo->prepare("
-                    UPDATE `Enrollment`
-                    SET 
-                        `admissionStatus` = 'confirmada',
-                        `formalizationSignedAt` = NOW(3),
-                        `signature1Data` = :sig1,
-                        `signature2Data` = :sig2,
-                        `contractAccepted` = :ca,
-                        `dataAccepted` = 1,
-                        `termsAccepted` = :ta,
-                        `billingName` = COALESCE(NULLIF(:bn, ''), `billingName`),
-                        `billingCuit` = COALESCE(NULLIF(:bc, ''), `billingCuit`),
-                        `billingTaxCondition` = COALESCE(NULLIF(:bt, ''), `billingTaxCondition`),
-                        `billingEmail` = COALESCE(NULLIF(:bm, ''), `billingEmail`),
-                        `billingAddress` = COALESCE(NULLIF(:ba, ''), `billingAddress`)
-                    WHERE `id` = :id
-                ");
-
-                $updateStmt->execute([
+                $clauses = [
+                    "`admissionStatus` = 'confirmada'",
+                    "`formalizationSignedAt` = NOW(3)",
+                    "`signature1Data` = :sig1",
+                    "`signature2Data` = :sig2",
+                    "`contractAccepted` = :ca",
+                    "`dataAccepted` = 1",
+                    "`termsAccepted` = :ta"
+                ];
+                $params = [
                     ':sig1' => $signature1Data,
                     ':sig2' => $signature2Data ?: null,
                     ':ca'   => $contractAccepted,
                     ':ta'   => $termsAccepted,
-                    ':bn'   => $bName,
-                    ':bc'   => $bCuit,
-                    ':bt'   => $bTax,
-                    ':bm'   => $bMail,
-                    ':ba'   => $bAddr,
                     ':id'   => $current['id']
-                ]);
+                ];
+                if ($bName !== '') { $clauses[] = "`billingName` = :bn"; $params[':bn'] = $bName; }
+                if ($bCuit !== '') { $clauses[] = "`billingCuit` = :bc"; $params[':bc'] = $bCuit; }
+                if ($bTax !== '')  { $clauses[] = "`billingTaxCondition` = :bt"; $params[':bt'] = $bTax; }
+                if ($bMail !== '') { $clauses[] = "`billingEmail` = :bm"; $params[':bm'] = $bMail; }
+                if ($bAddr !== '') { $clauses[] = "`billingAddress` = :ba"; $params[':ba'] = $bAddr; }
+
+                $updateStmt = $pdo->prepare("UPDATE `Enrollment` SET " . implode(", ", $clauses) . " WHERE `id` = :id");
+                $updateStmt->execute($params);
             } catch (Exception $e) {
                 error_log('[FORMALIZACION] Error guardando firma en MySQL: ' . $e->getMessage());
             }
