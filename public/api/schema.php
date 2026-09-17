@@ -76,6 +76,9 @@ function enrollmentSchemaDefinition(): array
         'admissionNotes'            => "TEXT NULL DEFAULT NULL",
         'decidedBy'                 => "VARCHAR(100) NULL DEFAULT NULL",
         'decidedAt'                 => "DATETIME(3) NULL DEFAULT NULL",
+        'formalizationToken'        => "VARCHAR(64) NULL DEFAULT NULL",
+        'formalizationExpiresAt'    => "DATETIME(3) NULL DEFAULT NULL",
+        'formalizationSignedAt'     => "DATETIME(3) NULL DEFAULT NULL",
 
         // ── Reinscripción: hermanos ─────────────────────────────────────────
         'hasSiblings'               => "TINYINT(1) NULL DEFAULT NULL",
@@ -142,6 +145,7 @@ function enrollmentSchemaIndexes(): array
         'idx_tracking'            => "(`trackingNumber`)",
         'idx_student_dni'         => "(`studentDni`)",
         'idx_admission'           => "(`cohortYear`, `admissionStatus`)",
+        'idx_formalization_token' => "(`formalizationToken`)",
     ];
 }
 
