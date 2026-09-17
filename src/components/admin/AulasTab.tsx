@@ -569,24 +569,210 @@ export function AulasTab({
         </div>
       </div>
 
-      {/* ── Lista de Aulas ── */}
-      <div className="space-y-6">
-        {filteredAulas.map((aula) => (
-          <AulaCard
-            key={aula.id}
-            gradeName={aula.gradeName}
-            level={aula.level}
-            school={aula.school}
-            capacity={aula.capacity}
-            students={aula.students}
-            forceExpandAll={forceExpandAll}
-            onInspect={(st) => setInspectingStudent(st)}
-            onUpdateStatus={handleUpdateStatus}
-            onResendEmail={handleResendEmail}
-            isSuperAdmin={isSuperAdmin}
-            onDelete={handleDeleteStudent}
-          />
-        ))}
+      {/* ── Barra de Salto Rápido Directo a Cada Aula (Quick-Jump Bar) ── */}
+      <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <span>⚡</span>
+            <span>Navegación Rápida por Aula:</span>
+          </span>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+            {filteredAulas.length} aulas disponibles
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Inicial */}
+          <div className="flex items-center bg-amber-50 dark:bg-amber-950/40 p-1 rounded-xl border border-amber-200 dark:border-amber-800/60 gap-1">
+            <span className="text-[10px] font-black text-amber-700 dark:text-amber-400 px-1.5 uppercase tracking-wide">
+              Inicial:
+            </span>
+            {[
+              { id: "ini-3", label: "S3", name: "Sala de 3" },
+              { id: "ini-4", label: "S4", name: "Sala de 4" },
+              { id: "ini-5", label: "S5", name: "Sala de 5" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById(`aula-${s.id}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-2 py-1 rounded-lg text-xs font-black bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/60 shadow-2xs transition-colors cursor-pointer"
+                title={`Ir a ${s.name}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Primario */}
+          <div className="flex items-center bg-blue-50 dark:bg-blue-950/40 p-1 rounded-xl border border-blue-200 dark:border-blue-800/60 gap-1">
+            <span className="text-[10px] font-black text-blue-700 dark:text-blue-400 px-1.5 uppercase tracking-wide">
+              Primaria:
+            </span>
+            {[
+              { id: "pri-1", label: "1°", name: "1° Grado" },
+              { id: "pri-2", label: "2°", name: "2° Grado" },
+              { id: "pri-3", label: "3°", name: "3° Grado" },
+              { id: "pri-4", label: "4°", name: "4° Grado" },
+              { id: "pri-5", label: "5°", name: "5° Grado" },
+              { id: "pri-6", label: "6°", name: "6° Grado" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById(`aula-${s.id}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-2 py-1 rounded-lg text-xs font-black bg-white dark:bg-slate-800 text-blue-900 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/60 shadow-2xs transition-colors cursor-pointer"
+                title={`Ir a ${s.name}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Secundario */}
+          <div className="flex items-center bg-purple-50 dark:bg-purple-950/40 p-1 rounded-xl border border-purple-200 dark:border-purple-800/60 gap-1">
+            <span className="text-[10px] font-black text-purple-700 dark:text-purple-400 px-1.5 uppercase tracking-wide">
+              Secundaria:
+            </span>
+            {[
+              { id: "sec-1", label: "1°", name: "1° Año" },
+              { id: "sec-2", label: "2°", name: "2° Año" },
+              { id: "sec-3", label: "3°", name: "3° Año" },
+              { id: "sec-4", label: "4°", name: "4° Año" },
+              { id: "sec-5", label: "5°", name: "5° Año" },
+              { id: "sec-6", label: "6°", name: "6° Año" },
+            ].map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById(`aula-${s.id}`);
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-2 py-1 rounded-lg text-xs font-black bg-white dark:bg-slate-800 text-purple-900 dark:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/60 shadow-2xs transition-colors cursor-pointer"
+                title={`Ir a ${s.name}`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Lista de Aulas con Cabeceras de Nivel Distintivas ── */}
+      <div className="space-y-8">
+        {(["Nivel Inicial", "Nivel Primario", "Nivel Secundario"] as const).map((lvl) => {
+          const aulasInLevel = filteredAulas.filter((a) => a.level === lvl);
+          if (aulasInLevel.length === 0) return null;
+
+          const levelConfig = {
+            "Nivel Inicial": {
+              title: "Nivel Inicial · Primeras Infancias",
+              school: "Escuela N.º 1030",
+              desc: "Salas de 3, 4 y 5 años · 75 cupos totales proyectados",
+              badge: "bg-amber-100 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+              border: "border-amber-500",
+              bgGradient: "bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-transparent border-y border-r border-amber-200 dark:border-amber-900/50",
+              iconBg: "bg-amber-500",
+              iconText: "🌱",
+              summary: "3 Salas · 25 cupos c/u"
+            },
+            "Nivel Primario": {
+              title: "Nivel Primario · 1° a 6° Grado",
+              school: "Escuela N.º 1030",
+              desc: "1° Ciclo (1°-3°) y 2° Ciclo (4°-6°) · 180 cupos totales proyectados",
+              badge: "bg-blue-100 dark:bg-blue-900/60 text-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700",
+              border: "border-blue-600",
+              bgGradient: "bg-gradient-to-r from-blue-600/15 via-cyan-600/10 to-transparent border-y border-r border-blue-200 dark:border-blue-900/50",
+              iconBg: "bg-blue-600",
+              iconText: "🎒",
+              summary: "6 Grados · 30 cupos c/u"
+            },
+            "Nivel Secundario": {
+              title: "Nivel Secundario · 1° a 6° Año",
+              school: "Escuela N.º 1739",
+              desc: "Ciclo Básico (1°-3°) y Ciclo Orientado Bachiller (4°-6°) · 180 cupos proyectados",
+              badge: "bg-purple-100 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200 border-purple-300 dark:border-purple-700",
+              border: "border-purple-600",
+              bgGradient: "bg-gradient-to-r from-purple-600/15 via-indigo-600/10 to-transparent border-y border-r border-purple-200 dark:border-purple-900/50",
+              iconBg: "bg-purple-600",
+              iconText: "🎓",
+              summary: "6 Años · 30 cupos c/u"
+            }
+          }[lvl];
+
+          return (
+            <div key={lvl} className="space-y-4">
+              {/* Banner Panorámico de Nivel Educativo */}
+              <div className={cn(
+                "flex items-center justify-between p-4 sm:p-5 rounded-2xl border-l-4 shadow-2xs",
+                levelConfig.border,
+                levelConfig.bgGradient
+              )}>
+                <div className="flex items-center gap-3.5">
+                  <div className={cn(
+                    "w-11 h-11 rounded-2xl text-white flex items-center justify-center font-black text-xl shadow-xs shrink-0",
+                    levelConfig.iconBg
+                  )}>
+                    {levelConfig.iconText}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                        {levelConfig.title}
+                      </h2>
+                      <span className={cn(
+                        "text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border",
+                        levelConfig.badge
+                      )}>
+                        {levelConfig.school}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                      {levelConfig.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden sm:block text-right">
+                  <span className="text-xs font-black text-slate-800 dark:text-slate-200 block">
+                    {levelConfig.summary}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    {aulasInLevel.length} {aulasInLevel.length === 1 ? "aula activa" : "aulas activas"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Aulas del Nivel */}
+              <div className="space-y-6">
+                {aulasInLevel.map((aula) => (
+                  <AulaCard
+                    key={aula.id}
+                    id={aula.id}
+                    gradeName={aula.gradeName}
+                    level={aula.level}
+                    school={aula.school}
+                    capacity={aula.capacity}
+                    students={aula.students}
+                    forceExpandAll={forceExpandAll}
+                    onInspect={(st) => setInspectingStudent(st)}
+                    onUpdateStatus={handleUpdateStatus}
+                    onResendEmail={handleResendEmail}
+                    isSuperAdmin={isSuperAdmin}
+                    onDelete={handleDeleteStudent}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
 
         {filteredAulas.length === 0 && (
           <div className="p-12 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-400">
