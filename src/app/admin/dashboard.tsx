@@ -16,7 +16,8 @@ import {
   deleteContactMessage,
   saveGalleryItemAction,
   deleteGalleryItemAction,
-  getEnrollmentDetails
+  getEnrollmentDetails,
+  getDashboardData
 } from "@/actions/admin";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -373,6 +374,23 @@ export function AdminDashboard({
         }
       })
       .catch(() => {});
+  };
+
+  const refreshAllDashboardData = async () => {
+    fetchGlobalSettings();
+    try {
+      const res = await getDashboardData();
+      if (res && res.success) {
+        if (Array.isArray(res.enrollments)) {
+          setEnrollmentList(res.enrollments);
+        }
+        if (Array.isArray(res.contacts)) {
+          setContactList(res.contacts);
+        }
+      }
+    } catch (e) {
+      console.error("[DASHBOARD] Error al refrescar datos:", e);
+    }
   };
 
   useEffect(() => {
@@ -3245,7 +3263,7 @@ export function AdminDashboard({
           <PreinscripcionesTab
             preinscripcionesList={preinscripcionesList}
             isSuperAdmin={isSuperAdmin}
-            onRefreshData={fetchGlobalSettings}
+            onRefreshData={refreshAllDashboardData}
             onDeleteEnrollment={handleDeleteEnrollment}
           />
         )}
@@ -3256,7 +3274,7 @@ export function AdminDashboard({
             cleanStudents={consolidatedFamiliesData.cleanStudents}
             preinscripcionesList={preinscripcionesList}
             isSuperAdmin={isSuperAdmin}
-            onRefreshData={fetchGlobalSettings}
+            onRefreshData={refreshAllDashboardData}
           />
         )}
 

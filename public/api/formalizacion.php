@@ -77,7 +77,9 @@ switch ($action) {
                 if (file_exists($jsonPath)) {
                     $items = readLocalJson($jsonPath);
                     foreach ($items as $item) {
-                        if (!empty($item['formalizationToken']) && hash_equals($item['formalizationToken'], $token)) {
+                        $primary = $item['formalizationToken'] ?? '';
+                        $prevs = is_array($item['previousTokens'] ?? null) ? $item['previousTokens'] : [];
+                        if ((!empty($primary) && hash_equals($primary, $token)) || in_array($token, $prevs, true)) {
                             $row = $item;
                             break 2;
                         }
@@ -119,11 +121,11 @@ switch ($action) {
                 'parent1Email'           => $row['parent1Email'] ?? ($row['tutorEmail'] ?? ''),
                 'parent1Address'         => $row['parent1Address'] ?? '',
                 'parent1City'            => $row['parent1City'] ?? 'Esquel',
-                'parent1PostalCode'      => $row['parent1PostalCode'] ?? '9200',
+                'parent1PostalCode'      => $row['parent1PostalCode'] ?? '',
                 'isSingleParent'         => !empty($row['isSingleParent']),
                 'parent2Name'            => $row['parent2Name'] ?? '',
                 'parent2Dni'             => $row['parent2Dni'] ?? '',
-                'parent2Relationship'    => $row['parent2Relationship'] ?? 'Padre/Madre',
+                'parent2Relationship'    => $row['parent2Relationship'] ?? '',
                 'parent2Phone'           => $row['parent2Phone'] ?? '',
                 'parent2Email'           => $row['parent2Email'] ?? '',
                 'billingName'            => $row['billingName'] ?? ($row['parent1Name'] ?? ''),
@@ -184,7 +186,9 @@ switch ($action) {
                 if (file_exists($jsonPath)) {
                     $items = readLocalJson($jsonPath);
                     foreach ($items as $item) {
-                        if (!empty($item['formalizationToken']) && hash_equals($item['formalizationToken'], $token)) {
+                        $primary = $item['formalizationToken'] ?? '';
+                        $prevs = is_array($item['previousTokens'] ?? null) ? $item['previousTokens'] : [];
+                        if ((!empty($primary) && hash_equals($primary, $token)) || in_array($token, $prevs, true)) {
                             $current = $item;
                             $matchedFile = $jsonPath;
                             break 2;

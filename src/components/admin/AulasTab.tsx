@@ -87,6 +87,9 @@ export function AulasTab({
   const [inspectingStudent, setInspectingStudent] = useState<AulaStudentItem | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+  // Estado local reactivo de overrides inmediatos (optimistic updates)
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, { admissionStatus?: string; formalizationToken?: string }>>({});
+
   const getCsrfToken = () => {
     if (typeof document === "undefined") return "";
     const match = document.cookie.match(/(?:^|;\s*)fee_csrf=([^;]+)/);
@@ -110,28 +113,34 @@ export function AulasTab({
     }));
   }, [cleanStudents]);
 
-  // Convertir preinscripcionesList (aspirantes) a AulaStudentItem
+  // Convertir preinscripcionesList (aspirantes) a AulaStudentItem con overrides inmediatos
   const preinscriptosItems: AulaStudentItem[] = useMemo(() => {
-    return preinscripcionesList.map((e) => ({
-      id: e.id,
-      studentName: e.studentName,
-      studentDni: e.studentDni,
-      studentGrade: e.studentGrade,
-      studentLevel: e.studentLevel,
-      school: e.school || "Escuela N.º 1030",
-      formKind: "preinscripcion" as const,
-      admissionStatus: e.admissionStatus || "recibida",
-      formalizationToken: e.formalizationToken,
-      formalizationSignedAt: e.formalizationSignedAt,
-      isStaffChild: Boolean(e.isStaffChild),
-      hasSiblingInSchool: Boolean(e.hasSiblingInSchool),
-      englishLevelAchieved: e.englishLevelAchieved,
-      parent1Name: e.parent1Name || e.tutorName || "Tutor/a",
-      parent1Phone: e.parent1Phone || e.tutorPhone,
-      parent1Email: e.parent1Email || e.tutorEmail,
-      raw: e
-    }));
-  }, [preinscripcionesList]);
+    return preinscripcionesList.map((e) => {
+      const override = statusOverrides[e.id];
+      const admissionStatus = override?.admissionStatus || e.admissionStatus || "recibida";
+      const formalizationToken = override?.formalizationToken || e.formalizationToken;
+
+      return {
+        id: e.id,
+        studentName: e.studentName,
+        studentDni: e.studentDni,
+        studentGrade: e.studentGrade,
+        studentLevel: e.studentLevel,
+        school: e.school || "Escuela N.º 1030",
+        formKind: "preinscripcion" as const,
+        admissionStatus,
+        formalizationToken,
+        formalizationSignedAt: e.formalizationSignedAt,
+        isStaffChild: Boolean(e.isStaffChild),
+        hasSiblingInSchool: Boolean(e.hasSiblingInSchool),
+        englishLevelAchieved: e.englishLevelAchieved,
+        parent1Name: e.parent1Name || e.tutorName || "Tutor/a",
+        parent1Phone: e.parent1Phone || e.tutorPhone,
+        parent1Email: e.parent1Email || e.tutorEmail,
+        raw: e
+      };
+    });
+  }, [preinscripcionesList, statusOverrides]);
 
   // Consolidar todos los estudiantes
   const allStudents = useMemo(() => {
@@ -221,6 +230,13 @@ export function AulasTab({
   // Acción: Actualizar estado de aspirante
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     setIsProcessingAction(true);
+
+    // 1. Actualización inmediata y optimista en UI (0ms)
+    setStatusOverrides(prev => ({
+      ...prev,
+      [id]: { ...prev[id], admissionStatus: newStatus }
+    }));
+
     try {
       const res = await fetch("/api/admin.php?action=update_admission_status", {
         method: "POST",
@@ -238,12 +254,29 @@ export function AulasTab({
 
       const json = await res.json();
       if (res.ok && json.success) {
+        if (json.tokens && json.tokens[id]) {
+          setStatusOverrides(prev => ({
+            ...prev,
+            [id]: { ...prev[id], admissionStatus: newStatus, formalizationToken: json.tokens[id] }
+          }));
+        }
         if (onRefreshData) onRefreshData();
       } else {
         alert(json.error || "Error al actualizar estado de admisión.");
+        // Revertir en caso de error
+        setStatusOverrides(prev => {
+          const copy = { ...prev };
+          delete copy[id];
+          return copy;
+        });
       }
     } catch (err: any) {
       alert("Error de conexión: " + err.message);
+      setStatusOverrides(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
     } finally {
       setIsProcessingAction(false);
     }
@@ -265,6 +298,12 @@ export function AulasTab({
 
       const json = await res.json();
       if (res.ok && json.success) {
+        if (json.token) {
+          setStatusOverrides(prev => ({
+            ...prev,
+            [id]: { ...prev[id], formalizationToken: json.token }
+          }));
+        }
         if (json.mailSent) {
           alert("¡Correo de formalización enviado exitosamente a la familia!");
         } else {
