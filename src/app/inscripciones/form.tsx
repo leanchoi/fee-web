@@ -52,7 +52,10 @@ const MONTH_NAMES = [
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
 ];
 
-export function EnrollmentForm() {
+export function EnrollmentForm({ isDirectAccess = false }: { isDirectAccess?: boolean }) {
+  // Determinar si es acceso directo deslistado (ej. /reinscripciones)
+  const isDirect = isDirectAccess || (typeof window !== "undefined" && window.location.pathname.includes("reinscripciones"));
+
   // Estado del formulario
   const [formData, setFormData] = useState<EnrollmentContractData>({
     studentName: "",
@@ -112,6 +115,12 @@ export function EnrollmentForm() {
   const [closedMessage, setClosedMessage] = useState("");
 
   useEffect(() => {
+    // Si es acceso directo para rezagados, la convocatoria permanece SIEMPRE habilitada
+    if (isDirect) {
+      setIsConvocatoriaAbierta(true);
+      return;
+    }
+
     fetch("/api/settings.php", { credentials: "same-origin" })
       .then(res => res.json())
       .then(data => {
@@ -121,7 +130,7 @@ export function EnrollmentForm() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isDirect]);
 
   // Cursos disponibles para el nivel seleccionado
   const currentLevel = (formData.studentLevel as keyof typeof LEVEL_CONFIG) || "Nivel Inicial";
@@ -370,7 +379,7 @@ export function EnrollmentForm() {
         contractAccepted: true,
         dataAccepted: true,
         termsAccepted: true,
-        isDirectAccess: true,
+        isDirectAccess: isDirect,
         studentLevel: formData.studentLevel || determineLevel(formData.studentGrade, formData.school),
         school: formData.school || determineSchool(formData.studentLevel || "Nivel Primario")
       });
@@ -1288,8 +1297,8 @@ export function EnrollmentForm() {
       {/* MODAL DE LECTURA DEL CONTRATO COMPLETO (23 CLÁUSULAS ÍNTEGRAS) */}
       {/* ======================================================== */}
       {isContractModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 pt-10 sm:pt-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 max-h-[90dvh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             {/* Header Modal */}
             <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-3xl">
               <div className="flex items-center gap-3">
@@ -1688,8 +1697,8 @@ export function EnrollmentForm() {
       {/* MODAL DE REVISIÓN PREVIA ANTES DE ENVIAR */}
       {/* ======================================================== */}
       {isReviewModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 pt-10 sm:pt-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 max-h-[90dvh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50 rounded-t-3xl">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold">

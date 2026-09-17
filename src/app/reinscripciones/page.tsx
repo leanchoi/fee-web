@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { EnrollmentForm } from "../inscripciones/form";
+import { ReinscripcionesClient } from "./ReinscripcionesClient";
 import { AlertTriangle } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -56,7 +56,7 @@ export default function ReinscripcionesPage() {
           </div>
 
           <div className="bg-white rounded-3xl p-6 sm:p-10 md:p-12 shadow-xl border border-slate-200/80">
-            <EnrollmentForm />
+            <ReinscripcionesClient />
           </div>
         </div>
       </section>
