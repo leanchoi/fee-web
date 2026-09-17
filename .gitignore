@@ -25,6 +25,9 @@ scripts/drive_dump.html
 
 # private config and backups
 fee-config.php
+api/env.php
+public/api/env.php
+env.php
 api/data/*.json
 public/api/data/*.json
 

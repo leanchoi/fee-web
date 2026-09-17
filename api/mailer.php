@@ -15,10 +15,10 @@ function getSmtpConfig(): array {
     return [
         'host'      => $env['SMTP_HOST'] ?? 'smtp.gmail.com',
         'port'      => (int)($env['SMTP_PORT'] ?? 587),
-        'user'      => $env['SMTP_USER'] ?? 'noresponder-fee@gmail.com',
+        'user'      => $env['SMTP_USER'] ?? 'noresponder.fee@gmail.com',
         'pass'      => $env['SMTP_PASS'] ?? '', // Contraseña de aplicación de 16 caracteres
         'from_name' => $env['SMTP_FROM_NAME'] ?? 'Fundación Educativa Esquel',
-        'from_mail' => $env['SMTP_FROM_EMAIL'] ?? ($env['SMTP_USER'] ?? 'noresponder-fee@gmail.com'),
+        'from_mail' => $env['SMTP_FROM_EMAIL'] ?? ($env['SMTP_USER'] ?? 'noresponder.fee@gmail.com'),
         'secure'    => $env['SMTP_SECURE'] ?? 'tls', // 'tls' (587) o 'ssl' (465)
     ];
 }
